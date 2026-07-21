@@ -1,0 +1,99 @@
+---
+# rules/tax_rules.yaml
+# Metadata and normative intelligence for fiscal calculations.
+# Use Decimal strings (two decimal places) to preserve precision in parsing.
+# Placeholders and bracket limits based on 2025 references — ALERT: review/update for 2026.
+metadata:
+  year: 2026
+  version: "1.0"
+  valid_from: "2026-01-01"
+  note: |
+    Valores e faixas referenciadas com base em 2025. Atualizar limites e deduções
+    para 2026 quando publicações oficiais estiverem disponíveis.
+
+# IRRF: tabela progressiva com 5 faixas (limites aproximados 2025).
+# Baseado nas regras de retenção do IRRF e nas instruções normativas aplicáveis.
+irrf_table:
+  description: "Tabela IRRF progressiva — valores em BRL (strings para Decimal parsing)."
+  # Base legal: Lei nº 7.713/1988, alterações e instruções da RFB
+  bands:
+    - lower: "0.00"
+      upper: "1903.98"
+      rate: "0.00"
+      deduction: "0.00"
+      comment: "Isento — faixa inicial (referência 2025)."
+    - lower: "1903.99"
+      upper: "2826.65"
+      rate: "7.50"
+      deduction: "142.80"
+      comment: "Alíquota 7,5% (referência 2025)."
+    - lower: "2826.66"
+      upper: "3751.05"
+      rate: "15.00"
+      deduction: "354.80"
+      comment: "Alíquota 15% (referência 2025)."
+    - lower: "3751.06"
+      upper: "4664.68"
+      rate: "22.50"
+      deduction: "636.13"
+      comment: "Alíquota 22,5% (referência 2025)."
+    - lower: "4664.69"
+      upper: "9999999999.99"
+      rate: "27.50"
+      deduction: "869.36"
+      comment: "Alíquota máxima 27,5% (referência 2025)."
+  dependent_deduction: "189.59"   # por dependente (referência 2025)
+  simplified_deduction: "528.00"  # dedução simplificada (quando aplicável)
+
+# INSS do Empregado: contribuições progressivas por faixas.
+# Base legal: Lei 8.212/1991 e alterações (contribuição previdenciária)
+employee_inss_table:
+  description: "Tabela INSS empregado — alíquotas progressivas (strings para Decimal)."
+  note: "Alíquotas 7.5%, 9%, 12%, 14% — faixas indicativas para 2025; revisar 2026."
+  bands:
+    - lower: "0.00"
+      upper: "1320.00"
+      rate: "7.50"
+      comment: "Faixa inferior — 7,5% (placeholder 2025)."
+    - lower: "1320.01"
+      upper: "2571.29"
+      rate: "9.00"
+      comment: "Faixa 2 — 9% (placeholder 2025)."
+    - lower: "2571.30"
+      upper: "3856.94"
+      rate: "12.00"
+      comment: "Faixa 3 — 12% (placeholder 2025)."
+    - lower: "3856.95"
+      upper: "7507.49"
+      rate: "14.00"
+      comment: "Faixa 4 — 14% (placeholder 2025)."
+  ceiling: "8157.41"  # Teto INSS — acordo/portaria vigente (2025/placeholder)
+
+# Encargos e Multas trabalhistas / previdenciárias
+charges_and_fines:
+  ceiling_inss: "8157.41"     # teto INSS (reafirmação)
+  prolabore_rate: "11.00"     # alíquota pró-labore (percentual)
+  fgts:
+    standard_rate: "8.00"     # FGTS padrão (percentual)
+    apprentice_rate: "2.00"   # Aprendiz
+    fines:
+      fgts_fine_standard: "40.00"  # multa padrão — 40% (rescisão sem acordo)
+      fgts_fine_agreed: "20.00"    # multa reduzida — 20% (Art. 484-A CLT, acordo)
+      legal_ref: "Art. 484-A CLT"
+
+# Adicionais e verbas trabalhistas
+additions:
+  hora_extra_min: "50.00"       # percentual adicional por hora extra mínima
+  adicional_noturno: "20.00"   # adicional noturno percentual
+  insalubridade:
+    min: "10.00"
+    med: "20.00"
+    max: "40.00"
+    legal_ref: "NR-15 / CLT"
+  periculosidade: "30.00"       # percentual de periculosidade
+  transferencia_provisoria: "25.00"
+
+# Observações finais e regras de parsing
+notes:
+  decimals: "Todos os valores devem ser parseados como Decimal para evitar erros de ponto flutuante."
+  update_alert: "Revisar faixas e deduções em 2026 quando normas atualizadas forem publicadas."

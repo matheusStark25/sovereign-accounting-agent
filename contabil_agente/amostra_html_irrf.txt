@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-br" xml:lang="pt-br">
+
+<head>
+    <meta charset="utf-8" />
+  <!-- Google Tag Manager -->
+  <script type="text">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-NHZSKTD');</script>
+  <!-- End Google Tag Manager -->
+
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "url": "https://www.gov.br/receitafederal",
+            "logo": "https://www.gov.br/receitafederal/logo.png"
+        }</script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "url": "https://www.gov.br/receitafederal",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://www.gov.br/receitafederal/search?SearchableText={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+        }</script>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    
+        <base href="https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/tributos/irpf-imposto-de-renda-pessoa-fisica" /><!--[if lt IE 7]></base><![endif]-->
+    
+
+    
+        <meta property="og:title" content="IRPF (Imposto sobre a renda das pessoas físicas)" />
+<meta property="og:description" content="Incide sobre a renda e os proventos de contribuintes residentes no País ou residentes no exterior que recebam rendimentos de fontes no Brasil. Apresenta alíquotas variáveis conforme a renda dos contribuintes, de forma que os de menor renda não sejam alcançados pela tributação." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/tributos/irpf-imposto-de-renda-pessoa-fisica" />
+<meta property="og:image" content="https://www.gov.br/receitafederal/logo.png" />
+
+<meta property="og:locale" content="pt_BR" />
+<meta property="og:site_name" content="Receita Federal " />
+
+
+  
+
+  
+  
+  <script type="text">
+    (function() {
+        var po = document.createElement('script');
+        po.async = true;
+        po.src = document.location.protocol + '//connect.facebook.net/pt_BR/all.js#xfbml=1';
+        var head = document.getElementsByTagName('head')[0];
+        head.appendChild(po);
+    }());
+    </script>
+
+
+
+  
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@" />
+  
+
+
+
+
+<meta name="description" content="Incide sobre a renda e os proventos de contribuintes residentes no País ou residentes no exterior que recebam rendimentos de fontes no Brasil. Apresenta alíquotas variáveis conforme a renda dos contribuintes, de forma que os de menor renda não sejam alcançados pela tributação." />
+<meta property="creator.productor" content="https://www.gov.br/fazenda" />
+
+
+
+  
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/reset-cachekey-f7754e39b2853ad8b1f19540b86143be.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/base-cachekey-a097df0235196de339fa73021e6aaa4f.css" />
+    <style type="text/css" media="screen">@import url(https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/resourceplone.app.jquerytools.dateinput-cachekey-fd7b9d1ac1b6026a95ca63aba784b8db.css);</style>
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/resourceplone.formwidget.datetimestyles-cachekey-47eeacdcfef4271a432509956e0264c8.css" />
+    <style type="text/css" media="screen">@import url(https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/jquery.autocomplete-cachekey-352a8f74652ade317efdf049e28c39c9.css);</style>
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/embedder-cachekey-9f15fd3a7abf217c62b97a377c83d14f.css" media="screen" />
+    <style type="text/css" media="screen">@import url(https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/resourcecollective.pollscsscollective.polls-cachekey-7c8f0bac5998b0bd2b397cc1d2bec530.css);</style>
+        <!--[if lt IE 8]>    
+    
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/IEFixes-cachekey-753b5733d85c1e31fa4e6f646c761fa3.css" media="screen" />
+        <![endif]-->
+    
+    <style type="text/css" media="all">@import url(https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/resourcepas.plugins.loginunicologinunico-cachekey-26917cf5efa4ed3e9d742d1253662d4e.css);</style>
+    <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/Swiper/3.4.2/css/swiper.min.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/resourcelgpd.plugindsgov.min-cachekey-921e1be23b656a83f7b4a168f133e2b1.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/receitafederal/portal_css/Sunburst%20Theme/resourcegovbr.policycanais-cachekey-cf24b972f930d484fa941b815f1c8dab.css" />
+
+  
+  
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcegovbr.policybrowser-update-cachekey-68186dae5008ca2a81aa1809d3d24a92.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourceplone.app.jquery-cachekey-6e51798259951a2dffa9e33b8055110c.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcegovbr.policyfolder_contents-cachekey-fe7f06e13dbc773fd7f03cad5dcfcad7.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcegovbr.policycookiebar_1_3_56-cachekey-0cfb62be109aea8eafe58fe484b4b9a9.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcegovbr.policyapplication_cookiebar_1_3_56-cachekey-ae6fd42dcaf11c2083772cf655c01524.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/collective.js.jqueryui.custom.min-cachekey-55601531e6a251870636dc08e77bdf5d.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourceplone.formwidget.recurrencejquery.tmpl-beta1-cachekey-79e60c11c6dc8b8db8cd4c582aeb09f3.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcecollective.js.bootstrapjsbootstrap.min-cachekey-58a894c130f56fcf6ca631f72e8a9a5d.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcecollective.coverjsmain-cachekey-43bec82a2044caf9721cb2be620dc8be.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcebrasil.gov.tilesvendorjquery.jplayer.min-cachekey-4ff081f2435eece0481bf1a1aea654f7.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcedropdown-menu-cachekey-7a0a2636e1ec6fd584f988ce7f8be68e.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/Swiper/3.4.2/js/swiper.min.js"></script>
+    <script type="text/javascript"></script>
+    <script type="text/javascript"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcelgpd.pluginchangeCookieImage-cachekey-bd35b0fa21614848a617ea475eb7503e.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/resourcelgpd.pluginblock_cookies-cachekey-cfb2193ea82e06313e0635eaf4d03011.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/receitafederal/portal_javascripts/Sunburst%20Theme/++resource++govbr.recomendacao/govbr.recom.c339e72c8ffbb2f6c087.js"></script>
+
+
+
+  <link rel="stylesheet" href="https://www.gov.br/receitafederal/++resource++brasil.gov.agenda/brasilgovagenda-720c34e.css" />
+
+
+  <script defer="defer" src="https://www.gov.br/receitafederal/++resource++brasil.gov.agenda/brasilgovagenda-720c34e.js"></script>
+
+
+
+  <link rel="stylesheet" href="https://www.gov.br/receitafederal/++resource++brasil.gov.portal/brasilgovportal-ee510e4.css" />
+
+
+  <script defer="defer" src="https://www.gov.br/receitafederal/++resource++brasil.gov.portal/brasilgovportal-ee510e4.js"></script>
+
+
+
+<title>IRPF (Imposto sobre a renda das pessoas físicas) — Receita Federal </title>
+<link rel="http://purl.org/dc/terms/subject http://schema.org/about http://xmlns.com/foaf/0.1/primaryTopic" href="http://vocab.e.gov.br/2011/03/vcge#esquema" />
+        
+    <link rel="author" href="https://www.gov.br/receitafederal/pt-br" title="Informações do Autor" />
+
+    <link rel="canonical" href="https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/tributos/irpf-imposto-de-renda-pessoa-fisica" />
+
+    
+    
+
+
+<script type="text/javascript">
+        jQuery(function($){
+            if (typeof($.datepicker) != "undefined"){
+              $.datepicker.setDefaults(
+                jQuery.extend($.datepicker.regional['pt-BR'],
+                {dateFormat: 'dd/mm/yy'}));
+            }
+        });
+        </script>
+
+
+
+
+    <link rel="search" h

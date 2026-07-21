@@ -1,0 +1,420 @@
+# Operational steps with realistic selectors and failure rules.
+# Types: click_css, type_css, wait_for_text, upload_file, sedif_parse, download_xml, validate_xml_schema, confirm_modal
+steps:
+  - id: 1
+    name: open_legacy_app
+    timeout: 60
+    type: launch_app
+    selector: {exe: "C:\\Program Files\\LegacySintegra\\sintegra.exe"}
+    screenshot_on_start: true
+    on_failure: retry
+
+  - id: 2
+    name: focus_main_window
+    timeout: 15
+    type: wait_for_text
+    selector: {text: "Sintegra - Consulta", timeout: 10}
+    screenshot_on_start: false
+    on_failure: abort_and_clean
+
+  - id: 3
+    name: navigate_to_import
+    timeout: 30
+    type: click_css
+    selector: {css: "#menu > li.import > a"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 4
+    name: select_file_dialog
+    timeout: 20
+    type: click_css
+    selector: {css: "button.open-file"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 5
+    name: upload_sedif_text
+    timeout: 60
+    type: upload_file
+    selector: {css: "input[type=file]", allowed_extensions: [".txt"]}
+    screenshot_on_start: true
+    on_failure: abort_and_clean
+
+  - id: 6
+    name: confirm_upload
+    timeout: 20
+    type: click_css
+    selector: {css: "button.confirm-upload"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 7
+    name: wait_import_complete
+    timeout: 60
+    type: wait_for_text
+    selector: {text: "Importação finalizada", timeout: 45}
+    screenshot_on_start: false
+    on_failure: screenshot_and_continue
+
+  - id: 8
+    name: validate_screen_data
+    timeout: 25
+    type: assert_text
+    selector: {css: ".summary .cnpj", regex: "\\d{14}"}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 9
+    name: extract_summary
+    timeout: 15
+    type: scrape
+    selector: {css: ".summary"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 10
+    name: open_ted_module
+    timeout: 30
+    type: click_css
+    selector: {css: "#menu > li.ted > a"}
+    screenshot_on_start: true
+    on_failure: abort_and_clean
+
+  - id: 11
+    name: ted_prepare
+    timeout: 30
+    type: wait_for_text
+    selector: {text: "TED - Envio", timeout: 20}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 12
+    name: ted_fill_fields
+    timeout: 40
+    type: type_css
+    selector: {fields: [{css: "#nome", from: "payload.nome"}, {css: "#cnpj", from: "payload.cnpj"}]}
+    screenshot_on_start: false
+    on_failure: screenshot_and_continue
+
+  - id: 13
+    name: ted_send
+    timeout: 40
+    type: click_css
+    selector: {css: "button.send-ted"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 14
+    name: wait_ted_ack
+    timeout: 45
+    type: wait_for_text
+    selector: {text: "Protocolo gerado", timeout: 40}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 15
+    name: open_sedif_import
+    timeout: 20
+    type: click_css
+    selector: {css: "#menu > li.sedif > a"}
+    screenshot_on_start: true
+    on_failure: retry
+
+  - id: 16
+    name: sedif_import_preview
+    timeout: 30
+    type: wait_for_text
+    selector: {text: "Visualização do SEDIF", timeout: 20}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 17
+    name: sedif_apply_mappings
+    timeout: 25
+    type: click_css
+    selector: {css: "button.apply-mapping"}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 18
+    name: sedif_validate_fields
+    timeout: 30
+    type: assert_text
+    selector: {css: ".validation .ok", count_min: 1}
+    screenshot_on_start: false
+    on_failure: screenshot_and_continue
+
+  - id: 19
+    name: sedif_finalize_import
+    timeout: 20
+    type: click_css
+    selector: {css: "button.finalize"}
+    screenshot_on_start: false
+    on_failure: abort_and_clean
+
+  - id: 20
+    name: export_xml
+    timeout: 40
+    type: download_xml
+    selector: {css: "a.export-xml", expect_extension: ".xml"}
+    screenshot_on_start: true
+    on_failure: retry
+
+  - id: 21
+    name: validate_xml_schema
+    timeout: 30
+    type: validate_xml_schema
+    selector: {schema: "sefaz_nfe_v1.xsd"}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 22
+    name: persist_xml
+    timeout: 20
+    type: persist
+    selector: {dest: "db:xml_documents"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 23
+    name: evidence_capture
+    timeout: 10
+    type: screenshot
+    selector: {region: "full"}
+    screenshot_on_start: true
+    on_failure: screenshot_and_continue
+
+  # SEDIF/text processing and post-processing steps (24-44)
+  - id: 24
+    name: sedif_parse
+    timeout: 25
+    type: sedif_parse
+    selector: {}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 25
+    name: cross_field_validation
+    timeout: 20
+    type: validate_payload
+    selector: {}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 26
+    name: generate_fiscal_entries
+    timeout: 30
+    type: business_rule
+    selector: {rule: "gen_financ"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 27
+    name: notify_compliance
+    timeout: 15
+    type: emit_event
+    selector: {topic: "compliance.queue"}
+    screenshot_on_start: false
+    on_failure: screenshot_and_continue
+
+  - id: 28
+    name: sign_documents
+    timeout: 40
+    type: signature
+    selector: {method: "local_keystore"}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 29
+    name: upload_to_repo
+    timeout: 30
+    type: upload
+    selector: {dest: "s3://evidence-bucket/"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 30
+    name: finalize_accounting
+    timeout: 20
+    type: finalize
+    selector: {}
+    screenshot_on_start: true
+    on_failure: retry
+
+  # Finalization, cleanup, and safe termination
+  - id: 31
+    name: post_process_checks
+    timeout: 20
+    type: assert_text
+    selector: {css: ".status.final"}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 32
+    name: backup_evidence
+    timeout: 30
+    type: persist
+    selector: {dest: "archive"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 33
+    name: cleanup_temp
+    timeout: 15
+    type: cleanup
+    selector: {path: "./work/{{cnpj}}"}
+    screenshot_on_start: false
+    on_failure: screenshot_and_continue
+
+  - id: 34
+    name: update_registry
+    timeout: 20
+    type: emit_event
+    selector: {topic: "registry.update"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 35
+    name: safe_terminate_children
+    timeout: 25
+    type: safe_terminate
+    selector: {}
+    screenshot_on_start: true
+    on_failure: safe_terminate
+
+  - id: 36
+    name: final_record
+    timeout: 10
+    type: persist
+    selector: {dest: "db:processamentos", final_state: "FINALIZADO"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 37
+    name: audit_log
+    timeout: 10
+    type: audit
+    selector: {}
+    screenshot_on_start: false
+    on_failure: continue
+
+  - id: 38
+    name: send_notifications
+    timeout: 20
+    type: notify
+    selector: {channels: ["email", "slack"]}
+    screenshot_on_start: false
+    on_failure: screenshot_and_continue
+
+  - id: 39
+    name: post_archive_cleanup
+    timeout: 15
+    type: cleanup
+    selector: {path: "./archives/old"}
+    screenshot_on_start: false
+    on_failure: continue
+
+  - id: 40
+    name: health_probe
+    timeout: 10
+    type: wait_for_text
+    selector: {text: "OK"}
+    screenshot_on_start: true
+    on_failure: abort_and_clean
+
+  - id: 41
+    name: metadata_index
+    timeout: 15
+    type: persist
+    selector: {dest: "search.index"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 42
+    name: finalize_evidence
+    timeout: 10
+    type: persist
+    selector: {dest: "db:documents"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 43
+    name: finish_workflow
+    timeout: 8
+    type: finalize
+    selector: {}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 44
+    name: safe_checkpoint
+    timeout: 6
+    type: persist
+    selector: {dest: "db:processamentos", final_state: "CHECKPOINTED"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 45
+    name: telemetry_flush
+    timeout: 6
+    type: emit_metrics
+    selector: {}
+    screenshot_on_start: false
+    on_failure: continue
+
+  - id: 46
+    name: archive_logs
+    timeout: 10
+    type: persist
+    selector: {dest: "logs:archive"}
+    screenshot_on_start: false
+    on_failure: continue
+
+  - id: 47
+    name: garbage_collect
+    timeout: 12
+    type: cleanup
+    selector: {path: "./temp"}
+    screenshot_on_start: false
+    on_failure: continue
+
+  - id: 48
+    name: finalize_signatures
+    timeout: 20
+    type: signature
+    selector: {method: "external_hsm"}
+    screenshot_on_start: false
+    on_failure: mark_manual_review
+
+  - id: 49
+    name: publish_events
+    timeout: 15
+    type: emit_event
+    selector: {topic: "workflow.completed"}
+    screenshot_on_start: false
+    on_failure: retry
+
+  - id: 50
+    name: final_audit
+    timeout: 10
+    type: audit
+    selector: {}
+    screenshot_on_start: true
+    on_failure: continue
+
+  - id: 51
+    name: finalize_cleanup
+    timeout: 8
+    type: cleanup
+    selector: {path: "./work/{{cnpj}}"}
+    screenshot_on_start: false
+    on_failure: continue
+
+  - id: 52
+    name: finalize_record
+    timeout: 20
+    type: finalize
+    selector: {final_state: "FINALIZADO"}
+    screenshot_on_start: false
+    on_failure: safe_terminate

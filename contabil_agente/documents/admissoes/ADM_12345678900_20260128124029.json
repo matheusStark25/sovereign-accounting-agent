@@ -1,0 +1,145 @@
+{
+  "processo_id": "ADM_12345678900_20260128124029",
+  "status_geral": "em_andamento",
+  "funcionario": {
+    "nome": "João Teste",
+    "cpf": "123.456.789-00",
+    "cargo": "Analista",
+    "data_admissao": "01/02/2026",
+    "salario": "5000",
+    "departamento": "TI",
+    "contato": {}
+  },
+  "checklist_documentos": [
+    {
+      "item": "RG ou CNH (original e cópia)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "CPF (original e cópia)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Título de Eleitor (se aplicável)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Certidão de Nascimento ou Casamento",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Comprovante de Residência (até 3 meses)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Carteira de Trabalho (CTPS)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "PIS/PASEP (se já tiver)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Certificado de Reservista (homens)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Cartão do SUS",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Foto 3x4 (2 vias)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Certidão de Nascimento dos filhos (se houver)",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Carteira de Vacinação dos filhos menores de 7 anos",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Comprovante de escolaridade",
+      "status": "pendente",
+      "observacao": ""
+    },
+    {
+      "item": "Dados bancários (para depósito)",
+      "status": "pendente",
+      "observacao": ""
+    }
+  ],
+  "etapas_processo": [
+    {
+      "etapa": "Triagem de documentos",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Exame médico admissional (ASO)",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Cadastro no eSocial (S-2200)",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Registro em CTPS (físico ou digital)",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Cadastro de benefícios (VT, VR, VA, plano de saúde)",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Entrega de EPI (se aplicável)",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Integração e treinamento inicial",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Assinatura de contrato de trabalho",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    },
+    {
+      "etapa": "Entrega de crachá e controle de ponto",
+      "status": "pendente",
+      "data_conclusao": null,
+      "responsavel": ""
+    }
+  ],
+  "criado_em": "28/01/2026 12:40:29",
+  "atualizado_em": "28/01/2026 12:40:29",
+  "pendencias": [],
+  "observacoes": []
+}

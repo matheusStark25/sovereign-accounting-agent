@@ -1,0 +1,64 @@
+---
+# rules/compliance_rules.yaml
+# Diretrizes de compliance, segurança e integridade para cálculos trabalhistas.
+# Comentários legais e trava contra violações da CLT e falhas de cálculo.
+
+metadata:
+  year: 2026
+  version: "1.0"
+  valid_from: "2026-01-01"
+  note: |
+    Regras de compliance para evitar descontos indevidos, cálculos incorretos e
+    violações contratuais/CLT. Revisar legalmente conforme atualizações normativas.
+
+# General & Limits
+# Baseado na Consolidação das Leis do Trabalho (CLT) e legislação correlata.
+general:
+  minimum_wage: "1412.00"           # Salário mínimo de referência (BRL)
+  vt_max_discount: "6.00"           # Vale-transporte máximo descontável (Lei 7.418/85)
+  max_discount_total: "70.00"       # Percentual máximo total de descontos
+  alimony_max_percent: "30.00"      # Pensão alimentícia máxima percentual aplicada
+  lock_on_calculation_error: true     # Trava: bloquear processamento em erro de cálculo
+
+# Audit & eSocial
+audit:
+  alert_threshold_termination: "15000.00"  # valor que aciona alerta em desligamentos
+  mandatory_eSocial_events:
+    - "S-1200"
+    - "S-2200"
+    - "S-2230"
+    - "S-2299"
+  require_double_check_for_cause: true
+  legal_refs: |
+    - CLT
+    - eSocial technical documentation
+
+# Integrity Checks
+integrity:
+  mandatory_fields:
+    - "cbo"
+    - "pis"
+    - "cpf"
+    - "rg"
+    - "data_admissao"
+    - "data_demissao"
+  require_cpf_for_dependents: true
+  block_negative_net_pay: true
+  minimum_wage_enforcement: true
+
+# Security locks and Golden Rule
+# Regra de Ouro: proteger empregado e evitar qualquer cálculo que viole CLT
+golden_rule:
+  description: "Nenhum processamento deve resultar em descontos ou situações que violem CLT."
+  enforcement_actions:
+    - "halt_and_alert"
+    - "require_manual_review"
+  comments: |
+    # Baseado na CLT e princípios constitucionais de proteção ao trabalho.
+    # Implementar logs de auditoria e evidências (hash de inputs/outputs).
+
+# Developer / Operational notes
+notes:
+  parse_as_decimal: true
+  fail_safe: "on_error_lock_calculation"
+  update_note: "Revisar percentuais e limites conforme alterações legislativas e convenções coletivas."

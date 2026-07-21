@@ -1,0 +1,13 @@
+{
+  "gps_id": "GPS_2100_012026_20260128124028",
+  "codigo_pagamento": "2100",
+  "descricao_codigo": "Contribuinte Individual - Recolhimento Mensal",
+  "competencia": "01/2026",
+  "identificador": "12345678000190",
+  "nome_contribuinte": "Empresa Teste LTDA",
+  "tipo_contribuinte": "empresa",
+  "valor": "550.00",
+  "data_vencimento": "20/02/2026",
+  "gerado_em": "28/01/2026 12:40:28",
+  "status": "pendente"
+}

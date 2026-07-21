@@ -1,0 +1,24 @@
+{"ts": "2026-04-01T19:02:50.463918+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.463918+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.466119+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.467123+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.467123+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.468132+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.468132+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.469173+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.469173+00:00", "event": "job_created", "session": "200fce12b32a4b8da5140f5737af6402", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.476441+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.481723+00:00", "event": "job_created", "session": "0fd4bf31715b45d4add73265b9672528", "job_id": "2f49143dd26142b9b396624a51754651"}
+{"ts": "2026-04-01T19:02:50.489662+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.500401+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.512357+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.526196+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.537851+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.550419+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.562188+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.573961+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:50.586200+00:00", "event": "job_completed", "job_id": "65c2220ab5724f97a53effba7a51e00c"}
+{"ts": "2026-04-01T19:02:52.006590+00:00", "event": "job_dead_lettered", "job_id": "2f49143dd26142b9b396624a51754651", "reason": "timeout"}
+{"ts": "2026-04-01T19:02:52.367443+00:00", "event": "validation_failed_format", "session": "bad!!"}
+{"ts": "2026-04-01T19:02:52.379537+00:00", "event": "prompt_injection", "session": "abcdef12abcd3456"}
+{"ts": "2026-04-01T19:02:52.394085+00:00", "event": "auth_failed_chat"}

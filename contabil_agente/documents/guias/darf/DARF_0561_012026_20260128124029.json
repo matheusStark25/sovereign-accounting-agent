@@ -1,0 +1,17 @@
+{
+  "darf_id": "DARF_0561_012026_20260128124029",
+  "codigo_receita": "0561",
+  "descricao": "IRRF - Imposto de Renda Retido na Fonte",
+  "competencia": "01/2026",
+  "cnpj": "12345678000190",
+  "razao_social": "Empresa Teste",
+  "valores": {
+    "principal": "342.26",
+    "multa": "0.00",
+    "juros": "0.00",
+    "total": "342.26"
+  },
+  "data_vencimento": "20/02/2026",
+  "gerado_em": "28/01/2026 12:40:29",
+  "status": "pendente"
+}

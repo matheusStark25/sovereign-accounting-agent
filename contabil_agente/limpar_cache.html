@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>🔄 Limpando Cache...</title>
+    <script>
+        // FORÇA limpeza de cache e reload
+        window.onload = function () {
+            // Limpa cache do navegador via JavaScript
+            if ('caches' in window) {
+                caches.keys().then(function (names) {
+                    names.forEach(function (name) {
+                        caches.delete(name);
+                    });
+                });
+            }
+
+            // Redireciona com timestamp para forçar novo request
+            const url = '/adaptada?' + new Date().getTime();
+            window.location.replace(url);
+        };
+    </script>
+</head>
+
+<body
+    style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial;background:#1e40af;color:white;">
+    <div style="text-align:center;">
+        <h1>🔄 Limpando cache...</h1>
+        <p>Redirecionando em instantes...</p>
+    </div>
+</body>
+
+</html>

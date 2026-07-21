@@ -1,0 +1,45 @@
+# === Minimal Dependencies for Python 3.14 ===
+# Core backend já instalado
+flask==2.3.3
+flask-cors==4.0.0
+flask-socketio==5.3.4
+gunicorn==21.2.0
+
+# AI/LLM - versão simples
+groq>=0.3.0
+
+# Database
+redis==5.0.0
+
+# PDF Generation
+reportlab==4.0.4
+PyPDF2==3.0.1
+qrcode==7.4.2
+python-barcode==0.15.1
+
+# Data Processing - usa numpy 2.x nativo do Python 3.14
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# Security
+PyJWT==2.8.0
+cryptography==41.0.4
+
+# Utils - já instalados
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+python-dateutil>=2.8.0
+pytz>=2023.0
+
+# Scheduling
+apscheduler==3.10.4
+
+# Audio (opcional - comentado se não precisar)
+# SpeechRecognition==3.10.0
+# pyttsx3==2.90
+
+# Monitoring
+psutil==5.9.5
+
+# Cloud (opcional - comentado se não precisar)
+# boto3==1.28.57

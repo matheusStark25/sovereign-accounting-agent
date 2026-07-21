@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pt-br" xml:lang="pt-br">
+
+<head>
+    <meta charset="utf-8" />
+  <!-- Google Tag Manager -->
+  <script type="text">(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-NHZSKTD');</script>
+  <!-- End Google Tag Manager -->
+
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "url": "https://www.gov.br/inss",
+            "logo": "https://www.gov.br/inss/logo.png"
+        }</script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "url": "https://www.gov.br/inss",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://www.gov.br/inss/search?SearchableText={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+        }</script>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    
+        <base href="https://www.gov.br/inss/pt-br/direitos-e-deveres/inscricao-e-contribuicao/tabela-de-contribuicao-mensal" /><!--[if lt IE 7]></base><![endif]-->
+    
+
+    
+        <meta property="og:title" content="Tabela de contribuição mensal" />
+<meta property="og:description" content="" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://www.gov.br/inss/pt-br/direitos-e-deveres/inscricao-e-contribuicao/tabela-de-contribuicao-mensal/tabela-de-contribuicao-mensal" />
+<meta property="og:image" content="https://www.gov.br/inss/logo.png" />
+
+<meta property="og:locale" content="pt_BR" />
+<meta property="og:site_name" content="Instituto Nacional do Seguro Social - INSS" />
+
+
+  
+
+  
+  
+  <script type="text">
+    (function() {
+        var po = document.createElement('script');
+        po.async = true;
+        po.src = document.location.protocol + '//connect.facebook.net/pt_BR/all.js#xfbml=1';
+        var head = document.getElementsByTagName('head')[0];
+        head.appendChild(po);
+    }());
+    </script>
+
+
+
+  
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@" />
+  
+
+
+
+
+
+<meta property="creator.productor" content="https://www.gov.br/previdencia/pt-br" />
+
+
+
+  
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/reset-cachekey-c8d7bbfe6df8c4a5b70731d8e593d071.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/base-cachekey-e66dba888996ecae3ff7854a28e5b0a1.css" />
+    <style type="text/css" media="screen">@import url(https://www.gov.br/inss/portal_css/Sunburst%20Theme/resourceplone.app.jquerytools.dateinput-cachekey-1630b2ec956e8864ea1d822c37e23943.css);</style>
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/resourceplone.formwidget.datetimestyles-cachekey-bc198afec83516a4aa6efa240e1ec280.css" />
+    <style type="text/css" media="screen">@import url(https://www.gov.br/inss/portal_css/Sunburst%20Theme/jquery.autocomplete-cachekey-d8d89d53932a2dab42bfe2ca8c592d55.css);</style>
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/embedder-cachekey-16dbda29f6c099c32b6f805c8b0efb04.css" media="screen" />
+    <style type="text/css" media="screen">@import url(https://www.gov.br/inss/portal_css/Sunburst%20Theme/resourcecollective.pollscsscollective.polls-cachekey-61372162acd9b45588ed7a05f137a35f.css);</style>
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/ploneCustom-cachekey-a9647793f0eb13a2c9159c287dca1357.css" />
+        <!--[if lt IE 8]>    
+    
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/IEFixes-cachekey-bcbb765f1f3ac422149c4c4251b62cf6.css" media="screen" />
+        <![endif]-->
+    
+    <style type="text/css" media="all">@import url(https://www.gov.br/inss/portal_css/Sunburst%20Theme/resourcepas.plugins.loginunicologinunico-cachekey-6ad2288dbabf6dbf9fab4df73efd8dbe.css);</style>
+    <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/Swiper/3.4.2/css/swiper.min.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/resourcelgpd.plugindsgov.min-cachekey-3e7a5efa8479b9719eb4c63e66736b4e.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="https://www.gov.br/inss/portal_css/Sunburst%20Theme/resourcegovbr.policycanais-cachekey-fea79c01904f82a9e6febb0dab6ea1c9.css" media="screen" />
+
+  
+  
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcegovbr.policybrowser-update-cachekey-47d82e415ec090e9f4cfb56940e73014.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourceplone.app.jquery-cachekey-e3b734fa29e20ba72d79d15477532e40.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcegovbr.policyfolder_contents-cachekey-de8cc1bd96dc4db91dcc2a23db132bd1.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcegovbr.policycookiebar_1_3_56-cachekey-ee0cfb10ce2db5b3164ec580207bc4a6.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcegovbr.policyapplication_cookiebar_1_3_56-cachekey-33898138155e7a001018e60697e99cb5.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/collective.js.jqueryui.custom.min-cachekey-a27113157bbd4d939c2c8b24a329488a.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourceplone.formwidget.recurrencejquery.tmpl-beta1-cachekey-eb9cc8b36ed967bde853e4af757e04c1.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcecollective.js.bootstrapjsbootstrap.min-cachekey-86c526529fb2df0a5888d55cc4b6fff6.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcecollective.coverjsmain-cachekey-962c50ce41f07b6e0bc868d7695fe73b.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcebrasil.gov.tilesvendorjquery.jplayer.min-cachekey-a5be08d9aa3033d9aba993d36da67e56.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcedropdown-menu-cachekey-a4177a1a4fb454158ffedb478d1a6542.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/Swiper/3.4.2/js/swiper.min.js"></script>
+    <script type="text/javascript"></script>
+    <script type="text/javascript"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcelgpd.pluginchangeCookieImage-cachekey-c79207a30e683a37d5d1e2148cb4f838.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/resourcelgpd.pluginblock_cookies-cachekey-383047299a08d4ca6e926e8c68d4fca2.js"></script>
+    <script type="text/javascript" src="https://www.gov.br/inss/portal_javascripts/Sunburst%20Theme/++resource++govbr.recomendacao/govbr.recom.c339e72c8ffbb2f6c087.js"></script>
+
+
+
+  <link rel="stylesheet" href="https://www.gov.br/inss/++resource++brasil.gov.agenda/brasilgovagenda-720c34e.css" />
+
+
+  <script defer="defer" src="https://www.gov.br/inss/++resource++brasil.gov.agenda/brasilgovagenda-720c34e.js"></script>
+
+
+
+  <link rel="stylesheet" href="https://www.gov.br/inss/++resource++brasil.gov.portal/brasilgovportal-ee510e4.css" />
+
+
+  <script defer="defer" src="https://www.gov.br/inss/++resource++brasil.gov.portal/brasilgovportal-ee510e4.js"></script>
+
+
+
+<title>Tabela de contribuição mensal — Instituto Nacional do Seguro Social - INSS</title>
+<link rel="http://purl.org/dc/terms/subject http://schema.org/about http://xmlns.com/foaf/0.1/primaryTopic" href="http://vocab.e.gov.br/2011/03/vcge#esquema" />
+        
+    <link rel="author" href="https://www.gov.br/inss/pt-br" title="Informações do Autor" />
+
+    <link rel="canonical" href="https://www.gov.br/inss/pt-br/direitos-e-deveres/inscricao-e-contribuicao/tabela-de-contribuicao-mensal" />
+
+    
+    
+
+
+<script type="text/javascript">
+        jQuery(function($){
+            if (typeof($.datepicker) != "undefined"){
+              $.datepicker.setDefaults(
+                jQuery.extend($.datepicker.regional['pt-BR'],
+                {dateFormat: 'dd/mm/yy'}));
+            }
+        });
+        </script>
+
+
+
+
+    <link rel="search" href="https://www.gov.br/inss/pt-br/@@search" title="Buscar neste site" />
+
+
+
+        
+        
+        
+        
+        
+
+        
+        <meta name="generator" content="Plone - http://plone.org" />
+    
+
+    
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/inss/++theme++padrao_govbr/favicons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/inss/++theme++padrao_govbr/favicons/favicon-32x32.png" />
+    <link rel="shortcut icon" type="image/png" href="/inss/++theme++padrao_govbr/favicons/favicon-48x48.png" />
+    <link rel="mask-icon" href="/inss/++theme++padrao_govbr/favicons/safari-pinned-tab.svg" color="#00a300" />

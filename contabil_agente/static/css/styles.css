@@ -1,0 +1,641 @@
+/* TEMA LIMPO - FÁCIL PARA TODOS */
+:root {
+    /* CORES CLARAS - TEMA WHATSAPP */
+    --purple-dark: #075e54;
+    --purple-medium: #075e54;
+    --purple-light: #25d366;
+    --purple-glow: #25d366;
+    --accent-neon: #25d366;
+    --bg-dark: #f5f5f5;
+    --bg-darker: #e8e8e8;
+    --text-white: #1a1a1a;
+    --text-gray: #333333;
+    --text-muted: #666666;
+    --success-neon: #25d366;
+    --warning-neon: #fbbf24;
+    --danger-neon: #ef4444;
+    --ai-glow: none;
+    --ai-pulse: none;
+    --shadow-neon: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --gradient-purple: #075e54;
+    --gradient-animated: #075e54;
+
+    /* VARIÁVEIS DE COMPATIBILIDADE - TEMA CLARO */
+    --primary-blue: #075e54;
+    --secondary-blue: #25d366;
+    --accent-blue: #25d366;
+    --bg-primary: #f5f5f5;
+    --bg-secondary: #e8e8e8;
+    --bg-sidebar: #f5f5f5;
+    --bg-chat: #e5ddd5;
+    --text-primary: #1a1a1a;
+    --text-secondary: #333333;
+    --border-light: #ddd;
+    --border-medium: #ccc;
+    --success: #25d366;
+    --warning: #fbbf24;
+    --danger: #ef4444;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 6px 12px rgba(0, 0, 0, 0.15);
+    --accent-green: #25d366;
+
+    /* VARIÁVEIS AI - TEMA CLARO */
+    --primary: #075e54;
+    --bg: #f5f5f5;
+    --glow: none;
+    --gradient-ai: #075e54;
+}
+
+/* ESCONDER SIDEBAR E PARTÍCULAS */
+.particles,
+.particle {
+    display: none !important;
+}
+
+.sidebar,
+aside.sidebar {
+    display: none !important;
+}
+
+/* CORPO DA PÁGINA */
+html,
+body {
+    background: #f5f5f5 !important;
+    color: #1a1a1a !important;
+    font-family: 'Segoe UI', Arial, sans-serif !important;
+    font-size: 16px !important;
+}
+
+/* HEADER VERDE */
+header {
+    background: #075e54 !important;
+    border-bottom: none !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ÁREA PRINCIPAL SEM MARGIN DA SIDEBAR */
+.app-wrapper,
+main,
+.main-content {
+    margin-left: 0 !important;
+    background: #f5f5f5 !important;
+}
+
+/* MENSAGENS ESTILO WHATSAPP */
+.message.user {
+    background: #dcf8c6 !important;
+    color: #1a1a1a !important;
+    border: none !important;
+}
+
+.message.bot {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    border: none !important;
+}
+
+/* BOTÕES VERDES */
+button,
+.btn {
+    background: #075e54 !important;
+    color: white !important;
+    border: none !important;
+}
+
+button:hover,
+.btn:hover {
+    background: #064e46 !important;
+}
+
+/* INPUT LIMPO */
+input[type="text"],
+textarea,
+#messageInput {
+    background: white !important;
+    color: #1a1a1a !important;
+    border: 1px solid #ddd !important;
+    font-size: 16px !important;
+}
+
+/* REMOVER ANIMAÇÕES NEON */
+@keyframes glowPulse {
+
+    0%,
+    100% {
+        filter: none;
+    }
+}
+
+@keyframes neonPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* � MELHORIAS PARA TOUCH/MOBILE */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+button {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Prevenir zoom duplo-toque no iOS */
+input,
+textarea,
+select {
+    font-size: 16px !important;
+}
+
+/* Scroll suave em mobile */
+#dashboardChatMessages,
+#chatMessages {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Botões mais fáceis de tocar */
+button {
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Flex responsivo */
+.flex-responsive {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* Container mobile-friendly */
+.mobile-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* �🌌 FUNDO ROXO ESCURO ANIMADO */
+body,
+html {
+    margin: 0;
+    padding: 0;
+    font-family: "Inter", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--bg-darker);
+    background-image:
+        radial-gradient(circle at 20% 50%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(192, 132, 252, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, rgba(109, 40, 217, 0.1) 0%, transparent 50%);
+    background-size: 200% 200%;
+    animation: gradientShift 15s ease infinite;
+    color: var(--text-white);
+}
+
+@keyframes gradientShift {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+/* ✨ ANIMAÇÃO DE BRILHO PULSANTE */
+@keyframes glowPulse {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.6));
+        transform: scale(1);
+    }
+
+    50% {
+        filter: drop-shadow(0 0 25px rgba(192, 132, 252, 1));
+        transform: scale(1.05);
+    }
+}
+
+@keyframes neonPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(192, 132, 252, 0.8), 0 0 60px rgba(168, 85, 247, 0.4);
+    }
+}
+
+/* 🤖 LOGO AI PULSANTE */
+.ai-logo {
+    background: var(--gradient-ai);
+    border-radius: 14px;
+    padding: 12px;
+    font-size: 2rem;
+    animation: aiLogoPulse 2s infinite;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    box-shadow: 0 0 20px var(--glow);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.ai-logo:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 40px var(--glow);
+}
+
+@keyframes aiLogoPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(99, 102, 241, 0.8);
+    }
+}
+
+/* 🧠 INDICADOR DE PENSAMENTO AI */
+.ai-thinking {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 24px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 2px solid rgba(99, 102, 241, 0.4);
+    border-radius: 16px;
+    margin: 10px 0;
+    animation: thinkingPulse 1.5s ease-in-out infinite;
+    max-width: 90%;
+}
+
+@keyframes thinkingPulse {
+
+    0%,
+    100% {
+        opacity: 0.85;
+        transform: scale(1);
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.01);
+        box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+    }
+}
+
+/* (file continues with the original CSS content) */
+
+/* ----------------------------- */
+/* Partículas de fundo animadas */
+/* ----------------------------- */
+.particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.particle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    opacity: 0.24;
+    background: radial-gradient(circle at 30% 30%, rgba(168, 85, 247, 0.45) 0%, rgba(168, 85, 247, 0.22) 40%, transparent 70%);
+    filter: blur(3px);
+    transform: translate3d(0, 0, 0);
+    /* Animação fluida das partículas */
+    animation: particleDrift 30s ease-in-out infinite;
+    pointer-events: none;
+    mix-blend-mode: normal;
+    will-change: transform, opacity;
+}
+
+/* When reload is detected, disable animations/transitions site-wide to avoid freeze */
+.no-animations *,
+.no-animations *::before,
+.no-animations *::after {
+    animation: none !important;
+    transition: none !important;
+}
+
+/* Also hide particle container entirely on reload to avoid canvas/svg work */
+.no-animations .particle,
+.no-animations .particles-container {
+    display: none !important;
+}
+
+.particle:nth-child(odd) {
+    background: radial-gradient(circle at 30% 30%, rgba(168, 85, 247, 0.5) 0%, rgba(192, 132, 252, 0.30) 40%, transparent 70%);
+}
+
+.particle:nth-child(even) {
+    background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.38) 0%, rgba(168, 85, 247, 0.28) 40%, transparent 70%);
+}
+
+.particle.small {
+    width: 5px;
+    height: 5px;
+    opacity: 0.08;
+}
+
+.particle.medium {
+    width: 7px;
+    height: 7px;
+    opacity: 0.10;
+}
+
+.particle.large {
+    width: 12px;
+    height: 12px;
+    opacity: 0.14;
+}
+
+/* Distribute particles vertically and horizontally using nth-child to vary start positions and durations */
+.particle:nth-child(1) {
+    left: 5%;
+    top: 10%;
+    animation-duration: 48s;
+    animation-delay: -6s;
+}
+
+.particle:nth-child(2) {
+    left: 15%;
+    top: 25%;
+    animation-duration: 52s;
+    animation-delay: -12s;
+}
+
+.particle:nth-child(3) {
+    left: 25%;
+    top: 5%;
+    animation-duration: 46s;
+    animation-delay: -8s;
+}
+
+.particle:nth-child(4) {
+    left: 35%;
+    top: 40%;
+    animation-duration: 60s;
+    animation-delay: -16s;
+}
+
+.particle:nth-child(5) {
+    left: 45%;
+    top: 15%;
+    animation-duration: 50s;
+    animation-delay: -4s;
+}
+
+.particle:nth-child(6) {
+    left: 55%;
+    top: 30%;
+    animation-duration: 64s;
+    animation-delay: -10s;
+}
+
+.particle:nth-child(7) {
+    left: 65%;
+    top: 8%;
+    animation-duration: 44s;
+    animation-delay: -6s;
+}
+
+.particle:nth-child(8) {
+    left: 75%;
+    top: 45%;
+    animation-duration: 70s;
+    animation-delay: -14s;
+}
+
+.particle:nth-child(9) {
+    left: 85%;
+    top: 20%;
+    animation-duration: 56s;
+    animation-delay: -6s;
+}
+
+.particle:nth-child(10) {
+    left: 92%;
+    top: 5%;
+    animation-duration: 48s;
+    animation-delay: -18s;
+}
+
+.particle:nth-child(11) {
+    left: 10%;
+    top: 70%;
+    animation-duration: 66s;
+    animation-delay: -22s;
+}
+
+.particle:nth-child(12) {
+    left: 20%;
+    top: 80%;
+    animation-duration: 46s;
+    animation-delay: -12s;
+}
+
+.particle:nth-child(13) {
+    left: 30%;
+    top: 60%;
+    animation-duration: 54s;
+    animation-delay: -8s;
+}
+
+.particle:nth-child(14) {
+    left: 40%;
+    top: 90%;
+    animation-duration: 58s;
+    animation-delay: -16s;
+}
+
+.particle:nth-child(15) {
+    left: 50%;
+    top: 65%;
+    animation-duration: 42s;
+    animation-delay: -2s;
+}
+
+.particle:nth-child(16) {
+    left: 60%;
+    top: 78%;
+    animation-duration: 62s;
+    animation-delay: -10s;
+}
+
+.particle:nth-child(17) {
+    left: 70%;
+    top: 62%;
+    animation-duration: 56s;
+    animation-delay: -6s;
+}
+
+.particle:nth-child(18) {
+    left: 80%;
+    top: 85%;
+    animation-duration: 68s;
+    animation-delay: -14s;
+}
+
+.particle:nth-child(19) {
+    left: 90%;
+    top: 68%;
+    animation-duration: 50s;
+    animation-delay: -6s;
+}
+
+.particle:nth-child(20) {
+    left: 95%;
+    top: 75%;
+    animation-duration: 72s;
+    animation-delay: -20s;
+}
+
+@keyframes particleDrift {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 0.32;
+    }
+
+    50% {
+        transform: translateY(-18vh) translateX(1.2vw) scale(1.02);
+        opacity: 0.22;
+    }
+
+    100% {
+        transform: translateY(-36vh) translateX(-1.2vw) scale(0.98);
+        opacity: 0.12;
+    }
+}
+
+/* Prefer reduced motion: stop particle animations */
+@media (prefers-reduced-motion: reduce) {
+    .particle {
+        animation-play-state: paused !important;
+    }
+}
+
+/* Reduce particle density on very small screens to preserve perf */
+@media (max-width: 600px) {
+    .particle:nth-child(n+15) {
+        display: none;
+    }
+}
+
+/* Safety overrides to ensure page scrolling and remove leftover tutorial overlays */
+html,
+body {
+    overflow-y: auto !important;
+    touch-action: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Hide any leftover tutorial/overlay elements that may block interaction */
+#tutorialOverlay,
+#welcomeTutorial,
+.tutorial-overlay,
+.overlay {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Ensure particles stay visually in background and don't block scroll */
+.particles {
+    z-index: 0 !important;
+}
+
+/* Make main content accept pointer events and be scrollable */
+.app-wrapper,
+main,
+.main-content {
+    position: relative !important;
+    overflow: visible !important;
+    z-index: 1 !important;
+}
+
+/* Extra safety: force animations running and ensure pointer events for app content */
+html,
+body,
+#app,
+.app-wrapper,
+main,
+.main-content {
+    overflow-y: auto !important;
+    touch-action: auto !important;
+}
+
+/* Force animations to run (helps if animation-play-state got paused) */
+* {
+    -webkit-animation-play-state: running !important;
+    animation-play-state: running !important;
+}
+
+.particle,
+.particles {
+    -webkit-animation-play-state: running !important;
+    animation-play-state: running !important;
+    will-change: transform, opacity !important;
+}
+
+/* Ensure the main app accepts pointer events */
+.app-wrapper,
+main,
+.main-content {
+    pointer-events: auto !important;
+}
+
+/* Reusable pulse class (used by JS via class toggles) */
+.pulse {
+    animation: pulse 1.5s infinite;
+}
+
+/* Voice/listening state for the voice button */
+.voice-listening {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6) !important;
+    color: white !important;
+}
+
+.voice-listening.pulse {
+    animation: pulse 1.5s infinite !important;
+}
+
+/* Only enable particle animations when .particles-active is present on body */
+body.particles-active .particle {
+    animation-play-state: running !important;
+    animation-name: particleDrift;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}

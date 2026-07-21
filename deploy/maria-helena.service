@@ -1,0 +1,36 @@
+# Systemd service file for Maria Helena Chatbot
+# Install to: /etc/systemd/system/maria-helena.service
+#
+# Usage:
+#   sudo systemctl enable maria-helena
+#   sudo systemctl start maria-helena
+#   sudo systemctl status maria-helena
+
+[Unit]
+Description=Maria Helena - Assistente Contábil com IA
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/maria-helena
+Environment="PATH=/opt/maria-helena/venv/bin"
+Environment="FLASK_ENV=production"
+EnvironmentFile=/opt/maria-helena/.env.production
+ExecStart=/opt/maria-helena/venv/bin/python -m waitress --host=0.0.0.0 --port=5000 --threads=4 contabil_agente.app:app
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=maria-helena
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/maria-helena/data /opt/maria-helena/logs
+
+[Install]
+WantedBy=multi-user.target

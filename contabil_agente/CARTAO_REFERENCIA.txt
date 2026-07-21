@@ -1,0 +1,196 @@
+┌────────────────────────────────────────────────────────────────┐
+│                                                                │
+│           🤖 ROGIO PRO - CARTÃO DE REFERÊNCIA RÁPIDA           │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════╗
+║                     INÍCIO EM 30 SEGUNDOS                      ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  1. notepad .env                                               ║
+║     → Cole: GROQ_API_KEY=gsk_sua_chave                         ║
+║                                                                ║
+║  2. .\iniciar_servidor.ps1                                     ║
+║     → Aguarde: "Running on http://0.0.0.0:5000"                ║
+║                                                                ║
+║  3. http://localhost:5000/adaptada                             ║
+║     → Comece a conversar!                                      ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                      COMANDOS ESSENCIAIS                       ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  .\iniciar_servidor.ps1 ........... Iniciar servidor          ║
+║  .\diagnosticar.ps1 ............... Resolver problemas        ║
+║  .\testar_configuracao.ps1 ........ Testar setup              ║
+║                                                                ║
+║  curl http://localhost:5000/api/health ... Status servidor    ║
+║  netstat -ano | findstr :5000 ............ Ver porta          ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                           URLS                                 ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Interface Adaptável .. http://localhost:5000/adaptada        ║
+║  Health Check ......... http://localhost:5000/api/health       ║
+║  Obter API Key ........ https://console.groq.com/keys          ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                    PERFIS DE INTERFACE                         ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  👔 PROFISSIONAL                                               ║
+║     • Tema escuro e moderno                                    ║
+║     • Mostra raciocínio da IA                                  ║
+║     • Informações técnicas completas                           ║
+║                                                                ║
+║  🌾 RURAL                                                      ║
+║     • Interface clara/branca                                   ║
+║     • Linguagem simples                                        ║
+║     • Botões grandes                                           ║
+║                                                                ║
+║  👴 IDOSO                                                      ║
+║     • Fontes MUITO grandes (1.2rem)                            ║
+║     • Alto contraste (preto/branco)                            ║
+║     • Navegação simplificada                                   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                     PROBLEMAS COMUNS                           ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Problema: Servidor não inicia                                ║
+║  Solução: .\diagnosticar.ps1                                   ║
+║                                                                ║
+║  Problema: API Key inválida                                   ║
+║  Solução: Verifique se começa com "gsk_" e tem ~52 chars      ║
+║                                                                ║
+║  Problema: Porta 5000 ocupada                                 ║
+║  Solução: Edite .env → PORT=5001                               ║
+║                                                                ║
+║  Problema: Status "Offline"                                   ║
+║  Solução: Verifique se servidor está rodando                  ║
+║                                                                ║
+║  Problema: Mensagens sem resposta                             ║
+║  Solução: Veja logs no terminal do servidor                   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                      ENDPOINTS DA API                          ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  POST /api/chat                                                ║
+║    Body: {mensagem: "...", session_id: "..."}                  ║
+║    → Processa mensagens do chat                                ║
+║                                                                ║
+║  GET /api/health                                               ║
+║    → Retorna status do servidor                                ║
+║                                                                ║
+║  GET /download/<filename>                                      ║
+║    → Download de PDFs gerados                                  ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                    ATALHOS DO TECLADO                          ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Enter ................... Enviar mensagem                     ║
+║  F12 ..................... Abrir DevTools (debug)              ║
+║  Ctrl+F5 ................. Recarregar (limpar cache)           ║
+║  Ctrl+C (terminal) ....... Parar servidor                      ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                   LIMITES DE SEGURANÇA                         ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  • 20 requisições por minuto (por IP)                          ║
+║  • 200 requisições por dia (por IP)                            ║
+║  • 10.000 caracteres por mensagem                              ║
+║  • PDFs expiram em 24 horas                                    ║
+║  • Sessões limpas após 2 horas de inatividade                  ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                      TESTE DE DEBUG                            ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Console do navegador (F12) deve mostrar:                      ║
+║                                                                ║
+║    🚀 Rogio Pro Interface Iniciada                             ║
+║    📋 Session ID: [UUID]                                       ║
+║    💚 Health check: {status: "online"}                         ║
+║    ✅ Interface pronta para uso!                               ║
+║                                                                ║
+║  Ao enviar mensagem:                                           ║
+║                                                                ║
+║    📤 Enviando mensagem para backend: {...}                    ║
+║    📡 Resposta HTTP: 200 OK                                    ║
+║    📥 Dados recebidos: {...}                                   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                  ARQUIVOS DE DOCUMENTAÇÃO                      ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  📄 README.md ............... Documentação completa            ║
+║  📄 RESUMO_FINAL.txt ........ O que foi feito                  ║
+║  📄 LEIA_PRIMEIRO.txt ....... Resumo visual                    ║
+║  📄 CHECKLIST_SETUP.md ...... Passo a passo                    ║
+║  📄 CONEXAO_COMPLETA.md ..... Guia técnico                     ║
+║  📄 INSTALACAO_RAPIDA.md .... Setup rápido                     ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                      EXEMPLO DE USO                            ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  1. Digite: "Como calcular férias?"                            ║
+║  2. Aguarde resposta com base legal e exemplos                 ║
+║  3. Pergunte: "E se o funcionário pediu demissão?"             ║
+║  4. IA mantém contexto da conversa anterior                    ║
+║  5. Para gerar PDF: "Calcule rescisão para João..."           ║
+║  6. Sistema gera documento automaticamente                     ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════════════════════╗
+║                       INFORMAÇÕES TÉCNICAS                     ║
+╠════════════════════════════════════════════════════════════════╣
+║                                                                ║
+║  Backend ............ Flask 2.3.3                              ║
+║  Modelo IA .......... llama-3.3-70b-versatile (GROQ)           ║
+║  Geração PDF ........ ReportLab 4.0.4                          ║
+║  Frontend ........... HTML5 + CSS3 + Vanilla JS                ║
+║  CORS ............... Flask-CORS 4.0.0                         ║
+║                                                                ║
+║  Python ............. 3.8+ requerido                           ║
+║  RAM ................ 512MB mínimo                             ║
+║  Disco .............. ~100MB para deps                         ║
+║  Internet ........... Necessária (API GROQ)                    ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────┐
+│                                                                │
+│  💡 DICA: Imprima este cartão e mantenha perto do computador!  │
+│                                                                │
+│  🆘 AJUDA: Execute .\diagnosticar.ps1 se algo não funcionar    │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+
+Versão 1.0.0 | Elite Sênior Consultoria | Janeiro 2026

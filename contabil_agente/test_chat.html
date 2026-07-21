@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Chat Simples</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        #chatMessages {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+        }
+
+        .user {
+            background: #0f3460;
+            margin-left: 20%;
+        }
+
+        .bot {
+            background: #533483;
+            margin-right: 20%;
+        }
+
+        #inputArea {
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #533483;
+            border-radius: 10px;
+            background: #16213e;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: #a855f7;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: #533483;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #a855f7;
+        }
+
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #0f3460;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🤖 Teste Chat - Maria Helena</h1>
+
+    <div id="chatMessages">
+        <div class="message bot">Olá! Sou Maria Helena. Digite sua mensagem abaixo.</div>
+    </div>
+
+    <div id="inputArea">
+        <input type="text" id="messageInput" placeholder="Digite sua mensagem aqui..." autofocus>
+        <button onclick="enviarMensagem()">Enviar</button>
+    </div>
+
+    <div id="status">Status: Aguardando mensagem...</div>
+
+    <script>
+        const BACKEND_URL = window.location.origin;
+        let sessionId = localStorage.getItem('test_session') || 'test_' + Date.now();
+        localStorage.setItem('test_session', sessionId);
+
+        document.getElementById('messageInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                enviarMensagem();
+            }
+        });
+
+        async function enviarMensagem() {
+            const input = document.getElementById('messageInput');
+            const status = document.getElementById('status');
+            const chatMessages = document.getElementById('chatMessages');
+
+            const mensagem = input.value.trim();
+            if (!mensagem) {
+                status.textContent = 'Status: Digite uma mensagem!';
+                return;
+            }
+
+            // Mostrar mensagem do usuário
+            chatMessages.innerHTML += `<div class="message user">${mensagem}</div>`;
+            input.value = '';
+            status.textContent = 'Status: Enviando...';
+
+            try {
+                const response = await fetch(BACKEND_URL + '/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    body: JSON.stringify({
+                        mensagem: mensagem,
+                        session_id: sessionId
+                    })
+                });
+
+                status.textContent = 'Status: Resposta recebida (' + response.status + ')';
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+
+                const data = await response.json();
+                console.log('Resposta:', data);
+
+                // Mostrar resposta do bot
+                chatMessages.innerHTML += `<div class="message bot">${data.resposta || 'Sem resposta'}</div>`;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                status.textContent = 'Status: ✅ Sucesso!';
+
+            } catch (error) {
+                console.error('Erro:', error);
+                status.textContent = 'Status: ❌ Erro: ' + error.message;
+                chatMessages.innerHTML += `<div class="message bot" style="background: #c0392b;">Erro: ${error.message}</div>`;
+            }
+        }
+
+        // Teste inicial
+        console.log('🚀 Teste Chat carregado');
+        console.log('Backend URL:', BACKEND_URL);
+        console.log('Session ID:', sessionId);
+    </script>
+</body>
+
+</html>

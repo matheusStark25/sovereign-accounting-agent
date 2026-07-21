@@ -1,0 +1,87 @@
+/* Responsive Design - Mobile First */
+
+/* Mobile (< 640px) - Default */
+.chat-container {
+  font-size: 14px;
+}
+
+.chat-header-agent {
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.message-user-bubble .content,
+.message-ai-bubble .content {
+  max-width: 90%;
+  font-size: 14px;
+}
+
+/* Tablet (≥ 640px) */
+@media (min-width: 640px) {
+  .chat-header-agent {
+    flex-direction: row;
+  }
+
+  .message-user-bubble .content,
+  .message-ai-bubble .content {
+    max-width: 80%;
+  }
+}
+
+/* Desktop (≥ 1024px) */
+@media (min-width: 1024px) {
+  .chat-container {
+    font-size: 15px;
+  }
+
+  .message-user-bubble .content,
+  .message-ai-bubble .content {
+    max-width: 70%;
+    font-size: 15px;
+  }
+
+  .chat-input-area {
+    padding: var(--spacing-xl);
+  }
+}
+
+/* Large Desktop (≥ 1280px) */
+@media (min-width: 1280px) {
+  .chat-messages {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+}
+
+/* Dark mode preference */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-dark: #f1f5f9;
+    --bg-darker: #ffffff;
+    --text-light: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast */
+@media (prefers-contrast: high) {
+  .btn {
+    border: 2px solid currentColor;
+  }
+
+  .chat-input {
+    border-width: 2px;
+  }
+}

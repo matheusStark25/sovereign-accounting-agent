@@ -1,0 +1,29 @@
+{
+  "status": "success",
+  "detalhes": {
+    "saldo_salario": 1750.0,
+    "aviso_previo": 0.0,
+    "ferias_vencidas": 0.0,
+    "ferias_proporcionais": 4666.67,
+    "decimo_terceiro": 0.0,
+    "multa_fgts": 0.0,
+    "total_proventos": 6416.67,
+    "total_descontos": 815.71,
+    "total_liquido": 5600.96
+  },
+  "explanation": [
+    "Salário base considerado: R$ 3,500.00",
+    "Dias considerados para saldo salarial: 15",
+    "Saldo salário (salario/30*dias): R$ 1,750.00",
+    "Aviso prévio calculado (dias): R$ 0.00",
+    "Férias vencidas (1/3 inclusa): R$ 0.00",
+    "Férias proporcionais (1/3 inclusa): R$ 4,666.67",
+    "13º proporcional: R$ 0.00",
+    "Multa FGTS (40%): R$ 0.00",
+    "Total de proventos: R$ 6,416.67"
+  ],
+  "raw": {
+    "salario": "3500",
+    "dias_mes": "15"
+  }
+}
