@@ -28,12 +28,12 @@ from typing import Any, Callable, Optional
 
 from flask import g, jsonify, request, make_response
 
-from security import (
+from contabil_agente.security import (
     AuditAction,
     Permission,
     Role,
 )
-from security.rbac_manager import SecurityError
+from contabil_agente.security.rbac_manager import SecurityError
 
 __all__ = [
     "init_security",
@@ -69,10 +69,10 @@ def init_security(app):
     try:
         # Importa localmente para evitar problemas de import circular em runtime
         try:
-            from security.rbac_manager import RBACManager
-            from security.audit_trail_manager import AuditTrailManager
-            from security.pii_protection_service import PIIProtectionService
-            from security.encryption_service import EncryptionService
+            from contabil_agente.security.rbac_manager import RBACManager
+            from contabil_agente.security.audit_trail_manager import AuditTrailManager
+            from contabil_agente.security.pii_protection_service import PIIProtectionService
+            from contabil_agente.security.encryption_service import EncryptionService
         except Exception as imp_e:
             logger.critical(
                 f"Erro ao importar componentes de segurança: {imp_e}", exc_info=True

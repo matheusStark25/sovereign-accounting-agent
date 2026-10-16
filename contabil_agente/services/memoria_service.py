@@ -3,7 +3,7 @@ import logging
 import threading
 from typing import Deque, Tuple
 
-from config.settings import MEMORIA_LIMIT
+from contabil_agente.config.settings import MEMORIA_LIMIT
 
 logger = logging.getLogger(__name__)
 

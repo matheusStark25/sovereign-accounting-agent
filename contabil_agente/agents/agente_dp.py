@@ -37,9 +37,9 @@ def recuperar_contexto(
 # --- 2. IMPORTAÃÃES DOS OUTROS SERVIÃOS (Apenas os que existem) ---
 # Se esses arquivos ainda nÃ£o existirem, o Python vai reclamar de novo.
 try:
-    from services.historico_service import salvar_historico
-    from services.ia_service import chamar_ia
-    from services.memoria_service import atualizar_memoria, recuperar_memoria
+    from contabil_agente.services.historico_service import salvar_historico
+    from contabil_agente.services.ia_service import chamar_ia
+    from contabil_agente.services.memoria_service import atualizar_memoria, recuperar_memoria
 
     print("✓ Serviços importados com sucesso!")
 except ImportError as e:

@@ -22,9 +22,9 @@ from flask import send_from_directory
 from flask import make_response
 from flask_cors import CORS
 
-from api.middleware.auth import register_auth_error_handlers
-from api.middleware.tenant import register_tenant_error_handlers
-from api.v1 import rescisao_bp
+from contabil_agente.api.middleware.auth import register_auth_error_handlers
+from contabil_agente.api.middleware.tenant import register_tenant_error_handlers
+from contabil_agente.api.v1 import rescisao_bp
 
 # Adicionar diretório raiz ao path (pai da pasta `contabil_agente`) para
 # permitir imports absolutos como `contabil_agente.routes.*` durante dev.
@@ -143,7 +143,7 @@ try:
     app.register_blueprint(chat_refactored_bp)
 except Exception:
     try:
-        from routes.chat_refactored import chat_refactored_bp
+        from contabil_agente.routes.chat_refactored import chat_refactored_bp
 
         app.register_blueprint(chat_refactored_bp)
     except Exception:

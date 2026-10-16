@@ -15,7 +15,7 @@ try:
     from contabil_agente.core.config import Config
 except Exception:
     try:
-        from core.config import Config
+        from contabil_agente.core.config import Config
     except Exception:
         # Create minimal Config stub if imports fail
         class Config:

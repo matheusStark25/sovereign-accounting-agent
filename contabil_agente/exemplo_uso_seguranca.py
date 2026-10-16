@@ -13,7 +13,7 @@ import os
 import sys
 from datetime import datetime
 
-from security import (
+from contabil_agente.security import (
     RBACManager,
     Role,
     SecureAccountingService,

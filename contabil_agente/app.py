@@ -63,7 +63,7 @@ try:
     from contabil_agente.core.app_config import AppConfig
 except Exception:
     try:
-        from core.app_config import AppConfig
+        from contabil_agente.core.app_config import AppConfig
     except Exception:
 
         class AppConfig:
@@ -102,7 +102,7 @@ try:
     from contabil_agente.api.job_status import register_job_api
 except Exception:
     try:
-        from api.job_status import register_job_api
+        from contabil_agente.api.job_status import register_job_api
     except Exception:
 
         def register_job_api(app):
@@ -117,7 +117,7 @@ try:
     from contabil_agente.middleware.security import init_security
 except Exception:
     try:
-        from middleware.security import init_security
+        from contabil_agente.middleware.security import init_security
     except Exception:
 
         def init_security(app):
@@ -132,7 +132,7 @@ else:
         from contabil_agente.routes.chat_multi_tenant import chat_multi_tenant_bp
     except Exception:
         try:
-            from routes.chat_multi_tenant import chat_multi_tenant_bp
+            from contabil_agente.routes.chat_multi_tenant import chat_multi_tenant_bp
         except Exception:
             chat_multi_tenant_bp = None
 
@@ -143,7 +143,7 @@ else:
         from contabil_agente.routes.chat_refactored import chat_refactored_bp
     except Exception:
         try:
-            from routes.chat_refactored import chat_refactored_bp
+            from contabil_agente.routes.chat_refactored import chat_refactored_bp
         except Exception:
             chat_refactored_bp = None
 # If a refactored chat blueprint was imported, try to mount it at startup so
@@ -155,7 +155,7 @@ try:
     from contabil_agente.utils.health_check import deep_health_check
 except Exception:
     try:
-        from utils.health_check import deep_health_check
+        from contabil_agente.utils.health_check import deep_health_check
     except Exception:
         # Provide a fallback that returns a degraded health structure
         def deep_health_check():
@@ -167,7 +167,7 @@ except Exception:
 
 
 try:
-    from utils.logger import setup_json_logging
+    from contabil_agente.utils.logger import setup_json_logging
 except Exception:
     # minimal fallback logger setup
     def setup_json_logging(app, level=logging.INFO):
@@ -206,7 +206,7 @@ try:
     from contabil_agente.services.ingestion_service import IngestionService
 except Exception:
     try:
-        from services.ingestion_service import IngestionService
+        from contabil_agente.services.ingestion_service import IngestionService
     except Exception:
 
         class IngestionService:
@@ -436,7 +436,7 @@ try:
             from contabil_agente.routes.chat_refactored import chat_refactored_bp as bp
         except Exception:
             try:
-                from routes.chat_refactored import chat_refactored_bp as bp
+                from contabil_agente.routes.chat_refactored import chat_refactored_bp as bp
             except Exception:
                 bp = None
                 logging.getLogger(__name__).warning(
@@ -695,7 +695,7 @@ except Exception as e:
 
 # SECURE API: Rotas protegidas com camada de seguranÃ§a (rotas /api/v3/secure/*)
 try:
-    from routes.secure_api import secure_api_bp
+    from contabil_agente.routes.secure_api import secure_api_bp
 
     app.register_blueprint(secure_api_bp)
     logger.info("âœ… Secure API Blueprint registrado")
@@ -963,7 +963,7 @@ def api_health():
 def debug_session(session_id):
     """Endpoint de debug para visualizar histÃ³rico de sessÃ£o"""
     try:
-        from routes.chat import historico_conversas
+        from contabil_agente.routes.chat import historico_conversas
     except ImportError:
         try:
             from contabil_agente.routes.chat import historico_conversas
@@ -1038,7 +1038,7 @@ if chat_refactored_bp is None:
                 return legacy_chat()
             except Exception:
                 try:
-                    from routes.chat import processar_chat as legacy_chat
+                    from contabil_agente.routes.chat import processar_chat as legacy_chat
 
                     app.logger.info("=== Chamando legacy_chat (routes.chat) ===")
                     return legacy_chat()
@@ -1183,7 +1183,7 @@ def _reset_ratelimit():
         except Exception:
             try:
                 # fallback to top-level import if package context differs
-                from middleware.rate_limiter import get_rate_limiter  # type: ignore
+                from contabil_agente.middleware.rate_limiter import get_rate_limiter  # type: ignore
             except Exception:
                 # As a last resort, scan loaded modules for a rate_limiter provider
                 for mname, mod in list(sys.modules.items()):
@@ -1258,7 +1258,7 @@ def _reset_ratelimit():
                 from contabil_agente.routes import chat as legacy_chat
             except Exception:
                 try:
-                    from routes import chat as legacy_chat
+                    from contabil_agente.routes import chat as legacy_chat
                 except Exception:
                     legacy_chat = None
 

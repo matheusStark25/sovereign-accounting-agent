@@ -16,13 +16,13 @@ HAS_PROMPTS = True
 HAS_SESSION = True
 HAS_VALIDATION = True
 try:
-    from core.app_config import AppConfig
+    from contabil_agente.core.app_config import AppConfig
 except Exception:
     HAS_APPCONFIG = False
     AppConfig = None
 
 try:
-    from core.prompts import get_system_prompt
+    from contabil_agente.core.prompts import get_system_prompt
 except Exception:
     HAS_PROMPTS = False
 
@@ -31,13 +31,13 @@ except Exception:
 
 
 try:
-    from services.session_service import session_service
+    from contabil_agente.services.session_service import session_service
 except Exception:
     HAS_SESSION = False
     session_service = None
 
 try:
-    from services.validation_service import validation_service
+    from contabil_agente.services.validation_service import validation_service
 except Exception:
     HAS_VALIDATION = False
     validation_service = None
@@ -58,7 +58,7 @@ def _import_groq():
 
 # Import validation service (com fallback suave)
 try:
-    from services.validation_service import validation_service
+    from contabil_agente.services.validation_service import validation_service
 except ImportError:
     validation_service = None
 

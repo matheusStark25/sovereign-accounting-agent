@@ -1,3 +1,0 @@
-"""Minimal legislacao stub."""
-
-legislacao = {}

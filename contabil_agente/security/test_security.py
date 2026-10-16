@@ -16,7 +16,7 @@ import os
 import sys
 import unittest
 
-from security import (
+from contabil_agente.security import (
     AuditAction,
     AuditTrailManager,
     EncryptionService,
@@ -158,7 +158,7 @@ class TestRBACManager(unittest.TestCase):
 
     def test_idor_detection(self):
         """Testa detecção de IDOR."""
-        from security.rbac_manager import SecurityError
+        from contabil_agente.security.rbac_manager import SecurityError
 
         # Tenta acessar recurso de outro tenant
         with self.assertRaises(SecurityError):
@@ -233,7 +233,7 @@ class TestAuditTrailManager(unittest.TestCase):
 
     def test_entry_signature(self):
         """Testa assinatura de entrada."""
-        from security.audit_trail_manager import AuditEntry
+        from contabil_agente.security.audit_trail_manager import AuditEntry
 
         entry = AuditEntry(tenant_id="TEST", operator_id="OP", action=AuditAction.LOGIN)
 
@@ -243,7 +243,7 @@ class TestAuditTrailManager(unittest.TestCase):
 
     def test_verify_entry(self):
         """Testa verificação de entrada."""
-        from security.audit_trail_manager import AuditEntry
+        from contabil_agente.security.audit_trail_manager import AuditEntry
 
         entry = AuditEntry(tenant_id="TEST", operator_id="OP", action=AuditAction.LOGIN)
 

@@ -49,7 +49,7 @@ from contabil_agente.utils.common import (
 logger = logging.getLogger("contabil_agente.agent_contabil")
 
 try:
-    from backend.interfaces import BaseAgent  # type: ignore
+    from contabil_agente.backend.interfaces import BaseAgent  # type: ignore
 except Exception:
     from abc import ABC as BaseAgent  # type: ignore
 

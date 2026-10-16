@@ -452,7 +452,7 @@ from contabil_agente.intelligence.intelligence_orchestrator import (
 from ..tax.tax_engine import TaxEngine
 
 try:
-    from utils.pdf_transfer_generator import generate_transfer_addendum_pdf
+    from contabil_agente.utils.pdf_transfer_generator import generate_transfer_addendum_pdf
 except Exception:
     try:
         # fallback import if package layout differs

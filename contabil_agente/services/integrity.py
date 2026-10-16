@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 try:
     from contabil_agente.utils.logging_adapter import get_logger, set_correlation_id
 except ImportError:
-    from utils.logging_adapter import get_logger, set_correlation_id
+    from contabil_agente.utils.logging_adapter import get_logger, set_correlation_id
 
 logger = get_logger(__name__)
 
@@ -26,8 +26,8 @@ def _publish_failure(cid: Optional[str], reason: str, payload: Dict[str, Any]) -
             from contabil_agente.services.event_bus import get_event_bus
             from contabil_agente.services.database_service import DatabaseService
         except ImportError:
-            from services.event_bus import get_event_bus
-            from services.database_service import DatabaseService
+            from contabil_agente.services.event_bus import get_event_bus
+            from contabil_agente.services.database_service import DatabaseService
 
         bus = get_event_bus()
         # best-effort publish

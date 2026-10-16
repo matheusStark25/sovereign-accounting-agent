@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional
 
-from core.config import Config
+from contabil_agente.core.config import Config
 
 from .base_sovereign import BaseSovereignTool
 from .rules_loader import RulesLoader, RuleNotFoundError

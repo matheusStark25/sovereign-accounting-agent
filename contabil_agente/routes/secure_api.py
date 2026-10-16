@@ -13,14 +13,14 @@ import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
-from middleware.security import (
+from contabil_agente.middleware.security import (
     get_current_operator_id,
     get_current_tenant_id,
     is_operator_admin,
     mask_pii_in_response,
     require_security,
 )
-from security import (
+from contabil_agente.security import (
     AuditAction,
     Permission,
     PIIType,
@@ -324,7 +324,7 @@ def listar_usuarios():
         - Permissão: MANAGE_USERS (apenas admins)
     """
     try:
-        from security import RBACManager
+        from contabil_agente.security import RBACManager
 
         rbac = RBACManager()
         tenant_id = get_current_tenant_id()
@@ -366,7 +366,7 @@ def estatisticas_seguranca():
         - Permissão: CONFIGURE_SYSTEM (apenas superadmin)
     """
     try:
-        from security import RBACManager, VaultManager
+        from contabil_agente.security import RBACManager, VaultManager
 
         rbac = RBACManager()
         vault = VaultManager()

@@ -31,10 +31,10 @@ ComplianceChecker = None
 ForensicAudit = None
 
 try:
-    from intelligence.orchestrator import IntelligenceOrchestrator
-    from intelligence.calculator import TaxEngine
-    from intelligence.compliance import ComplianceChecker
-    from intelligence.audit import ForensicAudit
+    from contabil_agente.intelligence.orchestrator import IntelligenceOrchestrator
+    from contabil_agente.intelligence.calculator import TaxEngine
+    from contabil_agente.intelligence.compliance import ComplianceChecker
+    from contabil_agente.intelligence.audit import ForensicAudit
 
     INTELLIGENCE_AVAILABLE = True
 except ImportError as e:
@@ -133,7 +133,7 @@ def _import_reportlab():
 
 # --- IMPORTAÃ‡ÃƒO DO GERADOR DE PDF DE TRANSFERÃŠNCIA ---
 try:
-    from utils.pdf_transfer_generator import generate_transfer_addendum_pdf
+    from contabil_agente.utils.pdf_transfer_generator import generate_transfer_addendum_pdf
 
     PDF_TRANSFER_AVAILABLE = True
 except ImportError:
@@ -148,7 +148,7 @@ except ImportError:
 
 # --- IMPORTAÇÃO DO MÓDULO DE TIPOS DE DOCUMENTO ---
 try:
-    from routes.tipos_documento import (
+    from contabil_agente.routes.tipos_documento import (
         TIPOS_DOCUMENTO,
         detectar_tipo_documento,
         extrair_dados_documento,
@@ -1447,13 +1447,13 @@ def processar_chat():
 
         # SEM detecÃ§Ã£o automÃ¡tica de perfil - seja neutra e inteligente
         try:
-            from core.prompts import get_system_prompt
+            from contabil_agente.core.prompts import get_system_prompt
 
             system_prompt = get_system_prompt()
         except Exception:
             # Fallback: try to import the canonical prompt constant, else use a minimal placeholder
             try:
-                from core.prompts import SYSTEM_PROMPT
+                from contabil_agente.core.prompts import SYSTEM_PROMPT
 
                 system_prompt = SYSTEM_PROMPT
             except Exception:
@@ -3355,7 +3355,7 @@ def text_to_speech():
 
             try:
                 # Tentativa de fallback local usando ToolVoz (pyttsx3)
-                from tools.voz_tool import ToolVoz
+                from contabil_agente.tools.voz_tool import ToolVoz
 
                 voz = ToolVoz()
                 if getattr(voz, "tts_engine", None) is not None:
@@ -3408,9 +3408,9 @@ def text_to_speech():
 
 # --- Delegar implementaÃ§Ãµes de intenÃ§Ã£o para services.intent_service quando disponÃ­vel
 try:
-    from services.intent_service import detectar_perfil_usuario as _det_impl
-    from services.intent_service import extrair_contexto_negocio as _extr_impl
-    from services.intent_service import normalizar_texto_avancado as _norm_impl
+    from contabil_agente.services.intent_service import detectar_perfil_usuario as _det_impl
+    from contabil_agente.services.intent_service import extrair_contexto_negocio as _extr_impl
+    from contabil_agente.services.intent_service import normalizar_texto_avancado as _norm_impl
 
     # Substituir as implementaÃ§Ãµes locais pelas versÃµes centralizadas
     normalizar_texto_avancado = _norm_impl
@@ -3423,7 +3423,7 @@ try:
 except Exception:
     # Fallback: definir implementaÃ§Ãµes mÃ­nimas se nÃ£o houver serviÃ§o centralizado
     try:
-        from services.intent_service import normalizar_texto_avancado
+        from contabil_agente.services.intent_service import normalizar_texto_avancado
     except Exception:
 
         def normalizar_texto_avancado(texto: str) -> str:

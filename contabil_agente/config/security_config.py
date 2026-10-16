@@ -61,7 +61,7 @@ def configure_security(
     # 1. Security Headers (sempre seguro habilitar)
     if enable_security_headers:
         try:
-            from middleware.security_headers import SecurityHeaders
+            from contabil_agente.middleware.security_headers import SecurityHeaders
 
             allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
             SecurityHeaders.setup_app(app, allowed_origins)
@@ -73,7 +73,7 @@ def configure_security(
     # 2. Metrics (não invasivo, apenas coleta)
     if enable_metrics:
         try:
-            from routes.metrics import metrics_bp
+            from contabil_agente.routes.metrics import metrics_bp
 
             # Registra blueprint de métricas
             app.register_blueprint(metrics_bp, url_prefix="/api")
@@ -85,7 +85,7 @@ def configure_security(
     # 3. Rate Limiting (pode afetar performance sob carga)
     if enable_rate_limit:
         try:
-            from middleware.rate_limiter import get_rate_limiter
+            from contabil_agente.middleware.rate_limiter import get_rate_limiter
 
             # Instancia rate limiter
             get_rate_limiter()
@@ -121,7 +121,7 @@ def configure_security(
     # 6. LGPD (passivo, não afeta rotas)
     if enable_lgpd:
         try:
-            from middleware.lgpd import LGPDLogger
+            from contabil_agente.middleware.lgpd import LGPDLogger
 
             # Configura logger LGPD
             LGPDLogger("logs/lgpd_events.log")
@@ -139,49 +139,49 @@ def get_middleware_status() -> dict:
     status = {}
 
     try:
-        import middleware.auth  # noqa: F401
+        import contabil_agente.middleware.auth  # noqa: F401
 
         status["auth"] = True
     except Exception:
         status["auth"] = False
 
     try:
-        import middleware.rate_limiter  # noqa: F401
+        import contabil_agente.middleware.rate_limiter  # noqa: F401
 
         status["rate_limit"] = True
     except Exception:
         status["rate_limit"] = False
 
     try:
-        from middleware.validators import validate_chat_input  # noqa: F401
+        from contabil_agente.middleware.validators import validate_chat_input  # noqa: F401
 
         status["validation"] = True
     except Exception:
         status["validation"] = False
 
     try:
-        from middleware.security_headers import SecurityHeaders  # noqa: F401
+        from contabil_agente.middleware.security_headers import SecurityHeaders  # noqa: F401
 
         status["security_headers"] = True
     except Exception:
         status["security_headers"] = False
 
     try:
-        from middleware.observability import get_metrics_collector  # noqa: F401
+        from contabil_agente.middleware.observability import get_metrics_collector  # noqa: F401
 
         status["metrics"] = True
     except Exception:
         status["metrics"] = False
 
     try:
-        from middleware.lgpd import PIIAnonymizer  # noqa: F401
+        from contabil_agente.middleware.lgpd import PIIAnonymizer  # noqa: F401
 
         status["lgpd"] = True
     except Exception:
         status["lgpd"] = False
 
     try:
-        import middleware.resilience  # noqa: F401
+        import contabil_agente.middleware.resilience  # noqa: F401
 
         status["resilience"] = True
     except Exception:

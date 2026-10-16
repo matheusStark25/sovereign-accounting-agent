@@ -218,7 +218,7 @@ def executar_teste_basico() -> Tuple[bool, str]:
         if str(TOOLS_DIR.parent) not in sys.path:
             sys.path.insert(0, str(TOOLS_DIR.parent))
 
-        from tools.executor_motor import SessionAuditoria, ElementoMapeado
+        from contabil_agente.tools.executor_motor import SessionAuditoria, ElementoMapeado
 
         # Teste 1: SessionAuditoria
         sessao = SessionAuditoria(tenant_id="TEST", session_id="test_001")

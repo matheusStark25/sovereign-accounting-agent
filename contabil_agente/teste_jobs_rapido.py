@@ -16,8 +16,8 @@ print("1️⃣ Testando imports...")
 try:
     import importlib
 
-    from api.job_status import job_status_bp
-    from infra.job_state import JobStateManager, JobStatus
+    from contabil_agente.api.job_status import job_status_bp
+    from contabil_agente.infra.job_state import JobStateManager, JobStatus
 
     # Import modules dynamically so we only test importability (avoids unused-import lint)
     _tasks_mod = importlib.import_module("infra.tasks")
@@ -26,7 +26,7 @@ try:
     AuditedTask = getattr(_worker_mod, "AuditedTask", None)
     gerar_sped = getattr(_tasks_mod, "gerar_sped", None)
     processar_folha_pagamento = getattr(_tasks_mod, "processar_folha_pagamento", None)
-    from services.workflow_manager import WorkflowManager
+    from contabil_agente.services.workflow_manager import WorkflowManager
 
     print("   ✅ Todos os imports OK\n")
 except ImportError as e:

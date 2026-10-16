@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import os
-from core.config import Config
-import utils.audit as audit
+from contabil_agente.core.config import Config
+import contabil_agente.utils.audit as audit
 import random
 import time
 

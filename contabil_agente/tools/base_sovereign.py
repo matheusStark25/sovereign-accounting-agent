@@ -26,8 +26,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from core.config import Config
-from utils.audit import send_audit
+from contabil_agente.core.config import Config
+from contabil_agente.utils.audit import send_audit
 
 logger = logging.getLogger(__name__)
 

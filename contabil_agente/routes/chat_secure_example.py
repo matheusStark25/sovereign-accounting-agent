@@ -12,10 +12,10 @@ from flask import Blueprint, jsonify, request
 
 # Importa middleware (OPCIONAL - só se quiser habilitar)
 try:
-    from middleware.auth import require_api_key
-    from middleware.observability import StructuredLogger, track_request_metrics
-    from middleware.rate_limiter import rate_limit
-    from middleware.validators import validate_chat_input
+    from contabil_agente.middleware.auth import require_api_key
+    from contabil_agente.middleware.observability import StructuredLogger, track_request_metrics
+    from contabil_agente.middleware.rate_limiter import rate_limit
+    from contabil_agente.middleware.validators import validate_chat_input
 
     SECURITY_AVAILABLE = True
 except ImportError:
@@ -118,7 +118,7 @@ def chat_insecure():
 @chat_secure_bp.route("/security_status", methods=["GET"])
 def security_status():
     """Retorna quais módulos de segurança estão ativos."""
-    from config.security_config import get_middleware_status
+    from contabil_agente.config.security_config import get_middleware_status
 
     status = get_middleware_status()
 

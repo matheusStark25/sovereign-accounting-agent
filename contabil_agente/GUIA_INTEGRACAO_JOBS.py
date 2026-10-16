@@ -13,7 +13,7 @@ Este guia mostra como integrar a infraestrutura de jobs no seu app.py
 """
 
 # No seu app.py, adicione após as outras importações:
-from api.job_status import register_job_api  # noqa: E402
+from contabil_agente.api.job_status import register_job_api  # noqa: E402
 
 """
 2. REGISTRAR A API NO FLASK
@@ -42,7 +42,7 @@ def processar_folha_chat(empresa_id: str, mes: int, ano: int, funcionarios: list
     Dispara job de folha de forma assíncrona
     Retorna job_id imediatamente sem bloquear o chat
     """
-    from infra.tasks import processar_folha_pagamento
+    from contabil_agente.infra.tasks import processar_folha_pagamento
 
     # Dispara job
     result = processar_folha_pagamento.apply_async(
@@ -76,7 +76,7 @@ def processar_folha_chat(empresa_id: str, mes: int, ano: int, funcionarios: list
 # Ou você pode criar uma função no chat:
 def verificar_status_job(task_id: str):
     """Verifica status de um job em andamento"""
-    from infra.job_state import JobStateManager
+    from contabil_agente.infra.job_state import JobStateManager
 
     state_manager = JobStateManager()
     state = state_manager.get_state(task_id)
@@ -108,7 +108,7 @@ def workflow_mensal_completo(empresa_id: str, mes: int, ano: int):
     3. Envia notificações
     """
     from celery import chain
-    from infra.tasks import gerar_sped, processar_folha_pagamento
+    from contabil_agente.infra.tasks import gerar_sped, processar_folha_pagamento
 
     # Cria cadeia de tasks
     workflow = chain(

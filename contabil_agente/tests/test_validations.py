@@ -3,7 +3,7 @@ Testes para funções de validação do chat_service
 """
 
 import pytest
-from services.chat_service import validar_cpf, validar_data, validar_nome
+from contabil_agente.services.chat_service import validar_cpf, validar_data, validar_nome
 
 
 class TestValidations:

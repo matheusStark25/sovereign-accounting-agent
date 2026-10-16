@@ -35,34 +35,34 @@ except Exception:
 
 
 try:
-    from infra.job_state import JobStateManager
+    from contabil_agente.infra.job_state import JobStateManager
 except ImportError:
     from contabil_agente.infra.job_state import JobStateManager
 
 try:
-    from infra.worker import celery_app
+    from contabil_agente.infra.worker import celery_app
 except ImportError:
     from contabil_agente.infra.worker import celery_app
 
 try:
     from contabil_agente.utils.logging_adapter import get_logger, set_correlation_id
 except ImportError:
-    from utils.logging_adapter import get_logger, set_correlation_id
+    from contabil_agente.utils.logging_adapter import get_logger, set_correlation_id
 
 try:
     from contabil_agente.services.integrity import verify_artifact_integrity
 except ImportError:
-    from services.integrity import verify_artifact_integrity
+    from contabil_agente.services.integrity import verify_artifact_integrity
 
 try:
     from contabil_agente.utils.outbox import TransactionalOutbox
 except ImportError:
-    from utils.outbox import TransactionalOutbox
+    from contabil_agente.utils.outbox import TransactionalOutbox
 
 try:
     from contabil_agente.utils.backoff import full_jitter_sleep
 except ImportError:
-    from utils.backoff import full_jitter_sleep
+    from contabil_agente.utils.backoff import full_jitter_sleep
 
 logger = get_logger("workflow_manager")
 
@@ -910,7 +910,7 @@ def executar_folha_mensal() -> Dict:
     set_correlation_id(None)
     logger.info("🗓️  Iniciando processamento de folha mensal automático")
 
-    from infra.tasks import processar_folha_pagamento
+    from contabil_agente.infra.tasks import processar_folha_pagamento
 
     # Em produção, buscar empresas ativas do banco
     empresas_ativas = [
@@ -956,7 +956,7 @@ def executar_sped_mensal() -> Dict:
     set_correlation_id(None)
     logger.info("🗓️  Iniciando geração de SPED mensal automático")
 
-    from infra.tasks import gerar_sped
+    from contabil_agente.infra.tasks import gerar_sped
 
     # Em produção, buscar empresas do banco
     empresas_ativas = ["EMP001", "EMP002"]
@@ -1001,7 +1001,7 @@ def processar_vencimentos_dia() -> Dict:
     set_correlation_id(None)
     logger.info("🗓️  Processando vencimentos do dia")
 
-    from infra.tasks import processar_vencimentos
+    from contabil_agente.infra.tasks import processar_vencimentos
 
     hoje = datetime.now().date().isoformat()
 

@@ -15,8 +15,8 @@ from decimal import Decimal
 from typing import Dict, List
 
 from celery import chain
-from infra.job_state import JobStateManager
-from infra.worker import celery_app
+from contabil_agente.infra.job_state import JobStateManager
+from contabil_agente.infra.worker import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +59,10 @@ def processar_folha_pagamento(
         )
 
         # Importa serviços necessários
-        from services.calculation_service import CalculationService
-        from services.document_service import DocumentService
-        from services.evidence_service import GerenciadorEvidencias
-        from services.signature_service import SignatureService
+        from contabil_agente.services.calculation_service import CalculationService
+        from contabil_agente.services.document_service import DocumentService
+        from contabil_agente.services.evidence_service import GerenciadorEvidencias
+        from contabil_agente.services.signature_service import SignatureService
 
         calc_service = CalculationService()
         doc_service = DocumentService()
@@ -218,8 +218,8 @@ def gerar_sped(
             message=f"Iniciando geração SPED {tipo_sped}",
         )
 
-        from services.evidence_service import GerenciadorEvidencias
-        from services.fiscal_service import FiscalService, TipoArquivoFiscal
+        from contabil_agente.services.evidence_service import GerenciadorEvidencias
+        from contabil_agente.services.fiscal_service import FiscalService, TipoArquivoFiscal
 
         fiscal_service = FiscalService()
         evidencias = GerenciadorEvidencias()
@@ -312,8 +312,8 @@ def processar_vencimentos(self, data_referencia: str) -> Dict:
         )
 
         # Importa serviços
-        from services.evidence_service import GerenciadorEvidencias
-        from services.financial_service import FinancialService
+        from contabil_agente.services.evidence_service import GerenciadorEvidencias
+        from contabil_agente.services.financial_service import FinancialService
 
         FinancialService()
         evidencias = GerenciadorEvidencias()

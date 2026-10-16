@@ -16,7 +16,7 @@ import pytest
 from pathlib import Path
 from datetime import datetime
 
-from tools.executor_motor import (
+from contabil_agente.tools.executor_motor import (
     AccountingBot,
     SessionAuditoria,
     ElementoMapeado,

@@ -59,7 +59,7 @@ except Exception:
 # Optional tool
 HAS_TOOLCALC = True
 try:
-    from tools.calculo import ToolCalculo
+    from contabil_agente.tools.calculo import ToolCalculo
 except Exception:
     HAS_TOOLCALC = False
 

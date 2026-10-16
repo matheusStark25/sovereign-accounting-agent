@@ -83,8 +83,8 @@ except Exception:
     KaldiRecognizer = None  # type: ignore
     VOSK_AVAILABLE = False
 
-from core.config import Config
-from utils.audit import send_audit
+from contabil_agente.core.config import Config
+from contabil_agente.utils.audit import send_audit
 
 # Lock global para TTS (pyttsx3 não é thread-safe)
 TTS_LOCK = threading.Lock()

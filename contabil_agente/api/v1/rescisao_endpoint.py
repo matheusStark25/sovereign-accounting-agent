@@ -9,10 +9,10 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request
 
-from api.middleware.auth import get_current_user, require_role
-from api.middleware.tenant import require_tenant_isolation
-from services.audit_service import AuditService, audit_service
-from services.calculation_service import CalculadoraRescisao, TabelasOficiais
+from contabil_agente.api.middleware.auth import get_current_user, require_role
+from contabil_agente.api.middleware.tenant import require_tenant_isolation
+from contabil_agente.services.audit_service import AuditService, audit_service
+from contabil_agente.services.calculation_service import CalculadoraRescisao, TabelasOficiais
 
 logger = logging.getLogger(__name__)
 

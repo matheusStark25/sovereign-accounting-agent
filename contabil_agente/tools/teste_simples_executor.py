@@ -31,8 +31,8 @@ def teste_1_importacoes():
     print_header("TESTE 1: Importações de Classes")
 
     try:
-        from tools.executor_motor import SessionAuditoria as SA
-        from tools.executor_motor import ElementoMapeado as EM
+        from contabil_agente.tools.executor_motor import SessionAuditoria as SA
+        from contabil_agente.tools.executor_motor import ElementoMapeado as EM
 
         _ = SA
         _ = EM
@@ -50,7 +50,7 @@ def teste_2_sessao_auditoria():
     print_header("TESTE 2: SessionAuditoria")
 
     try:
-        from tools.executor_motor import SessionAuditoria
+        from contabil_agente.tools.executor_motor import SessionAuditoria
 
         # Criar sessão
         sessao = SessionAuditoria(tenant_id="TESTE-001", session_id="test_session_001")
@@ -99,7 +99,7 @@ def teste_3_elemento_mapeado():
     print_header("TESTE 3: ElementoMapeado")
 
     try:
-        from tools.executor_motor import ElementoMapeado
+        from contabil_agente.tools.executor_motor import ElementoMapeado
 
         # Criar elemento
         elemento = ElementoMapeado(
@@ -147,7 +147,7 @@ def teste_4_constantes():
     print_header("TESTE 4: Constantes da Classe")
 
     try:
-        from tools.executor_motor import AccountingBot
+        from contabil_agente.tools.executor_motor import AccountingBot
 
         # Validar constantes
         assert AccountingBot.TIMEOUT_PADRAO == 30000, "TIMEOUT_PADRAO incorreto"

@@ -11,11 +11,11 @@ from typing import Any, Dict, List
 try:
     from contabil_agente.core.config import Config
 except ImportError:
-    from core.config import Config
+    from contabil_agente.core.config import Config
 try:
     from contabil_agente.utils.audit import send_audit
 except ImportError:
-    from utils.audit import send_audit
+    from contabil_agente.utils.audit import send_audit
 
 
 class ToolAdmissao:

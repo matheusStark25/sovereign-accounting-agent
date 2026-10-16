@@ -9,8 +9,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any, Dict
 
-from core.config import Config
-from utils.audit import send_audit
+from contabil_agente.core.config import Config
+from contabil_agente.utils.audit import send_audit
 
 
 class ToolDARF:

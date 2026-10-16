@@ -7,8 +7,8 @@ import os
 import sys
 from decimal import Decimal
 
-from core.legislacao import legislacao
-from services.validation_service import validation_service
+from contabil_agente.core.legislacao import legislacao
+from contabil_agente.services.validation_service import validation_service
 
 # Adiciona path do projeto
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -8,7 +8,7 @@ from typing import List, Tuple, Optional
 
 # Blindagem de importação / fallback para configuração
 try:
-    from config.settings import DB_NAME as CONFIG_DB_NAME
+    from contabil_agente.config.settings import DB_NAME as CONFIG_DB_NAME
 except Exception:
     CONFIG_DB_NAME = None
 

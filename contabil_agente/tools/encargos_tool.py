@@ -6,7 +6,7 @@ Calcula INSS patronal, RAT, Terceiros, FGTS
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict
 
-from utils.audit import send_audit
+from contabil_agente.utils.audit import send_audit
 
 
 class ToolEncargosPatronais:

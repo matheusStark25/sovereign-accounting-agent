@@ -36,14 +36,14 @@ from reportlab.lib.units import mm
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
-from core.config import Config
+from contabil_agente.core.config import Config
 
 # Import DatabasePool defensively: prefer package-local contabil_agente.core.database
 try:
     from contabil_agente.core.database import DatabasePool  # type: ignore
 except Exception:
     try:
-        from core.database import DatabasePool  # type: ignore
+        from contabil_agente.core.database import DatabasePool  # type: ignore
     except Exception:
         DatabasePool = None  # type: ignore
 
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
         from contabil_agente.core.database import DatabasePool  # type: ignore
     except Exception:
         try:
-            from core.database import DatabasePool  # type: ignore
+            from contabil_agente.core.database import DatabasePool  # type: ignore
         except Exception:
             DatabasePool = Any  # type: ignore
 from .base_sovereign import BaseSovereignTool
@@ -301,7 +301,7 @@ class FGTSRescisorioTool(BaseSovereignTool):
     def _apply_signature(self, pdf_bytes: bytes, inp: FGTSInputModel) -> None:
         # Best-effort stub: fetch certificate from Vault and call TSA client.
         try:
-            from security.vault_manager import VaultManager
+            from contabil_agente.security.vault_manager import VaultManager
 
             vault = VaultManager()
             cert_pem = vault.get_cert("signing/a1")

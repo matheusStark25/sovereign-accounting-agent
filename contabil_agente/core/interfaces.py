@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Protocol, Any, Dict
-from models.rescisao import RescisaoInput
+from contabil_agente.models.rescisao import RescisaoInput
 
 
 class CalculoToolProtocol(Protocol):

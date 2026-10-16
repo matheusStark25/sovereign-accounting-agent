@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def _get_broker_url() -> Optional[str]:
     # Prefer Config if available, otherwise env
     try:
-        from core.config import Config
+        from contabil_agente.core.config import Config
 
         broker = getattr(Config, "CELERY_BROKER_URL", None) or os.environ.get(
             "CELERY_BROKER_URL"

@@ -35,7 +35,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY") or "SUA_CHAVE_AQUI"
 
 # Prompt do agente - importe do `core.prompts` (fallback vazio se indisponível)
 try:
-    from core.prompts import SYSTEM_PROMPT
+    from contabil_agente.core.prompts import SYSTEM_PROMPT
 except Exception:
     SYSTEM_PROMPT = ""
 

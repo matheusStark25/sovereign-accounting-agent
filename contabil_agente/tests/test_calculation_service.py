@@ -12,7 +12,7 @@ Baseado em:
 import unittest
 from decimal import Decimal
 
-from services.calculation_service import (
+from contabil_agente.services.calculation_service import (
     Calculadora13Salario,
     CalculadoraAdicionais,
     CalculadoraFerias,

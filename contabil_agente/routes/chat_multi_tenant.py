@@ -6,9 +6,9 @@ import logging
 import uuid
 
 from flask import Blueprint, jsonify, request
-from middleware.auth import get_current_empresa, require_api_key
-from services.chat_service import ChatService
-from services.session_service import SessionService
+from contabil_agente.middleware.auth import get_current_empresa, require_api_key
+from contabil_agente.services.chat_service import ChatService
+from contabil_agente.services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
 

@@ -37,7 +37,7 @@ logging.basicConfig(
 
 # --- Group D integrations ---
 try:
-    from core.settings import settings
+    from contabil_agente.core.settings import settings
 except Exception:
     settings = None
 
@@ -51,14 +51,14 @@ except Exception:
         Config = None  # type: ignore
 
 try:
-    from governance.redaction import RedactionFilter
+    from contabil_agente.governance.redaction import RedactionFilter
 
     # install redaction filter globally so all logs are sanitized
     logging.getLogger().addFilter(RedactionFilter())
 except Exception:
     logger.warning("Redaction filter unavailable")
 try:
-    from backend.app import app, _vault, _audit_logger, _start_cleanup, _graceful_shutdown, _intelligence  # type: ignore
+    from contabil_agente.backend.app import app, _vault, _audit_logger, _start_cleanup, _graceful_shutdown, _intelligence  # type: ignore
 except Exception:
     app = None
     _vault = None
@@ -299,7 +299,7 @@ def validar_data(s: str) -> bool:
 
 # Backwards-compatibility: prefer backend.app for canonical app and infra
 try:
-    from backend.app import app, _vault, _audit_logger, _start_cleanup, _graceful_shutdown, _intelligence  # type: ignore
+    from contabil_agente.backend.app import app, _vault, _audit_logger, _start_cleanup, _graceful_shutdown, _intelligence  # type: ignore
 except Exception:
     # fall back to original app modules when backend shim unavailable
     try:

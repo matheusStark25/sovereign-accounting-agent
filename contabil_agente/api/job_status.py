@@ -17,12 +17,12 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 try:
-    from infra.job_state import JobStateManager, JobStatus
+    from contabil_agente.infra.job_state import JobStateManager, JobStatus
 except ImportError:
     from contabil_agente.infra.job_state import JobStateManager, JobStatus
 
 try:
-    from services.workflow_manager import WorkflowManager
+    from contabil_agente.services.workflow_manager import WorkflowManager
 except ImportError:
     from contabil_agente.services.workflow_manager import WorkflowManager
 

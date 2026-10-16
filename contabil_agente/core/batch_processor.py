@@ -9,16 +9,16 @@ import time
 from decimal import Decimal
 from pathlib import Path
 
-from models.rescisao import RescisaoInput
-from core.interfaces import CalculoToolProtocol, PDFToolProtocol, AuditServiceProtocol
-from core.monitor import MetricsCollector, Timer
-from core.cache import CalculationCache
-from utils.csv_handler import CSVHandler
-from utils.retry import retry
-from core.config import load_settings
-from core.checkpoint import Checkpoint
-from core.atomic_writer import compute_hash, atomic_write_bytes
-from utils.pdf_generator import generate_trct_pdf
+from contabil_agente.models.rescisao import RescisaoInput
+from contabil_agente.core.interfaces import CalculoToolProtocol, PDFToolProtocol, AuditServiceProtocol
+from contabil_agente.core.monitor import MetricsCollector, Timer
+from contabil_agente.core.cache import CalculationCache
+from contabil_agente.utils.csv_handler import CSVHandler
+from contabil_agente.utils.retry import retry
+from contabil_agente.core.config import load_settings
+from contabil_agente.core.checkpoint import Checkpoint
+from contabil_agente.core.atomic_writer import compute_hash, atomic_write_bytes
+from contabil_agente.utils.pdf_generator import generate_trct_pdf
 
 
 class BatchProcessor:

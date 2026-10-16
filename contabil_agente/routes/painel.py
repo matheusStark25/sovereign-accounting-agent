@@ -1,5 +1,5 @@
 from flask import Blueprint  # type: ignore
-from services.historico_service import recuperar_historico  # type: ignore
+from contabil_agente.services.historico_service import recuperar_historico  # type: ignore
 
 painel_bp = Blueprint("painel_bp", __name__)
 

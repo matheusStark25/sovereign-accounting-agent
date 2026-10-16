@@ -73,7 +73,7 @@ class AuditedTask(Task):
     def on_success(self, retval: Any, task_id: str, args: tuple, kwargs: dict) -> None:
         """Callback executado após sucesso da task"""
         try:
-            from services.evidence_service import GerenciadorEvidencias
+            from contabil_agente.services.evidence_service import GerenciadorEvidencias
 
             gerenciador = GerenciadorEvidencias()
             gerenciador.registrar_evidencia(
@@ -102,7 +102,7 @@ class AuditedTask(Task):
     ) -> None:
         """Callback executado após falha da task"""
         try:
-            from services.evidence_service import GerenciadorEvidencias
+            from contabil_agente.services.evidence_service import GerenciadorEvidencias
 
             gerenciador = GerenciadorEvidencias()
             gerenciador.registrar_evidencia(
@@ -148,7 +148,7 @@ def task_prerun_handler(task_id: str, task: Task, *args, **kwargs) -> None:
 
     # Atualiza estado no Redis
     try:
-        from infra.job_state import JobStateManager
+        from contabil_agente.infra.job_state import JobStateManager
 
         state_manager = JobStateManager()
         state_manager.update_state(
@@ -167,7 +167,7 @@ def task_postrun_handler(task_id: str, task: Task, *args, **kwargs) -> None:
 
     # Atualiza estado final no Redis
     try:
-        from infra.job_state import JobStateManager
+        from contabil_agente.infra.job_state import JobStateManager
 
         state_manager = JobStateManager()
 
@@ -194,7 +194,7 @@ def task_failure_handler(task_id: str, exception: Exception, *args, **kwargs) ->
 
     # Atualiza estado de falha no Redis
     try:
-        from infra.job_state import JobStateManager
+        from contabil_agente.infra.job_state import JobStateManager
 
         state_manager = JobStateManager()
         state_manager.update_state(

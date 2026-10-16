@@ -23,8 +23,8 @@ Adicione estas linhas ao seu app.py existente
 
 # ===== ADICIONAR APÓS OS IMPORTS EXISTENTES =====
 
-from api.job_status import register_job_api  # noqa: E402
-from services.workflow_manager import WorkflowManager  # noqa: E402
+from contabil_agente.api.job_status import register_job_api  # noqa: E402
+from contabil_agente.services.workflow_manager import WorkflowManager  # noqa: E402
 
 # ===== ADICIONAR APÓS CRIAR O APP FLASK =====
 
@@ -63,7 +63,7 @@ def test_job_endpoint():
     """
     try:
         from flask import jsonify, request
-        from infra.tasks import processar_folha_pagamento
+        from contabil_agente.infra.tasks import processar_folha_pagamento
 
         data = request.get_json() or {}
         empresa_id = data.get("empresa_id", "TEST001")
@@ -127,7 +127,7 @@ def health_workers():
     """
     try:
         from flask import jsonify
-        from infra.worker import celery_app
+        from contabil_agente.infra.worker import celery_app
 
         # Verifica workers ativos
         inspect = celery_app.control.inspect()

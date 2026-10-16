@@ -7,7 +7,7 @@ from typing import Any, Optional
 try:
     from contabil_agente.services.event_bus import get_event_bus
 except ImportError:
-    from services.event_bus import get_event_bus
+    from contabil_agente.services.event_bus import get_event_bus
 
 logger = logging.getLogger("contabil_agente.outbox")
 
