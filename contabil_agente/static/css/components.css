@@ -1,0 +1,174 @@
+/* UI Components - Buttons, Badges, Tooltips */
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary-blue);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-blue-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Badges */
+.tool-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--transition-base);
+  opacity: 0.5;
+}
+
+.tool-badge.active {
+  opacity: 1;
+  animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
+.badge-calc {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.badge-pdf {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.badge-sign {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+/* Status LED */
+.status-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-led.online {
+  background: var(--success-green);
+  box-shadow: 0 0 8px var(--success-green);
+}
+
+.status-led.offline {
+  background: var(--text-muted);
+}
+
+/* Tooltips */
+.tooltip {
+  position: relative;
+  cursor: help;
+}
+
+.tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 6px 12px;
+  background: #1e293b;
+  color: white;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+}
+
+.tooltip:hover::before {
+  opacity: 1;
+}
+
+/* Voice button */
+.voice-btn {
+  background: var(--bg-darker);
+  color: var(--text-light);
+  border: 1px solid var(--border-color);
+}
+
+.voice-btn:hover:not(:disabled) {
+  background: var(--bg-dark);
+  border-color: var(--primary-blue);
+}
+
+.voice-btn.listening {
+  background: var(--danger-red);
+  color: white;
+  border-color: var(--danger-red);
+  animation: voicePulse 1.5s infinite;
+}
+
+@keyframes voicePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+}
+
+/* Audit log */
+.audit-entry {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(30, 41, 59, 0.5);
+  border-left: 3px solid var(--primary-blue);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  transition: all var(--transition-fast);
+}
+
+.audit-entry:hover {
+  background: rgba(30, 41, 59, 0.8);
+  transform: translateX(4px);
+}

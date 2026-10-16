@@ -1,0 +1,129 @@
+{
+  "nome": "Fluxo de Emissão de Nota Fiscal",
+  "descricao": "Automação completa para emissão de NF-e no sistema contábil",
+  "versao": "1.0.0",
+  "tenant_id": "MATRIZ-CONTABIL-SISTEMA",
+  "acoes": [
+    {
+      "tipo": "goto",
+      "url": "https://sistema-contabil.exemplo.com/notas-fiscais/nova",
+      "timeout": 30000,
+      "descricao": "Navegar para página de emissão de NF-e"
+    },
+    {
+      "tipo": "wait",
+      "selector": "#form-nfe",
+      "timeout": 10000,
+      "descricao": "Aguardar formulário carregar"
+    },
+    {
+      "tipo": "select",
+      "selector": "#tipo-operacao",
+      "value": "venda",
+      "descricao": "Selecionar tipo de operação"
+    },
+    {
+      "tipo": "fill",
+      "selector": "#cliente-cnpj",
+      "value": "12.345.678/0001-90",
+      "descricao": "Preencher CNPJ do cliente"
+    },
+    {
+      "tipo": "press",
+      "selector": "#cliente-cnpj",
+      "key": "Tab",
+      "descricao": "Disparar busca automática do cliente"
+    },
+    {
+      "tipo": "wait",
+      "selector": ".cliente-encontrado",
+      "timeout": 8000,
+      "descricao": "Aguardar dados do cliente carregarem"
+    },
+    {
+      "tipo": "fill",
+      "selector": "#produto-codigo",
+      "value": "PROD-001",
+      "descricao": "Preencher código do produto"
+    },
+    {
+      "tipo": "fill",
+      "selector": "#produto-quantidade",
+      "value": "10",
+      "descricao": "Preencher quantidade"
+    },
+    {
+      "tipo": "fill",
+      "selector": "#produto-valor-unitario",
+      "value": "150.00",
+      "descricao": "Preencher valor unitário"
+    },
+    {
+      "tipo": "click",
+      "selector": "#btn-adicionar-item",
+      "descricao": "Adicionar item à nota"
+    },
+    {
+      "tipo": "wait",
+      "selector": ".item-adicionado",
+      "timeout": 5000,
+      "descricao": "Aguardar item ser adicionado"
+    },
+    {
+      "tipo": "screenshot",
+      "path": "nfe_preenchida.png",
+      "full_page": true,
+      "descricao": "Capturar screenshot da NF-e preenchida"
+    },
+    {
+      "tipo": "hover",
+      "selector": "#btn-validar",
+      "descricao": "Destacar botão de validação"
+    },
+    {
+      "tipo": "click",
+      "selector": "#btn-validar",
+      "descricao": "Validar dados da nota"
+    },
+    {
+      "tipo": "wait",
+      "selector": ".validacao-sucesso",
+      "timeout": 15000,
+      "descricao": "Aguardar validação"
+    },
+    {
+      "tipo": "click",
+      "selector": "#btn-transmitir",
+      "descricao": "Transmitir NF-e para SEFAZ"
+    },
+    {
+      "tipo": "wait",
+      "selector": ".transmissao-concluida",
+      "timeout": 30000,
+      "descricao": "Aguardar transmissão (pode demorar)"
+    },
+    {
+      "tipo": "screenshot",
+      "path": "nfe_autorizada.png",
+      "full_page": true,
+      "descricao": "Capturar screenshot da NF-e autorizada"
+    },
+    {
+      "tipo": "download",
+      "selector": "#btn-download-xml",
+      "descricao": "Baixar XML da NF-e"
+    },
+    {
+      "tipo": "download",
+      "selector": "#btn-download-pdf",
+      "descricao": "Baixar DANFE (PDF)"
+    }
+  ],
+  "metadata": {
+    "autor": "Principal Automation Engineer",
+    "criado_em": "2026-02-04",
+    "tags": ["nfe", "emissao", "fiscal"],
+    "ambiente": "producao",
+    "criticidade": "alta"
+  }
+}

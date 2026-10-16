@@ -1,0 +1,7 @@
+--- 2026-01-30T16:53:05.040852 ---
+flask_parsed={'mensagem': 'Por favor, gerar documento contrato de teste'}
+raw=b'{"mensagem": "Por favor, gerar documento contrato de teste"}'
+dados={'mensagem': 'Por favor, gerar documento contrato de teste'}
+mensagem='Por favor, gerar documento contrato de teste'
+confirmado=False
+

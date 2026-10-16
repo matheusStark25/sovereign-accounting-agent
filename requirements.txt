@@ -1,0 +1,70 @@
+# ===== DEPENDÊNCIAS PRINCIPAIS =====
+Flask==3.0.0
+flask-cors==4.0.0
+flask-limiter==3.5.0
+python-dotenv==1.0.0
+groq==1.0.0
+PyJWT==2.8.0
+Pydantic>=2.12.5
+
+# ===== JOBS ASSÍNCRONOS E ORQUESTRAÇÃO =====
+celery==5.3.4
+redis==5.0.1
+kombu==5.3.4  # Biblioteca de mensageria do Celery
+vine==5.1.0    # Dependência do Celery
+billiard==4.2.0  # Pool de processos do Celery
+
+# ===== GERAÇÃO DE DOCUMENTOS =====
+reportlab==4.0.7
+# Use pypdf (successor of PyPDF2) to avoid deprecation warnings
+pypdf==3.16.0
+
+# ===== SEGURANÇA E CRIPTOGRAFIA =====
+cryptography==41.0.7  # Para assinatura digital
+bcrypt==4.1.2  # Para hash de senhas
+
+# ===== EXTRAÇÃO DE DADOS E OCR (OPCIONAL) =====
+# Descomente para habilitar extração de dados de documentos
+# pytesseract==0.3.10
+# pillow==10.1.0
+# pdf2image==1.16.3
+# spacy==3.7.2  # Para NER avançado (requer: python -m spacy download pt_core_news_sm)
+
+# ===== AGENDAMENTO E JOBS =====
+APScheduler==3.10.4
+
+# ===== TESTES E ANÁLISE =====
+selenium==4.15.2
+
+# ===== WEBSOCKETS (OPCIONAL) =====
+# Descomente se precisar de WebSocket real-time
+# flask-socketio==5.3.5
+# python-socketio==5.10.0
+
+# ===== PRODUÇÃO =====
+gunicorn==21.2.0  # Para deploy em produção
+eventlet==0.33.3  # Worker assíncrono para Celery
+
+# Additional requirements for crypto, process/window and automation
+pycryptodome==3.23.0
+psutil==7.2.2
+pygetwindow==0.0.9
+pywinauto==0.6.9
+pyautogui==0.9.54
+python-dotenv==1.2.1
+fastapi==0.133.0
+uvicorn[standard]==0.41.0
+python-jose[cryptography]==3.5.0
+passlib==1.7.4
+hvac==2.4.0
+httpx==0.28.1
+pytest==9.0.2
+pytest-asyncio==1.3.0
+arq==0.27.0
+aioboto3==15.5.0
+tenacity==9.1.4
+
+# TTS dependencies
+gTTS==2.5.4
+pyttsx3==2.99
+portalocker==2.8.0

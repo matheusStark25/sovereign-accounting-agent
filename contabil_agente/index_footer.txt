@@ -1,0 +1,121 @@
+﻿        const lastResult = event.results[event.results.length - 1];
+        if (!lastResult || !lastResult.isFinal) return;
+
+        const transcript = lastResult[0]?.transcript || "";
+        if (transcript.trim()) {
+          document.getElementById('userInput').value = transcript.trim();
+          stopVoiceRecognition();
+          wasVoiceInput = true;
+          sendMessage();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Erro de voz:", event.error);
+        stopVoiceRecognition();
+        addAIMessage(" Erro no reconhecimento de voz. Tente novamente.");
+      };
+
+      recognition.onend = () => {
+        stopVoiceRecognition();
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error("Falha ao iniciar voz:", error);
+        addAIMessage(" Não foi possível iniciar o microfone.");
+      }
+    }
+
+    function stopVoiceRecognition() {
+      isListening = false;
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch (e) {
+          console.warn("Erro ao parar reconhecimento:", e);
+        }
+        recognition = null;
+      }
+
+      const voiceBtn = document.getElementById('voiceButton');
+      voiceBtn.classList.remove('listening');
+      voiceBtn.title = "Falar com o Agente";
+    }
+
+    function playAudioResponse(audioUrl) {
+      try {
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio = null;
+        }
+        
+        currentAudio = new Audio(apiPath(audioUrl));
+        currentAudio.play().catch(err => {
+          console.error('Erro ao tocar áudio:', err);
+        });
+        
+        currentAudio.onended = () => {
+          currentAudio = null;
+        };
+      } catch (error) {
+        console.error('Erro ao reproduzir áudio:', error);
+      }
+    }
+
+    function updateSendButton() {
+      const input = document.getElementById('userInput');
+      const button = document.getElementById('sendButton');
+      if (input && button) {
+        button.disabled = isProcessing || !input.value.trim();
+      }
+    }
+
+    // INICIALIZAÇÃO
+    window.addEventListener('DOMContentLoaded', () => {
+      // ENTER para enviar
+      document.getElementById('userInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      // Atualizar botão de enviar quando digitar
+      document.getElementById('userInput').addEventListener('input', updateSendButton);
+
+      // Mensagem de boas-vindas profissional
+      setTimeout(() => {
+        const welcomeMsg =  **Olá! Sou o Marcos, seu parceiro de Departamento Pessoal.**
+
+**Estou aqui para ajudar com:**
+
+ **Cálculos Trabalhistas Precisos**
+ Rescisões (com ou sem justa causa)
+ Férias individuais e coletivas  
+ 13º salário (parcelas e adiantamentos)
+ Folha de pagamento completa
+
+ **23+ Tipos de Documentos Profissionais**
+ Contratos de trabalho e aditivos
+ Termos de rescisão (TRCT)
+ Avisos prévios e afastamentos
+ Declarações e atestados
+ Advertências e suspensões
+ Transferências entre filiais
+ Alterações salariais e de função
+
+ **Consultoria Especializada**
+ Legislação trabalhista (CLT)
+ Normas e convenções coletivas
+ Processos de admissão e demissão
+ Gestão de benefícios
+
+**Digite sua solicitação ou clique no microfone  para falar!**;
+        addAIMessage(welcomeMsg);
+      }, 500);
+    });
+  </script>
+</body>
+</html>

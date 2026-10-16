@@ -1,0 +1,215 @@
+{
+  "versao": "1.0.0",
+  "ano": 2026,
+  "fonte": "Receita Federal do Brasil / Ministério do Trabalho",
+  "atualizado_em": "2026-01-01T00:00:00Z",
+  "hash_sha256": "a1b2c3d4e5f6...",
+  "aprovado_por": "Contador Responsável - CRC XXXXX",
+  "salario_minimo": 1518.00,
+  "changelog": [
+    {
+      "versao": "1.0.0",
+      "data": "2026-01-01",
+      "alteracoes": [
+        "Criação inicial com tabelas oficiais 2026",
+        "Inclusão de férias, 13º salário e rescisão",
+        "Adição de periculosidade e insalubridade"
+      ],
+      "aprovado_por": "Contador Responsável - CRC XXXXX"
+    }
+  ],
+  "inss": {
+    "descricao": "Tabela INSS 2026 - Contribuição Previdenciária",
+    "faixas": [
+      {
+        "min": 0.00,
+        "max": 1518.00,
+        "aliquota": 0.075,
+        "deducao": 0.00,
+        "descricao": "Até 1 salário mínimo - 7,5%"
+      },
+      {
+        "min": 1412.01,
+        "max": 2427.35,
+        "aliquota": 0.09,
+        "deducao": 0.00,
+        "descricao": "De R$ 1.412,01 até R$ 2.427,35 - 9%"
+      },
+      {
+        "min": 2427.36,
+        "max": 3641.03,
+        "aliquota": 0.12,
+        "deducao": 0.00,
+        "descricao": "De R$ 2.427,36 até R$ 3.641,03 - 12%"
+      },
+      {
+        "min": 3641.04,
+        "max": 8157.41,
+        "aliquota": 0.14,
+        "deducao": 0.00,
+        "descricao": "De R$ 3.641,04 até R$ 8.157,41 (teto) - 14%"
+      }
+    ],
+    "teto_maximo": 8157.41,
+    "observacao": "Valores progressivos - cada faixa incide apenas sobre o valor dentro dela"
+  },
+  "irrf": {
+    "descricao": "Tabela IRRF 2026 - Imposto de Renda Retido na Fonte",
+    "faixas": [
+      {
+        "min": 0.00,
+        "max": 2259.20,
+        "aliquota": 0.00,
+        "deducao": 0.00,
+        "descricao": "Isento - Até R$ 2.259,20"
+      },
+      {
+        "min": 2259.21,
+        "max": 2828.65,
+        "aliquota": 0.075,
+        "deducao": 169.44,
+        "descricao": "De R$ 2.259,21 até R$ 2.828,65 - 7,5%"
+      },
+      {
+        "min": 2828.66,
+        "max": 3751.05,
+        "aliquota": 0.15,
+        "deducao": 381.44,
+        "descricao": "De R$ 2.828,66 até R$ 3.751,05 - 15%"
+      },
+      {
+        "min": 3751.06,
+        "max": 4664.68,
+        "aliquota": 0.225,
+        "deducao": 662.77,
+        "descricao": "De R$ 3.751,06 até R$ 4.664,68 - 22,5%"
+      },
+      {
+        "min": 4664.69,
+        "max": 999999999.99,
+        "aliquota": 0.275,
+        "deducao": 896.00,
+        "descricao": "Acima de R$ 4.664,68 - 27,5%"
+      }
+    ],
+    "deducao_dependente": 189.59,
+    "observacao": "Fórmula: (Base de Cálculo × Alíquota) - Parcela a Deduzir"
+  },
+  "fgts": {
+    "aliquota_mensal": 0.08,
+    "multa_rescisao_sem_justa_causa": 0.40,
+    "descricao": "8% mensal sobre o salário bruto + 40% de multa em rescisão sem justa causa"
+  },
+  "ferias": {
+    "descricao": "Cálculo de Férias - CLT Art. 129 a 153",
+    "remuneracao_base": 1.0,
+    "adicional_constitucional": 0.3333,
+    "abono_pecuniario_maximo": 0.3333,
+    "proporcional_meses": 12,
+    "dias_ferias_integrais": 30,
+    "faltas_permitidas": {
+      "ate_5_faltas": 30,
+      "6_a_14_faltas": 24,
+      "15_a_23_faltas": 18,
+      "24_a_32_faltas": 12
+    },
+    "observacao": "Férias = (Salário + Média Variáveis) × (1 + 1/3). Incide INSS e IRRF."
+  },
+  "decimo_terceiro": {
+    "descricao": "13º Salário - Lei 4.090/1962 e Lei 4.749/1965",
+    "proporcional_meses": 12,
+    "primeira_parcela": 0.50,
+    "segunda_parcela": 0.50,
+    "prazo_primeira_parcela": "até 30 de novembro",
+    "prazo_segunda_parcela": "até 20 de dezembro",
+    "base_calculo": "Salário + Média Variáveis dos últimos 12 meses",
+    "observacao": "1ª parcela: 50% do salário (sem descontos). 2ª parcela: 50% restante menos INSS e IRRF."
+  },
+  "rescisao": {
+    "descricao": "Cálculo de Rescisão - CLT Art. 477 e seguintes",
+    "saldo_salario": {
+      "dias_trabalhados": "proporcional"
+    },
+    "aviso_previo": {
+      "dias_base": 30,
+      "dias_adicionais_por_ano": 3,
+      "maximo_dias": 90,
+      "indenizado": true,
+      "observacao": "30 dias + 3 dias por ano trabalhado, limitado a 90 dias"
+    },
+    "ferias_vencidas": {
+      "incluir": true,
+      "adicional_um_terco": true
+    },
+    "ferias_proporcionais": {
+      "incluir": true,
+      "meses_minimos": 1,
+      "adicional_um_terco": true
+    },
+    "decimo_terceiro_proporcional": {
+      "incluir": true,
+      "meses_minimos": 1
+    },
+    "multa_fgts": {
+      "sem_justa_causa": 0.40,
+      "descricao": "40% sobre saldo FGTS em rescisão sem justa causa"
+    },
+    "observacao": "Rescisão inclui: saldo salário, aviso prévio, férias vencidas/proporcionais + 1/3, 13º proporcional, multa FGTS 40%"
+  },
+  "adicionais": {
+    "periculosidade": {
+      "aliquota": 0.30,
+      "base_calculo": "salario_base",
+      "descricao": "30% sobre o salário base - NR 16",
+      "integra_inss": true,
+      "integra_irrf": true,
+      "integra_fgts": true,
+      "integra_ferias": true,
+      "integra_13": true
+    },
+    "insalubridade": {
+      "grau_minimo": 0.10,
+      "grau_medio": 0.20,
+      "grau_maximo": 0.40,
+      "base_calculo": "salario_minimo",
+      "descricao": "10%, 20% ou 40% sobre salário mínimo - NR 15",
+      "integra_inss": true,
+      "integra_irrf": true,
+      "integra_fgts": true,
+      "integra_ferias": true,
+      "integra_13": true
+    },
+    "horas_extras": {
+      "percentual_50": 0.50,
+      "percentual_100": 1.00,
+      "descricao": "50% dias úteis, 100% domingos/feriados",
+      "calculo": "valor_hora × (1 + percentual) × quantidade",
+      "integra_inss": true,
+      "integra_irrf": true,
+      "integra_fgts": true,
+      "integra_ferias": true,
+      "integra_13": true,
+      "observacao": "Média dos últimos 12 meses para férias e 13º"
+    }
+  },
+  "legislacao": {
+    "inss": "Portaria Interministerial MPS/MF nº XX/2026",
+    "irrf": "Lei nº 13.149/2015 com atualizações",
+    "fgts": "Lei nº 8.036/1990",
+    "ferias": "CLT Art. 129 a 153",
+    "decimo_terceiro": "Lei 4.090/1962 e Lei 4.749/1965",
+    "rescisao": "CLT Art. 477 e seguintes",
+    "periculosidade": "NR 16 - Portaria 3.214/78",
+    "insalubridade": "NR 15 - Portaria 3.214/78",
+    "horas_extras": "CLT Art. 59"
+  },
+  "governance": {
+    "politica_atualizacao": "Tabelas devem ser atualizadas anualmente com valores oficiais publicados pelo governo",
+    "responsavel_atualizacao": "Contador Responsável com CRC ativo",
+    "aprovacao_obrigatoria": true,
+    "versionamento": "Semantic Versioning (MAJOR.MINOR.PATCH)",
+    "rollback_disponivel": true,
+    "auditoria": "Todas as alterações são registradas no changelog com aprovação contábil"
+  },
+  "aviso": "IMPORTANTE: Estas tabelas devem ser atualizadas TODO ANO com os valores OFICIAIS publicados pelo governo. NÃO calcule proporcionalmente - use apenas valores OFICIAIS!"
+}

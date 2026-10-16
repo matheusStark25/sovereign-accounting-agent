@@ -1,0 +1,84 @@
+name: CI/CD Pipeline Elite - Agente Contabil
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # 1. ANALISE DE QUALIDADE (LINT & SECURITY)
+  quality_gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Quality Tools
+        run: pip install flake8 mypy safety
+      
+      - name: Linting (Standard Stark)
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      
+      - name: Security Scan (Dependencies)
+        run: |
+          safety check || echo "Aviso: Vulnerabilidades detectadas nas dependencias."
+
+  # 2. TESTES DE NUCLEO (BACKEND)
+  backend_tests:
+    needs: quality_gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements_new.txt ]; then pip install -r requirements_new.txt; fi
+          pip install pytest pytest-cov
+      
+      - name: Execute Rescisao & Calculation Tests
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          pytest tests/ -v --cov=contabil_agente --cov-report=xml
+
+  # 3. BUILD DOCKER (QUALIDADE INDUSTRIAL)
+  # Este bloco agora SO executa se voce configurar o Docker Hub, senao ele pula com elegancia
+  build_docker:
+    needs: backend_tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Docker Secrets
+        id: check_secrets
+        run: |
+          if [ "${{ secrets.DOCKER_USERNAME }}" != "" ]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "enabled=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Login to Docker Hub
+        if: steps.check_secrets.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Elite Image
+        if: steps.check_secrets.outputs.enabled == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.production
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/agente-contabil:latest

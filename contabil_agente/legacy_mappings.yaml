@@ -1,0 +1,11 @@
+# Mapeamentos externos para campos do Alterdata / eSocial
+# Formato: sistema: field_id -> selector
+alterdata:
+  empresa_nome: "#empresa_nome"
+  cnpj: "input[name='cnpj']"
+  salario: "#salario"
+
+esocial:
+  trabalhador_nome: "#nome_trabalhador"
+  cpf: "input[name='cpf']"
+  data_admissao: "#data_admissao"

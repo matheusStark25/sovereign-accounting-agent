@@ -1,0 +1,23 @@
+# Dependências do Motor de Execução Robótica (RPA)
+# =====================================================
+# Instalar com: pip install -r tools/requirements_executor.txt
+
+# Playwright - Motor de automação de navegadores
+playwright>=1.40.0
+
+# Asyncio support (já incluso no Python 3.7+, mas garantir compatibilidade)
+typing-extensions>=4.0.0
+
+# Para logs e análise de dados
+python-dateutil>=2.8.0
+
+# Para validação de schemas JSON (opcional, mas recomendado)
+jsonschema>=4.17.0
+
+# Para testes (opcional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-playwright>=0.4.0
+
+# Para análise de performance (opcional)
+aiofiles>=23.0.0

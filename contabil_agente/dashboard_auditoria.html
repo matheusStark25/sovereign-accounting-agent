@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Auditoria - Contabil Agente</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        }
+        
+        .card h2 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #1e3c72;
+            border-bottom: 2px solid #2a5298;
+            padding-bottom: 10px;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 8px 0;
+        }
+        
+        .stat label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .stat .value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2a5298;
+        }
+        
+        .stat.success .value {
+            color: #27ae60;
+        }
+        
+        .stat.error .value {
+            color: #e74c3c;
+        }
+        
+        .percent-bar {
+            width: 100%;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .percent-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #27ae60, #2ecc71);
+            transition: width 0.3s ease;
+        }
+        
+        .alert-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .alert-item.alta {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        
+        .alert-item.critica {
+            background: #f5c6cb;
+            border-left-color: #721c24;
+        }
+        
+        .alert-item .msg {
+            flex: 1;
+            font-size: 0.95em;
+        }
+        
+        .alert-item button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+        
+        .alert-item button:hover {
+            background: #5a6268;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-badge.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .refresh-btn {
+            background: #2a5298;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95em;
+            margin: 20px 0;
+            transition: background 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #1e3c72;
+        }
+        
+        .timestamp {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Dashboard de Auditoria</h1>
+            <p>Contabil Agente - Governança em Tempo Real</p>
+        </header>
+        
+        <button class="refresh-btn" onclick="refreshDashboard()">🔄 Atualizar Agora</button>
+        
+        <!-- Estatísticas -->
+        <div class="grid">
+            <div class="card">
+                <h2>📊 Estatísticas (24h)</h2>
+                <div class="stat">
+                    <label>Total de Operações:</label>
+                    <span class="value" id="total-ops">-</span>
+                </div>
+                <div class="stat success">
+                    <label>Sucesso:</label>
+                    <span class="value" id="sucesso-ops">-</span>
+                </div>
+                <div class="stat error">
+                    <label>Falhas:</label>
+                    <span class="value" id="falha-ops">-</span>
+                </div>
+                <div class="percent-bar">
+                    <div class="percent-bar-fill" id="taxa-fill" style="width: 0%"></div>
+                </div>
+                <div class="stat">
+                    <label>Taxa de Sucesso:</label>
+                    <span class="value" id="taxa-sucesso">0%</span>
+                </div>
+                <div class="timestamp" id="timestamp-stats"></div>
+            </div>
+            
+            <div class="card">
+                <h2>⚠️ Alertas Ativos</h2>
+                <div id="alertas-container">
+                    <div class="empty-state">Nenhum alerta ativo</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>✅ Aprovações Pendentes</h2>
+                <div id="aprovacoes-container">
+                    <div class="empty-state">Nenhuma aprovação pendente</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Histórico -->
+        <div class="card">
+            <h2>📝 Histórico de Operações (Últimas 50)</h2>
+            <div class="table-container">
+                <table id="historico-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Intenção</th>
+                            <th>Status</th>
+                            <th>Tempo (ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historico-tbody">
+                        <tr><td colspan="4" class="empty-state">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="timestamp" id="timestamp-historico"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api/auditoria';
+        let autoRefreshInterval;
+        
+        async function loadEstatisticas() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/estatisticas?horas=24`);
+                const data = await response.json();
+                
+                document.getElementById('total-ops').textContent = data.total_operacoes;
+                document.getElementById('sucesso-ops').textContent = data.operacoes_sucesso;
+                document.getElementById('falha-ops').textContent = data.operacoes_falha;
+                
+                const taxa = data.taxa_sucesso || 0;
+                document.getElementById('taxa-sucesso').textContent = taxa.toFixed(1) + '%';
+                document.getElementById('taxa-fill').style.width = taxa + '%';
+                
+                document.getElementById('timestamp-stats').textContent = 
+                    'Atualizado: ' + new Date(data.timestamp_geracao).toLocaleTimeString('pt-BR');
+            } catch (error) {
+                console.error('Erro ao carregar estatísticas:', error);
+            }
+        }
+        
+        async function loadAlertas() {
+            try {
+                const response = await fetch(`${API_BASE}/alertas/ativos`);
+                const data = await response.json();
+                const container = document.getElementById('alertas-container');
+                
+                if (data.total === 0) {
+                    container.innerHTML = '<div class="empty-state">✅ Nenhum alerta ativo</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.alertas.map(alerta => `
+                    <div class="alert-item ${alerta.severidade}">
+                        <div class="msg">
+                            <strong>${alerta.tipo}</strong><br>
+                            ${alerta.mensagem}
+                        </div>
+                        <button onclick="resolverAlerta('${alerta.id_alerta}')">Resolver</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar alertas:', error);
+            }
+        }
+        
+        async function loadAprovacoes() {
+            try {
+                const response = await fetch(`${API_BASE}/aprovacoes/pendentes`);
+                const data = await response.json();
+                const container = document.getElementById('aprovacoes-container');
+                
+                if (data.total === 0) {
+                    container.innerHTML = '<div class="empty-state">Nenhuma aprovação pendente</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.pendentes.map(apr => `
+                    <div class="alert-item">
+                        <div class="msg">
+                            <strong>${apr.tipo_decisao}</strong><br>
+                            R$ ${parseFloat(apr.valor).toFixed(2)} - ${apr.usuario_solicitante}
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="aprovarDecisao('${apr.id_aprovacao}')" style="background: #27ae60;">Aprovar</button>
+                            <button onclick="rejeitarDecisao('${apr.id_aprovacao}')" style="background: #e74c3c;">Rejeitar</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Erro ao carregar aprovações:', error);
+            }
+        }
+        
+        async function loadHistorico() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard/historico?limite=50`);
+                const data = await response.json();
+                const tbody = document.getElementById('historico-tbody');
+                
+                if (data.historico.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma operação registrada</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.historico.map(h => `
+                    <tr>
+                        <td>${new Date(h.timestamp).toLocaleString('pt-BR')}</td>
+                        <td>${h.intencao}</td>
+                        <td><span class="status-badge ${h.status === 'sucesso' ? 'success' : 'error'}">${h.status}</span></td>
+                        <td>${h.tempo_ms}</td>
+                    </tr>
+                `).join('');
+                
+                document.getElementById('timestamp-historico').textContent = 
+                    'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+            } catch (error) {
+                console.error('Erro ao carregar histórico:', error);
+            }
+        }
+        
+        async function resolverAlerta(id) {
+            if (!confirm('Marcar alerta como resolvido?')) return;
+            try {
+                await fetch(`${API_BASE}/alertas/${id}/resolver`, { method: 'POST' });
+                loadAlertas();
+            } catch (error) {
+                console.error('Erro ao resolver alerta:', error);
+            }
+        }
+        
+        async function aprovarDecisao(id) {
+            try {
+                await fetch(`${API_BASE}/aprovacoes/${id}/aprovar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario_aprovador: 'admin' })
+                });
+                loadAprovacoes();
+                alert('✅ Decisão aprovada!');
+            } catch (error) {
+                console.error('Erro ao aprovar:', error);
+            }
+        }
+        
+        async function rejeitarDecisao(id) {
+            const motivo = prompt('Motivo da rejeição:');
+            if (!motivo) return;
+            try {
+                await fetch(`${API_BASE}/aprovacoes/${id}/rejeitar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario_aprovador: 'admin', motivo })
+                });
+                loadAprovacoes();
+                alert('❌ Decisão rejeitada!');
+            } catch (error) {
+                console.error('Erro ao rejeitar:', error);
+            }
+        }
+        
+        async function refreshDashboard() {
+            await Promise.all([
+                loadEstatisticas(),
+                loadAlertas(),
+                loadAprovacoes(),
+                loadHistorico()
+            ]);
+        }
+        
+        // Auto-refresh a cada 10 segundos
+        window.addEventListener('load', () => {
+            refreshDashboard();
+            autoRefreshInterval = setInterval(refreshDashboard, 120000); // A cada 2 minutos
+        });
+
+        // Conexão WebSocket via Socket.IO para eventos em tempo real
+        (function(){
+            try {
+                const s = document.createElement('script');
+                s.src = '/socket.io/socket.io.js';
+                s.onload = () => {
+                    try {
+                        const socket = io();
+                        socket.on('connect', () => console.info('Socket.IO conectado'));
+                        socket.on('audit_event', (obj) => {
+                            try {
+                                const tbody = document.getElementById('historico-tbody');
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${new Date(obj.timestamp).toLocaleString('pt-BR')}</td>
+                                    <td>${obj.context?.intencao || obj.message}</td>
+                                    <td><span class="status-badge ${obj.level === 'error' ? 'error' : 'success'}">${obj.level}</span></td>
+                                    <td>-</td>
+                                `;
+                                if (tbody.firstChild && tbody.firstChild.classList && tbody.firstChild.classList.contains('empty-state')) {
+                                    tbody.innerHTML = '';
+                                }
+                                tbody.insertBefore(row, tbody.firstChild);
+                            } catch (err) { console.error('Erro ao processar evento Socket.IO', err); }
+                        });
+                        socket.on('disconnect', () => console.warn('Socket.IO desconectado'));
+                        
+                        // Tool status event listeners
+                        socket.on('tool_calculo_start', (data) => {
+                            console.info('🔵 Cálculo iniciado', data);
+                            const tbody = document.getElementById('historico-tbody');
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(data.timestamp).toLocaleString('pt-BR')}</td>
+                                <td>🧮 Cálculo de rescisão iniciado</td>
+                                <td><span class="status-badge" style="background: #3b82f6;">EM ANDAMENTO</span></td>
+                                <td>-</td>
+                            `;
+                            if (tbody.firstChild && tbody.firstChild.classList && tbody.firstChild.classList.contains('empty-state')) {
+                                tbody.innerHTML = '';
+                            }
+                            tbody.insertBefore(row, tbody.firstChild);
+                        });
+                        
+                        socket.on('tool_calculo_complete', (data) => {
+                            console.info('✅ Cálculo concluído', data);
+                            const tbody = document.getElementById('historico-tbody');
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(data.timestamp).toLocaleString('pt-BR')}</td>
+                                <td>✅ Cálculo concluído - Total líquido: R$ ${(data.total_liquido || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                                <td><span class="status-badge success">COMPLETO</span></td>
+                                <td>-</td>
+                            `;
+                            tbody.insertBefore(row, tbody.firstChild);
+                        });
+                        
+                        socket.on('tool_pdf_start', (data) => {
+                            console.info('🔵 PDF iniciado', data);
+                            const tbody = document.getElementById('historico-tbody');
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(data.timestamp).toLocaleString('pt-BR')}</td>
+                                <td>📄 Geração de PDF iniciada (${data.tipo_documento || 'documento'})</td>
+                                <td><span class="status-badge" style="background: #3b82f6;">EM ANDAMENTO</span></td>
+                                <td>-</td>
+                            `;
+                            tbody.insertBefore(row, tbody.firstChild);
+                        });
+                        
+                        socket.on('tool_pdf_complete', (data) => {
+                            console.info('✅ PDF concluído', data);
+                            const tbody = document.getElementById('historico-tbody');
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(data.timestamp).toLocaleString('pt-BR')}</td>
+                                <td>✅ PDF gerado com sucesso: ${data.filename || 'documento.pdf'}</td>
+                                <td><span class="status-badge success">COMPLETO</span></td>
+                                <td>-</td>
+                            `;
+                            tbody.insertBefore(row, tbody.firstChild);
+                        });
+                        
+                        socket.on('tool_hash_registered', (data) => {
+                            console.info('🔒 Hash registrado', data);
+                            const tbody = document.getElementById('historico-tbody');
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${new Date(data.timestamp).toLocaleString('pt-BR')}</td>
+                                <td>🔒 Hash registrado em governança: ${data.filename || 'documento'} (${data.hash_prefix || 'N/A'}...)</td>
+                                <td><span class="status-badge success">REGISTRADO</span></td>
+                                <td>-</td>
+                            `;
+                            tbody.insertBefore(row, tbody.firstChild);
+                        });
+                    } catch(e){ console.error('Erro ao inicializar Socket.IO client', e); }
+                };
+                document.head.appendChild(s);
+            } catch(e) { console.warn('Socket.IO client não disponível', e); }
+        })();
+    </script>
+</body>
+</html>

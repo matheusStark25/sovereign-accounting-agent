@@ -1,0 +1,82 @@
+{
+  "nome": "Fluxo de Login - Sistema Contábil",
+  "descricao": "Automação de login e navegação básica no sistema contábil",
+  "versao": "1.0.0",
+  "tenant_id": "MATRIZ-CONTABIL-SISTEMA",
+  "acoes": [
+    {
+      "tipo": "goto",
+      "url": "https://sistema-contabil.exemplo.com/login",
+      "timeout": 30000,
+      "descricao": "Navegar para página de login"
+    },
+    {
+      "tipo": "wait",
+      "selector": "#email",
+      "timeout": 10000,
+      "descricao": "Aguardar formulário de login carregar"
+    },
+    {
+      "tipo": "fill",
+      "selector": "#email",
+      "value": "contador@empresa.com",
+      "timeout": 5000,
+      "descricao": "Preencher campo de email"
+    },
+    {
+      "tipo": "fill",
+      "selector": "#senha",
+      "value": "senha123",
+      "timeout": 5000,
+      "descricao": "Preencher campo de senha"
+    },
+    {
+      "tipo": "screenshot",
+      "path": "login_preenchido.png",
+      "full_page": false,
+      "descricao": "Capturar screenshot antes do login"
+    },
+    {
+      "tipo": "click",
+      "selector": "button[type='submit']",
+      "timeout": 5000,
+      "descricao": "Clicar no botão de login"
+    },
+    {
+      "tipo": "wait",
+      "selector": ".dashboard",
+      "timeout": 15000,
+      "descricao": "Aguardar dashboard carregar"
+    },
+    {
+      "tipo": "screenshot",
+      "path": "dashboard.png",
+      "full_page": true,
+      "descricao": "Capturar screenshot do dashboard"
+    },
+    {
+      "tipo": "click",
+      "selector": "a[href='/relatorios']",
+      "timeout": 5000,
+      "critico": false,
+      "descricao": "Navegar para relatórios (não crítico)"
+    },
+    {
+      "tipo": "wait",
+      "tempo": 2000,
+      "descricao": "Aguardar 2 segundos para página estabilizar"
+    },
+    {
+      "tipo": "screenshot",
+      "path": "relatorios.png",
+      "full_page": true,
+      "descricao": "Capturar screenshot da página de relatórios"
+    }
+  ],
+  "metadata": {
+    "autor": "Principal Automation Engineer",
+    "criado_em": "2026-02-04",
+    "tags": ["login", "navegacao", "relatorios"],
+    "ambiente": "producao"
+  }
+}

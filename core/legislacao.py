@@ -1,0 +1,3 @@
+"""Minimal legislacao stub."""
+
+legislacao = {}
