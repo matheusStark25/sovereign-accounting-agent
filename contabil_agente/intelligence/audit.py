@@ -8,7 +8,7 @@ Designed to be small and deterministic for local E2E runs.
 from typing import Any
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -34,7 +34,7 @@ class ForensicAudit:
             entry = {
                 "request_id": request_id,
                 "session_id": session_id,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "input": safe_input,
                 "output": safe_output,
             }

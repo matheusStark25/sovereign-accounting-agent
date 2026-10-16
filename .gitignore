@@ -91,3 +91,14 @@ logs/audit/
 # Ambiente virtual local
 .venv/
 
+
+# Dados de execução (nunca versionar)
+contabil_agente/data/backups/
+contabil_agente/data/audio/
+contabil_agente/data/*.jsonl
+contabil_agente/data/*.db
+contabil_agente/data/*.sqlite*
+contabil_agente/processed_sessions_*.jsonl
+*.db
+*.sqlite
+*.sqlite3

@@ -1,4 +1,4 @@
-"""Chat integrado com TODA a inteligência do sistema.
+﻿"""Chat integrado com TODA a inteligência do sistema.
 
 Integra:
 - IntelligenceOrchestrator (FSM, cache, compliance, audit)
@@ -23,6 +23,9 @@ import unicodedata
 
 # Persona integration
 from contabil_agente.persona import process_intelligence_request_persona
+
+# Diálogo de cálculo (motor real, sem stub)
+from contabil_agente.intelligence.dialogo_calculo import DialogoCalculo
 
 chat_refactored_bp = Blueprint("chat_refactored", __name__)
 
@@ -114,6 +117,30 @@ def _generate_pdf_for_tipo(
     return {"success": False}
 
 
+def _montar_resposta_calculo(session_id: str, resposta: Dict[str, Any]) -> Dict[str, Any]:
+    """Resposta do /api/chat para um turno resolvido pelo diálogo de cálculo."""
+    return {
+        "resposta": resposta["resposta"],
+        "pensamento": "",
+        "session_id": session_id,
+        "pdf_url": None,
+        "sha256": None,
+        "dados_calculados": resposta.get("dados_calculados"),
+        "compliance": None,
+        "audit_id": None,
+        "intencao_detectada": resposta.get("tipo") or "calculo",
+        "confianca": 0.95,
+        "status": resposta.get("status", "ok"),
+        "timestamp": datetime.now().isoformat(),
+        "intelligence_status": {
+            "orchestrator": True,
+            "calculo": "contabil_agente.calc",
+            "tax_engine": True,
+            "persona": True,
+        },
+    }
+
+
 def _chat_integrado_impl():
     # DEBUG: Log no início (usar logger em vez de escrever em C:/)
     try:
@@ -163,6 +190,22 @@ def _chat_integrado_impl():
 
     # Adicionar mensagem do usuário ao histórico
     sessao["messages"].append({"role": "user", "content": mensagem})
+
+    # 0. DIÁLOGO DE CÁLCULO (motor real em contabil_agente.calc)
+    # Resolve pedidos de cálculo e as perguntas de dados que faltam. Se a mensagem não
+    # for de cálculo, devolve None e o fluxo continua pelas camadas seguintes.
+    try:
+        resposta_calculo = DialogoCalculo().processar(sessao, mensagem)
+    except Exception:
+        logger.exception("Falha no diálogo de cálculo")
+        resposta_calculo = None
+    if resposta_calculo is not None:
+        sessao["messages"].append(
+            {"role": "assistant", "content": resposta_calculo["resposta"]}
+        )
+        return jsonify(
+            _sanitize_for_json(_montar_resposta_calculo(session_id, resposta_calculo))
+        )
 
     # 🔍 DETECTAR CONFIRMAÇÃO PRIMEIRO: "sim", "certo", "gera", "ok", etc.
     # Isso deve ser feito ANTES de detectar intenção para que confirmações funcionem
@@ -446,10 +489,8 @@ import os
 from typing import Any, Dict, Optional
 from flask import request, jsonify, Blueprint
 import logging
-from contabil_agente.intelligence.intelligence_orchestrator import (
-    IntelligenceOrchestrator,
-)
-from ..tax.tax_engine import TaxEngine
+from contabil_agente.intelligence.orchestrator import IntelligenceOrchestrator
+from contabil_agente.intelligence.calculator import TaxEngine
 
 try:
     from contabil_agente.utils.pdf_transfer_generator import generate_transfer_addendum_pdf
@@ -494,9 +535,9 @@ def _get_compliance():
     global _compliance
     if _compliance is None and INTELLIGENCE_AVAILABLE:
         try:
+            from contabil_agente.intelligence.compliance import ComplianceChecker
 
-            from ..intelligence.compliance import ComplianceChecker
-
+            _compliance = ComplianceChecker()
             logger.info("✅ ComplianceChecker inicializado")
         except Exception as e:
             logger.warning(f"⚠️ Falha ao inicializar ComplianceChecker: {e}")

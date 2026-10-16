@@ -1,123 +1,111 @@
+"""IntelligenceOrchestrator: coleta contexto, valida, calcula (motor real) e audita.
+
+Fluxo (FSM): COLETANDO_CONTEXTO -> PROCESSANDO -> VALIDANDO -> CALCULANDO -> FINALIZADO.
+Dados faltando ou inválidos levam a AGUARDANDO_INPUT com a lista do que falta; erros de
+cálculo viram ``status = "error"`` com a mensagem, nunca um zero silencioso.
+"""
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import uuid
-from typing import Dict, Any
-from .fsm import FSM, State
+from datetime import date
+from typing import Any, Dict, Optional
+
+from contabil_agente.calc import servico
+from contabil_agente.calc.errors import CalculoError
+from contabil_agente.calc.servico import TIPOS_CALCULO
+
+from .audit import ForensicAudit
 from .cache import CacheDB
 from .calculator import TaxEngine
 from .compliance import ComplianceChecker
-from .audit import ForensicAudit
+from .fsm import FSM, State
 
 LOGGER = logging.getLogger("intelligence.orchestrator")
 
 
+def mesclar_fontes(fontes: list) -> Dict[str, Any]:
+    """Une dados de várias fontes: maior peso vence; em empate, a mais recente."""
+    escolhido: Dict[str, Dict[str, Any]] = {}
+    for fonte in fontes or []:
+        peso = fonte.get("weight", 0)
+        instante = fonte.get("timestamp") or 0
+        for chave, valor in (fonte.get("data") or {}).items():
+            atual = escolhido.get(chave)
+            if atual is None or (peso, instante) > (atual["peso"], atual["instante"]):
+                escolhido[chave] = {"valor": valor, "peso": peso, "instante": instante}
+    return {k: v["valor"] for k, v in escolhido.items()}
+
+
 class IntelligenceOrchestrator:
-    def __init__(self, db_path: str | None = None):
+    def __init__(self, db_path: Optional[str] = None, hoje: Optional[date] = None):
         self.cache = CacheDB(db_path)
-        self.engine = TaxEngine()
+        self.engine = TaxEngine(hoje)
         self.compliance = ComplianceChecker()
         self.audit = ForensicAudit()
+        self.hoje = hoje
         self._locks: Dict[str, asyncio.Lock] = {}
 
-    async def handle(
-        self, session_id: str, payload: Dict[str, Any], timeout: int = 30
-    ) -> Dict[str, Any]:
-        # enforce per-session isolation and processing lock
+    async def handle(self, session_id: str, payload: Dict[str, Any], timeout: int = 30) -> Dict[str, Any]:
         lock = self._locks.setdefault(session_id, asyncio.Lock())
         if lock.locked():
             raise RuntimeError("session processing in progress")
-
         async with lock:
-            fsm = FSM(session_id)
-            fsm.transition(State.PROCESSANDO, "start")
+            return await asyncio.wait_for(asyncio.to_thread(self._processar, session_id, payload), timeout)
 
-            request_id = str(uuid.uuid4())
+    # ------------------------------------------------------------------
+    def _processar(self, session_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        fsm = FSM(session_id)
+        fsm.transition(State.PROCESSANDO, "inicio")
+        request_id = str(uuid.uuid4())
 
-            # collect context
-            fsm.transition(State.COLETANDO_CONTEXTO)
-            # scoring: weight sources
-            sources = payload.get("sources", [])
-            # simple merge with precedence: document=0.9, message=0.5
-            merged = {}
-            for s in sorted(
-                sources, key=lambda x: (-x.get("weight", 0), x.get("timestamp", 0))
-            ):
-                # if same key exists, precedence rules: weight higher wins; if same weight 0.9 prefer newer timestamp
-                for k, v in s.get("data", {}).items():
-                    if k not in merged:
-                        merged[k] = {
-                            "value": v,
-                            "weight": s.get("weight", 0),
-                            "ts": s.get("timestamp"),
-                        }
-                    else:
-                        cur = merged[k]
-                        if s.get("weight", 0) > cur["weight"]:
-                            merged[k] = {
-                                "value": v,
-                                "weight": s.get("weight", 0),
-                                "ts": s.get("timestamp"),
-                            }
-                        elif (
-                            s.get("weight", 0) == cur["weight"]
-                            and s.get("weight") == 0.9
-                        ):
-                            # precedence temporal: newer document wins
-                            if s.get("timestamp", 0) > (cur.get("ts") or 0):
-                                merged[k] = {
-                                    "value": v,
-                                    "weight": s.get("weight", 0),
-                                    "ts": s.get("timestamp"),
-                                }
+        fsm.transition(State.COLETANDO_CONTEXTO)
+        dados = mesclar_fontes(payload.get("sources", []))
+        for chave in ("amount", "salario", "date"):
+            if payload.get(chave) not in (None, "", 0) and chave not in dados:
+                dados[chave] = payload[chave]
+        self.cache.set(session_id, {"final_data": dados}, ttl_seconds=3600)
 
-            # extract finalized data
-            final_data = {k: v["value"] for k, v in merged.items()}
+        fsm.transition(State.VALIDANDO, "conformidade dos dados")
+        comp = self.compliance.validate(dados)
+        if not comp["ok"]:
+            fsm.transition(State.FALHA_NA_EXTRACAO, "; ".join(i["issue"] for i in comp["issues"]))
+            fsm.transition(State.AGUARDANDO_INPUT, "corrigir dados")
+            return self._finalizar(request_id, session_id, dados, fsm, {"status": "needs_manual_input", "issues": comp["issues"], "comp": comp})
 
-            # cache with history
-            self.cache.set(session_id, {"final_data": final_data}, ttl_seconds=3600)
+        fsm.transition(State.CALCULANDO)
+        tipo = payload.get("tipo_calculo")
+        calc: Optional[Dict[str, Any]] = None
+        try:
+            if tipo in TIPOS_CALCULO:
+                resposta = servico.calcular(tipo, dados, hoje=self.hoje)
+                if resposta["status"] == "faltam_dados":
+                    fsm.transition(State.AGUARDANDO_INPUT, "faltam dados")
+                    return self._finalizar(request_id, session_id, dados, fsm, {
+                        "status": "needs_manual_input", "faltando": resposta["faltando"],
+                        "pergunta": resposta["pergunta"], "comp": comp})
+                if resposta["status"] == "erro":
+                    fsm.transition(State.FALHA_NA_EXTRACAO, resposta["mensagem"])
+                    return self._finalizar(request_id, session_id, dados, fsm, {
+                        "status": "error", "error": resposta["mensagem"], "comp": comp})
+                calc = dict(resposta["resultado"], tipo=tipo, resumo=resposta["resumo"])
+            elif dados.get("amount") or dados.get("salario"):
+                calc = self.engine.calculate(dados)
+        except CalculoError as exc:
+            fsm.transition(State.FALHA_NA_EXTRACAO, str(exc))
+            return self._finalizar(request_id, session_id, dados, fsm, {"status": "error", "error": str(exc), "comp": comp})
 
-            # validate extraction via JSON Schema placeholder
-            # if extraction fails, transition to FALHA_NA_EXTRACAO and attempt one retry
-            fsm.transition(State.VALIDANDO, "validate schema")
-            # minimal semantic checks
-            try:
-                # placeholder validations
-                cpf = final_data.get("cp")
-                if cpf and (not isinstance(cpf, str) or len(cpf) < 5):
-                    raise ValueError("cpf invalid")
-            except Exception as e:
-                fsm.transition(State.FALHA_NA_EXTRACAO, str(e))
-                # one retry logic (pseudo-LLM call) - here we simply pass
-                fsm.transition(State.AGUARDANDO_INPUT, "await manual or LLM retry")
-                return {"status": "needs_manual_input", "request_id": request_id}
+        comp = self.compliance.validate(dados, calc)
+        fsm.transition(State.FINALIZADO, "concluido")
+        return self._finalizar(request_id, session_id, dados, fsm, {"status": "ok", "calc": calc, "comp": comp})
 
-            # calculate
-            fsm.transition(State.CALCULANDO)
-            try:
-                calc_res = self.engine.calculate(
-                    {"amount": payload.get("amount", 0.0), "date": payload.get("date")}
-                )
-            except Exception as e:
-                fsm.transition(State.FALHA_NA_EXTRACAO, str(e))
-                return {"status": "error", "error": str(e)}
-
-            # compliance
-            comp = self.compliance.validate(final_data)
-
-            # forensic output
-            self.audit.record(
-                request_id=request_id,
-                session_id=session_id,
-                input_sanitized=final_data,
-                output={"calc": calc_res, "comp": comp},
-            )
-
-            fsm.transition(State.FINALIZADO, "done")
-            return {
-                "status": "ok",
-                "request_id": request_id,
-                "calc": calc_res,
-                "comp": comp,
-            }
+    def _finalizar(self, request_id, session_id, dados, fsm, resultado: Dict[str, Any]) -> Dict[str, Any]:
+        self.audit.record(
+            request_id=request_id,
+            session_id=session_id,
+            input_sanitized=dados,
+            output={k: v for k, v in resultado.items() if k != "calc"} | {"calc_ok": resultado.get("calc") is not None},
+        )
+        return {"request_id": request_id, "fsm": fsm.history, **resultado}
