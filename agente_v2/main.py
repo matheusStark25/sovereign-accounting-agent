@@ -6,6 +6,7 @@ Subir:  ``uvicorn agente_v2.main:app --host 0.0.0.0 --port 8000``
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -28,6 +29,10 @@ import hashlib
 import hmac as _hmac
 
 from contabil_agente.documentos import gerar_pdf_calculo, hash_do_resultado
+from contabil_agente.documentos.validadores import validar_cpf
+from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
+from contabil_agente.rpa import estado as rpa_estado
+from contabil_agente.rpa.estado import StatusStore
 from contabil_agente.lgpd import FINALIDADES, ConsentimentoStore, PoliticaDeRetencao, ServicoLGPD, TratamentoSemBaseLegal
 from contabil_agente.documentos.leitura import TAMANHO_MAXIMO, ArquivoInvalido
 from contabil_agente.documentos.tipos import TIPOS as TIPOS_DOCUMENTO
@@ -97,6 +102,10 @@ class PedidoConsentimento(BaseModel):
 
 class PedidoExclusao(BaseModel):
     documento: str = Field(max_length=20)
+
+
+class PedidoFGTS(BaseModel):
+    cpf: str = Field(max_length=20)
 
 
 class NovoUsuario(BaseModel):
@@ -199,6 +208,9 @@ def create_app(
             destinos=[ArquivoDestino(settings.DATA_DIR / "arquivo")],
         )
     app.state.dispatcher = dispatcher
+    app.state.rpa_status = StatusStore(settings.DATA_DIR / "rpa.db")
+    bruto_rpa = segredos.get("RPA_PQC_PUBLIC_KEY")
+    app.state.rpa_chave_publica = json.loads(bruto_rpa) if bruto_rpa else None
     chave_pii = segredos.get("PII_HASH_KEY") or _hmac.new(app.state.auth.settings.secret.encode(), b"lgpd-pii-hash-v1", hashlib.sha256).hexdigest()
     app.state.lgpd = lgpd or ServicoLGPD(
         app.state.audit.worm,
@@ -207,6 +219,7 @@ def create_app(
         raiz_arquivo=settings.DATA_DIR / "arquivo",
         chat_store=app.state.chat_store,
         historico=getattr(dispatcher, "historico", None),
+        status_rpa=app.state.rpa_status,
     )
     app.state.limite_login = LimiteDeUso(maximo=10, janela_segundos=60)
     app.state.limite_chat = LimiteDeUso(maximo=60, janela_segundos=60)
@@ -449,6 +462,77 @@ def create_app(
     @app.post("/api/v1/lgpd/retencao/executar")
     def executar_retencao(request: Request, usuario: Principal = Depends(exigir(Permission.DELETE_DATA))):
         return {"removidos": request.app.state.lgpd.executar_retencao(usuario.tenant_id, usuario.user_id)}
+
+    # -------------------------------------------------------------------- RPA
+    @app.post("/api/v1/rpa/fgts", status_code=202)
+    def enfileirar_extrato_fgts(pedido: PedidoFGTS, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        """Enfileira a consulta do extrato do FGTS. O CPF vai cifrado (pós-quântico) pelo broker; o robô pausa
+        para uma pessoa resolver captcha/login na janela do navegador do worker."""
+        if not validar_cpf(pedido.cpf):
+            raise HTTPException(status_code=422, detail="CPF inválido.")
+        try:
+            request.app.state.lgpd.exigir_base_legal("consulta_extrato_fgts", usuario.tenant_id, pedido.cpf)
+        except TratamentoSemBaseLegal as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        chave = request.app.state.rpa_chave_publica
+        if chave is None:
+            raise HTTPException(status_code=503, detail="RPA não configurado: falta RPA_PQC_PUBLIC_KEY (gere com: python -m agente_v2.cli gerar-chaves-rpa).")
+        from contabil_agente.tarefas.rpa import envelope_do_cpf, extrato_fgts
+
+        titular = PIIAnonymizer.hash_pii(pedido.cpf, request.app.state.lgpd._chave_hash)
+        status_store = request.app.state.rpa_status
+        job_id = status_store.criar(usuario.tenant_id, usuario.user_id, "extrato_fgts", titular)
+        envelope = envelope_do_cpf(chave, pedido.cpf, usuario.tenant_id, job_id)
+        _auditar(request, "process_document", usuario, "Extrato do FGTS solicitado", job=job_id, titular=titular)
+        try:
+            extrato_fgts.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope])
+        except Exception as exc:  # noqa: BLE001 - broker (Redis) fora do ar
+            status_store.atualizar(job_id, rpa_estado.FALHOU, "Fila indisponível.")
+            logger.error("Fila indisponível: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Fila de tarefas indisponível (Redis).")
+        return {"job_id": job_id, "estado": status_store.obter(job_id, usuario.tenant_id)["estado"]}
+
+    @app.get("/api/v1/rpa/jobs/{job_id}")
+    def estado_do_job(job_id: str, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        job = request.app.state.rpa_status.obter(job_id, usuario.tenant_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Trabalho não encontrado.")
+        return job
+
+    @app.post("/api/v1/documentos/lote", status_code=202)
+    async def processar_lote_de_documentos(
+        request: Request,
+        arquivos: list[UploadFile] = File(...),
+        usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL)),
+    ):
+        """Recebe até 50 arquivos e processa todos em segundo plano (Celery), cada um pelo pipeline de 7 estados."""
+        if not 1 <= len(arquivos) <= 50:
+            raise HTTPException(status_code=422, detail="Envie de 1 a 50 arquivos por lote.")
+        _base_legal(request, "processamento_de_documentos", usuario.tenant_id)
+        from contabil_agente.tarefas.documentos import processar_lote
+
+        status_store = request.app.state.rpa_status
+        job_id = status_store.criar(usuario.tenant_id, usuario.user_id, "lote_documentos")
+        pasta = settings.DATA_DIR / "entrada" / usuario.tenant_id / job_id
+        pasta.mkdir(parents=True, exist_ok=True)
+        nomes = []
+        for i, arq in enumerate(arquivos):
+            conteudo = await arq.read(TAMANHO_MAXIMO + 1)
+            if len(conteudo) > TAMANHO_MAXIMO:
+                raise HTTPException(status_code=413, detail=f"{arq.filename}: arquivo maior que {TAMANHO_MAXIMO // (1024 * 1024)} MB.")
+            sufixo = os.path.splitext(arq.filename or "")[1].lower()
+            sufixo = sufixo if sufixo in (".pdf", ".xml", ".txt", ".csv") else ".bin"
+            nome = f"{i:03d}{sufixo}"
+            (pasta / nome).write_bytes(conteudo)
+            nomes.append(nome)
+        _auditar(request, "process_document", usuario, "Lote de documentos enviado", job=job_id, arquivos=len(nomes))
+        try:
+            processar_lote.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, str(pasta), nomes])
+        except Exception as exc:  # noqa: BLE001
+            status_store.atualizar(job_id, rpa_estado.FALHOU, "Fila indisponível.")
+            logger.error("Fila indisponível: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Fila de tarefas indisponível (Redis).")
+        return {"job_id": job_id, "arquivos": len(nomes)}
 
     # ------------------------------------------------------------ documentos
     @app.get("/api/v1/documentos/tipos")

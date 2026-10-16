@@ -48,11 +48,13 @@ class ServicoLGPD:
         chat_store: Optional[ChatStore] = None,
         historico: Optional[HistoricoDocumentos] = None,
         chave_hash: Optional[str] = None,
+        status_rpa: Optional[Any] = None,
     ):
         self.audit, self.consentimentos = audit, consentimentos
         self.politica = politica or PoliticaDeRetencao()
         self.raiz_arquivo = Path(raiz_arquivo) if raiz_arquivo else None
         self.chat_store, self.historico = chat_store, historico
+        self.status_rpa = status_rpa
         self._chave_hash = chave_hash or consentimentos._chave
 
     # ------------------------------------------------------------- base legal
@@ -128,12 +130,14 @@ class ServicoLGPD:
                     apagados.append(str(arquivo.relative_to(self.raiz_arquivo)))
         conversas = self._limpar_conversas(tenant, variantes)
         consentimentos = self.consentimentos.apagar_do_titular(tenant, documento_do_titular)
+        trabalhos = self.status_rpa.apagar_do_titular(tenant, self._hash(documento_do_titular)) if self.status_rpa is not None else 0
         self.audit.append(
             "lgpd.exclusao",
-            {"titular": self._hash(documento_do_titular), "apagados": len(apagados), "retidos": len(retidos), "conversas_editadas": conversas, "consentimentos": consentimentos},
+            {"titular": self._hash(documento_do_titular), "apagados": len(apagados), "retidos": len(retidos), "conversas_editadas": conversas,
+             "consentimentos": consentimentos, "trabalhos_rpa": trabalhos},
             tenant=tenant, ator=ator,
         )
-        return {"apagados": apagados, "retidos": retidos, "conversas_editadas": conversas, "consentimentos": consentimentos}
+        return {"apagados": apagados, "retidos": retidos, "conversas_editadas": conversas, "consentimentos": consentimentos, "trabalhos_rpa": trabalhos}
 
     @staticmethod
     def _contem(arquivo: Path, variantes: List[str], digitos: str) -> bool:

@@ -40,11 +40,11 @@ def mesclar_fontes(fontes: list) -> Dict[str, Any]:
 
 
 class IntelligenceOrchestrator:
-    def __init__(self, db_path: Optional[str] = None, hoje: Optional[date] = None):
+    def __init__(self, db_path: Optional[str] = None, hoje: Optional[date] = None, audit: Optional[ForensicAudit] = None):
         self.cache = CacheDB(db_path)
         self.engine = TaxEngine(hoje)
         self.compliance = ComplianceChecker()
-        self.audit = ForensicAudit()
+        self.audit = audit or ForensicAudit()
         self.hoje = hoje
         self._locks: Dict[str, asyncio.Lock] = {}
 

@@ -7,9 +7,11 @@ from decimal import Decimal
 
 import pytest
 
+from contabil_agente.intelligence.audit import ForensicAudit
 from contabil_agente.intelligence.calculator import TaxEngine
 from contabil_agente.intelligence.compliance import ComplianceChecker
 from contabil_agente.intelligence.orchestrator import IntelligenceOrchestrator, mesclar_fontes
+from contabil_agente.security.worm_audit import WormAudit
 from contabil_agente.utils.documentos import cnpj_valido, cpf_valido
 
 HOJE = date(2026, 10, 15)
@@ -17,7 +19,8 @@ HOJE = date(2026, 10, 15)
 
 @pytest.fixture
 def orq(tmp_path):
-    return IntelligenceOrchestrator(db_path=str(tmp_path / "cache.sqlite"), hoje=HOJE)
+    worm = WormAudit(tmp_path / "audit", "k" * 40, fsync=False)
+    return IntelligenceOrchestrator(db_path=str(tmp_path / "cache.sqlite"), hoje=HOJE, audit=ForensicAudit(worm, tenant="t1"))
 
 
 def rodar(coro):
@@ -132,4 +135,12 @@ def test_orquestrador_erro_de_calculo_nao_vira_zero(orq):
 def test_orquestrador_audita_cada_pedido(orq, tmp_path):
     r = rodar(orq.handle("s7", {"amount": 3000}))
     assert r["request_id"]
-    assert orq.audit.log_path.exists()
+    worm = orq.audit.worm
+    entradas = worm.ler("t1")
+    assert entradas[-1]["evento"] == "intelligence.pedido" and entradas[-1]["dados"]["request_id"] == r["request_id"]
+    assert worm.verificar("t1").ok
+
+
+def test_orquestrador_sem_trilha_nao_grava_e_nao_quebra(tmp_path):
+    orq = IntelligenceOrchestrator(db_path=str(tmp_path / "c.sqlite"), hoje=HOJE)
+    assert orq.audit.worm is None and rodar(orq.handle("s8", {"amount": 3000}))["request_id"]
