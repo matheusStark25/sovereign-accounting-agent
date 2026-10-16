@@ -1,36 +1,22 @@
-# Systemd service file for Maria Helena Chatbot
-# Install to: /etc/systemd/system/maria-helena.service
-#
-# Usage:
-#   sudo systemctl enable maria-helena
-#   sudo systemctl start maria-helena
-#   sudo systemctl status maria-helena
-
+# Exemplo de unidade systemd (Linux, sem Docker). Ajuste caminhos e usuário.
 [Unit]
-Description=Maria Helena - Assistente Contábil com IA
-After=network.target
+Description=Sovereign Accounting Agent (API)
+After=network-online.target redis-server.service
+Wants=network-online.target
 
 [Service]
-Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/opt/maria-helena
-Environment="PATH=/opt/maria-helena/venv/bin"
-Environment="FLASK_ENV=production"
-EnvironmentFile=/opt/maria-helena/.env.production
-ExecStart=/opt/maria-helena/venv/bin/python -m waitress --host=0.0.0.0 --port=5000 --threads=4 contabil_agente.app:app
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=maria-helena
-
-# Security hardening
+User=agente
+Group=agente
+WorkingDirectory=/opt/sovereign-accounting-agent
+EnvironmentFile=/etc/sovereign-accounting-agent.env
+ExecStart=/opt/sovereign-accounting-agent/.venv/bin/uvicorn agente_v2.main:app --host 127.0.0.1 --port 8000 --proxy-headers
+Restart=on-failure
+RestartSec=3
 NoNewPrivileges=true
-PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/maria-helena/data /opt/maria-helena/logs
+PrivateTmp=true
+ReadWritePaths=/var/lib/sovereign-accounting-agent
 
 [Install]
 WantedBy=multi-user.target

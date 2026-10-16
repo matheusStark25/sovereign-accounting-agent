@@ -17,7 +17,7 @@ def pdf_extrato(saldo: str = "12.000,00") -> bytes:
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     y = 800
-    for linha in ("Extrato analítico do FGTS - conta vinculada", f"PIS 123.45678.91-9", f"Saldo total {saldo}", "CNPJ 11.222.333/0001-81"):
+    for linha in ("Extrato analítico do FGTS - conta vinculada", "PIS 123.45678.91-9", f"Saldo total {saldo}", "CNPJ 11.222.333/0001-81"):
         c.drawString(50, y, linha)
         y -= 16
     c.save()

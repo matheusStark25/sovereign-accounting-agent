@@ -51,7 +51,7 @@ ESOCIAL_DESLIG = f"""<?xml version="1.0" encoding="UTF-8"?>
 <infoDeslig><mtvDeslig>02</mtvDeslig><dtDeslig>2026-09-15</dtDeslig></infoDeslig>
 </evtDeslig></eSocial>""".encode("utf-8")
 
-REINF = f"""<?xml version="1.0" encoding="UTF-8"?>
+REINF = """<?xml version="1.0" encoding="UTF-8"?>
 <Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/evtServTom/v2_01_02"><evtServTom id="ID1">
 <ideEvento><perApur>2026-09</perApur></ideEvento><ideContri><tpInsc>1</tpInsc><nrInsc>11222333</nrInsc></ideContri>
 <infoServTom><ideEstabObra><idePrestServ><vlrTotalBruto>1000.00</vlrTotalBruto><vlrTotalRetPrinc>110.00</vlrTotalRetPrinc></idePrestServ></ideEstabObra></infoServTom>

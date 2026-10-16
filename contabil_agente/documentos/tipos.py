@@ -9,7 +9,7 @@ Nada é inventado: campo que não foi encontrado fica fora de ``dados`` e entra 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional, Tuple

@@ -1,45 +1,38 @@
-# Núcleo da aplicação. Testado com Python 3.12.
-# Instalar:  pip install -r requirements.txt
-# Desenvolvimento/testes: requirements-dev.txt   |   Voz e automação de desktop: requirements-extras.txt
+# Dependências de execução (Python 3.12).   Instalar:  pip install -r requirements.txt
+# Para rodar os testes:  pip install -r requirements-dev.txt
+# Versões exatamente testadas: requirements.lock
 
-# --- Aplicação web (chat) ---
-Flask>=3.0,<4
-flask-cors>=4.0
-flask-limiter>=3.5
-python-dotenv>=1.0
-requests>=2.31
-gunicorn>=21.2; sys_platform != "win32"
+# --- API ---
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic>=2.7
+httpx>=0.27
+prometheus-client>=0.20
+PyYAML>=6.0
 
-# --- LLM ---
+# --- Segurança ---
+PyJWT>=2.8
+bcrypt>=4.1
+cryptography>=43
+hvac>=2.1
+kyber-py>=1.2          # ML-KEM-768 (Kyber)
+dilithium-py>=1.5      # ML-DSA-65 (Dilithium)
+signxml>=4.0
+lxml>=5.0
+defusedxml>=0.7
+portalocker>=2.8
+
+# --- IA (opcional em tempo de execução: sem chave o sistema roda só com cálculo e regras) ---
 groq>=0.9
 
-# --- Autenticação e segurança ---
-PyJWT>=2.8
-cryptography>=42
-bcrypt>=4.1
-pycryptodome>=3.20
-hvac>=2.1
-
-# --- Dados, regras e documentos ---
-pydantic>=2.7
-PyYAML>=6.0
+# --- Documentos ---
 reportlab>=4.0
 pypdf>=4.0
 
-# --- Jobs e infraestrutura ---
+# --- Tarefas em segundo plano ---
 celery>=5.3
 redis>=5.0
-APScheduler>=3.10
-psutil>=5.9
-tenacity>=8.2
-portalocker>=2.8
-prometheus-client>=0.20
 
-# --- API v2 (FastAPI) ---
-fastapi>=0.110
-uvicorn[standard]>=0.29
-httpx>=0.27
-python-multipart>=0.0.9
-
-# --- RPA (extrato do FGTS). Depois de instalar: playwright install chromium ---
+# --- RPA do FGTS. Depois de instalar:  playwright install chromium ---
 playwright>=1.44

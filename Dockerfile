@@ -1,48 +1,30 @@
-FROM python:3.14-slim
+# API + worker de documentos (mesma imagem; o compose troca o comando).
+# O worker do RPA do FGTS NÃO roda aqui: ele abre um navegador para uma pessoa resolver captcha/login
+# e por isso roda numa máquina com tela (veja o README, seção RPA).
+FROM python:3.12-slim
 
-RUN groupadd -r app && useradd -r -g app -m app
-WORKDIR /app
-COPY . /app
-RUN pip install --no-cache-dir -r requirements.txt || true
-RUN chown -R app:app /app
-
-USER app
-ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "pytest", "-q"]
-# Dockerfile para produção
-
-FROM python:3.11-slim
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DATA_DIR=/data \
+    AGENTE_ENV=production
 
 WORKDIR /app
-
-# Instalar dependências do sistema
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiar requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copiar código
-COPY contabil_agente/ ./contabil_agente/
+COPY agente_v2 ./agente_v2
+COPY contabil_agente ./contabil_agente
+COPY rules ./rules
 
-# Criar diretórios necessários
-RUN mkdir -p /app/db /app/logs /app/documents /app/uploads
+RUN useradd --system --uid 10001 --create-home app \
+    && mkdir -p /data \
+    && chown -R app:app /data /app
+USER app
+VOLUME ["/data"]
+EXPOSE 8000
 
-# Usuário não-root
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/api/health')"
-
-# Expor porta
-EXPOSE 5000
-
-# Comando de inicialização
-CMD ["python", "-m", "contabil_agente.agent_contabil"]
+CMD ["uvicorn", "agente_v2.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

@@ -8,7 +8,6 @@ pessoa nos desafios (captcha/login); tenta de novo com backoff e para se o porta
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import re

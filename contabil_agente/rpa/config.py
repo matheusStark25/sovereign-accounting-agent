@@ -9,9 +9,9 @@ automação: quando aparece captcha ou tela de login, ele pausa e espera uma pes
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field, fields, replace
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
-from typing import Any, List, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 from urllib.parse import urlparse
 
 import yaml

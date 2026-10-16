@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Optional
 
 from contabil_agente.lgpd import ConsentimentoStore, PoliticaDeRetencao, ServicoLGPD
-from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, HistoricoDocumentos, provedores_do_ambiente
+from contabil_agente.pipeline import DocumentDispatcher, HistoricoDocumentos, destinos_do_ambiente, provedores_do_ambiente
 from contabil_agente.rpa import ConfigPortalFGTS
 from contabil_agente.rpa.estado import StatusStore
 from contabil_agente.security.worm_audit import WormAudit
@@ -52,7 +51,7 @@ def contexto_do_ambiente(env: Optional[Mapping[str, str]] = None) -> Contexto:
     audit = WormAudit.do_ambiente(settings.AUDIT_DIR, segredos)
     prov = provedores_do_ambiente(segredos)
     historico = HistoricoDocumentos(base / "documentos.db")
-    dispatcher = DocumentDispatcher(audit, historico, worker_llm=prov["worker"], revisor_llm=prov["revisor"], destinos=[ArquivoDestino(base / "arquivo")])
+    dispatcher = DocumentDispatcher(audit, historico, worker_llm=prov["worker"], revisor_llm=prov["revisor"], destinos=destinos_do_ambiente(base / "arquivo", segredos))
     chave_hash = segredos.get("PII_HASH_KEY") or segredos.get("JWT_SECRET", "")
     lgpd = ServicoLGPD(audit, ConsentimentoStore(base / "lgpd.db", chave_hash), PoliticaDeRetencao.carregar(), raiz_arquivo=base / "arquivo", historico=historico)
     return Contexto(

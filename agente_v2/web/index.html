@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Maria Helena · Departamento Pessoal</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232b6cb0'/%3E%3Cpath d='M9 22V10l7 8 7-8v12' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<main id="tela-login" class="login" hidden>
+  <form id="form-login" class="cartao login-cartao" autocomplete="on">
+    <div class="marca"><span class="marca-logo" aria-hidden="true">M</span><div><h1>Maria Helena</h1><p>Departamento Pessoal e contabilidade</p></div></div>
+    <label for="usuario">Usuário</label>
+    <input id="usuario" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
+    <label for="senha">Senha</label>
+    <input id="senha" name="password" type="password" autocomplete="current-password" required>
+    <p id="erro-login" class="erro" role="alert" hidden></p>
+    <button class="botao primario" type="submit" id="botao-entrar">Entrar</button>
+    <p class="nota">Acesso restrito. As ações ficam registradas em uma trilha de auditoria.</p>
+  </form>
+</main>
+
+<!-- ============ APLICATIVO ============ -->
+<div id="app" class="app" hidden>
+  <header class="topo">
+    <div class="marca pequena"><span class="marca-logo" aria-hidden="true">M</span><strong>Maria Helena</strong></div>
+    <nav class="abas" role="tablist" aria-label="Seções">
+      <button role="tab" class="aba ativa" data-aba="chat" aria-selected="true">Conversa</button>
+      <button role="tab" class="aba" data-aba="painel" aria-selected="false">Painel</button>
+    </nav>
+    <div class="usuario">
+      <span id="quem" class="quem"></span>
+      <button class="botao fantasma" id="botao-sair" type="button">Sair</button>
+    </div>
+  </header>
+
+  <!-- Conversa -->
+  <section id="aba-chat" class="aba-conteudo" role="tabpanel">
+    <div id="mensagens" class="mensagens" role="log" aria-live="polite" aria-label="Conversa"></div>
+    <div class="atalhos" id="atalhos" aria-label="Atalhos">
+      <button type="button" class="chip" data-texto="Calcular rescisão">Rescisão</button>
+      <button type="button" class="chip" data-texto="Calcular férias">Férias</button>
+      <button type="button" class="chip" data-texto="Calcular 13º salário">13º salário</button>
+      <button type="button" class="chip" data-texto="Calcular INSS">INSS</button>
+      <button type="button" class="chip" data-texto="Calcular IRRF">IRRF</button>
+      <button type="button" class="chip" data-texto="Gerar holerite">Folha</button>
+    </div>
+    <form id="form-chat" class="compositor" autocomplete="off">
+      <input type="file" id="arquivo" accept=".pdf,.xml,.txt,.csv" hidden>
+      <button type="button" class="botao icone" id="botao-anexo" aria-label="Enviar documento para análise" title="Enviar documento (PDF, XML, TXT)">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 01-7.8-7.8l9-9a3.7 3.7 0 015.2 5.2l-9 9a1.8 1.8 0 01-2.6-2.6l8.3-8.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <textarea id="texto" rows="1" maxlength="4000" placeholder="Escreva sua dúvida ou peça um cálculo…" aria-label="Mensagem"></textarea>
+      <button type="submit" class="botao primario" id="botao-enviar" aria-label="Enviar">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z" fill="currentColor"/></svg>
+      </button>
+    </form>
+  </section>
+
+  <!-- Painel -->
+  <section id="aba-painel" class="aba-conteudo painel" role="tabpanel" hidden>
+    <div class="grade">
+      <article class="cartao">
+        <h2>Extrato do FGTS</h2>
+        <p class="nota">O robô abre o portal e <strong>pausa</strong> se aparecer captcha ou login: a pessoa que está na máquina do worker resolve na janela do navegador.</p>
+        <form id="form-fgts" class="linha">
+          <input id="cpf-fgts" inputmode="numeric" placeholder="CPF do trabalhador" maxlength="14" aria-label="CPF do trabalhador" required>
+          <button class="botao primario" type="submit">Consultar</button>
+        </form>
+        <p id="status-fgts" class="status" role="status"></p>
+      </article>
+
+      <article class="cartao">
+        <h2>Aprovações pendentes</h2>
+        <div id="lista-pendentes" class="lista"><p class="nota">Carregando…</p></div>
+      </article>
+
+      <article class="cartao">
+        <h2>Privacidade (LGPD)</h2>
+        <label class="chave"><input type="checkbox" id="consentimento-ia"><span>Permitir envio de textos a provedores de IA externos</span></label>
+        <p class="nota">Sem isso o sistema funciona só com cálculos e regras. Só o administrador da empresa altera.</p>
+        <p id="status-lgpd" class="status" role="status"></p>
+      </article>
+
+      <article class="cartao">
+        <h2>Integridade da auditoria</h2>
+        <button class="botao" id="botao-auditoria" type="button">Verificar trilha</button>
+        <p id="status-auditoria" class="status" role="status"></p>
+      </article>
+    </div>
+  </section>
+</div>
+
+<div id="aviso" class="toast" role="status" aria-live="polite" hidden></div>
+<script src="app.js" defer></script>
+</body>
+</html>

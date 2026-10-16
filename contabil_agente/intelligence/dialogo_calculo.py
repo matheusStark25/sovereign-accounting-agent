@@ -12,7 +12,6 @@ from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from contabil_agente.calc import servico
-from contabil_agente.calc.servico import TIPOS_CALCULO
 
 from . import extracao as ex
 

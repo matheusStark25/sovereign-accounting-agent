@@ -4,9 +4,13 @@ Configuração por ambiente: ``CELERY_BROKER_URL`` (padrão ``redis://localhost:
 ``CELERY_RESULT_BACKEND`` (padrão: o broker) e ``CELERY_ALWAYS_EAGER=1`` para executar no próprio processo
 (desenvolvimento e testes, sem Redis).
 
-Subir o worker (na máquina onde a pessoa vai resolver captcha/login do FGTS, porque o navegador abre ali)::
+Duas filas, dois workers::
 
-    celery -A contabil_agente.tarefas worker --loglevel=info --pool=solo
+    # documentos em lote (pode ser em contêiner)
+    celery -A contabil_agente.tarefas worker -Q documentos --loglevel=info
+
+    # RPA do FGTS: na máquina onde a pessoa vai resolver captcha/login, porque o navegador abre ali
+    celery -A contabil_agente.tarefas worker -Q rpa --pool=solo --loglevel=info
 """
 
 from __future__ import annotations
@@ -34,6 +38,8 @@ def criar_app(broker: Optional[str] = None) -> Celery:
         worker_prefetch_multiplier=1,
         task_time_limit=60 * 30,
         broker_connection_retry_on_startup=True,
+        task_default_queue="documentos",
+        task_routes={"rpa.*": {"queue": "rpa"}, "documentos.*": {"queue": "documentos"}},
         include=["contabil_agente.tarefas.rpa", "contabil_agente.tarefas.documentos"],
     )
     return app

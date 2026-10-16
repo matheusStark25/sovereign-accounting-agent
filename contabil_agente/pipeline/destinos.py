@@ -4,7 +4,10 @@
   ``<raiz>/<tenant>/<tipo>/<sha256>.{ext,json}``, com permissão 0600 e escrita atômica.
 * ``WebhookDestino``: envia o resultado por POST assinado (HMAC-SHA256 no cabeçalho
   ``X-Signature``), com retry e disjuntor.
-* ``CallbackDestino``: chama uma função Python (integração direta).
+* ``CallbackDestino``: chama uma função Python (integração direta; só pela API Python).
+
+``destinos_do_ambiente`` monta a lista a partir do ambiente: o arquivo sempre; o webhook quando existirem
+``DOCUMENTOS_WEBHOOK_URL`` e ``DOCUMENTOS_WEBHOOK_SECRET``.
 """
 
 from __future__ import annotations
@@ -103,3 +106,15 @@ class CallbackDestino:
     def enviar(self, contexto: Dict[str, Any]) -> Dict[str, Any]:
         self._funcao(contexto)
         return {"ok": True}
+
+
+def destinos_do_ambiente(raiz_arquivo: str | Path, env: Optional[Dict[str, str]] = None) -> list:
+    """Arquivo local sempre; webhook assinado se ``DOCUMENTOS_WEBHOOK_URL`` e ``DOCUMENTOS_WEBHOOK_SECRET`` estiverem definidos.
+
+    O webhook recebe o resultado de todas as empresas desta instalação: aponte só para um serviço do operador."""
+    env = os.environ if env is None else env
+    destinos: list = [ArquivoDestino(raiz_arquivo)]
+    url, segredo = (env.get("DOCUMENTOS_WEBHOOK_URL") or "").strip(), env.get("DOCUMENTOS_WEBHOOK_SECRET") or ""
+    if url or segredo:
+        destinos.append(WebhookDestino(url, segredo))  # falta um dos dois ou valor inseguro → ErroDeDestino na subida
+    return destinos

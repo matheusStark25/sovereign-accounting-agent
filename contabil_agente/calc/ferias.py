@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from .errors import DadosInvalidos
 from .inss import calcular_inss
 from .irrf import calcular_irrf_mensal
-from .money import ZERO, D, nao_negativo, q2
+from .money import D, nao_negativo, q2
 
 
 @dataclass(frozen=True)

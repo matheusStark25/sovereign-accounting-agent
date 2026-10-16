@@ -103,7 +103,6 @@ def validar(bruto: Dict[str, Any]) -> List[str]:
         # conferência pela parcela a deduzir publicada (método alternativo da portaria)
         conf = reg.get("parcelas_a_deduzir_conferencia")
         if conf and len(conf) == len(faixas):
-            acumulado = D("0")
             anterior = D("0")
             for faixa, parcela in zip(faixas, conf):
                 aliq = D(faixa["aliquota"])

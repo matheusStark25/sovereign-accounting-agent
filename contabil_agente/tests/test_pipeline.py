@@ -24,6 +24,7 @@ from contabil_agente.pipeline import (
     ProvedorIndisponivel,
     TransicaoInvalida,
     WebhookDestino,
+    destinos_do_ambiente,
     provedores_do_ambiente,
 )
 from contabil_agente.pipeline.agentes import AgenteCorretor, AgenteRevisor, AgenteWorker, Divergencia
@@ -246,7 +247,8 @@ def test_cada_transicao_esta_na_trilha_e_a_cadeia_confere(disp, audit):
     assert audit.verificar("empresa_a").ok
     ultimo = audit.ler("empresa_a")[-1]
     assert r.audit_trail_id == f"empresa_a:{ultimo['seq']}:{ultimo['hash'][:16]}"
-    assert "4973" not in json.dumps(audit.ler("empresa_a"))  # valores do documento não vão para a trilha
+    trilha = json.dumps(audit.ler("empresa_a"))
+    assert "4973.39" not in trilha and "4.973,39" not in trilha  # valores do documento não vão para a trilha
 
 
 def test_o_exemplo_do_readme_funciona(tmp_path, audit):
@@ -440,6 +442,17 @@ def test_webhook_exige_https_e_segredo_forte():
         WebhookDestino("http://exemplo.com/hook", "segredo-bem-comprido-123")
     with pytest.raises(ErroDeDestino):
         WebhookDestino("https://exemplo.com/hook", "curto")
+
+
+def test_destinos_do_ambiente_liga_o_webhook_so_quando_configurado(tmp_path):
+    so_arquivo = destinos_do_ambiente(tmp_path, {})
+    assert [d.nome for d in so_arquivo] == ["arquivo"]
+    com_webhook = destinos_do_ambiente(tmp_path, {"DOCUMENTOS_WEBHOOK_URL": "https://exemplo.com/hook", "DOCUMENTOS_WEBHOOK_SECRET": "segredo-bem-comprido-123"})
+    assert [d.nome for d in com_webhook] == ["arquivo", "webhook"]
+    with pytest.raises(ErroDeDestino):  # só a URL, sem segredo: recusa em vez de ignorar em silêncio
+        destinos_do_ambiente(tmp_path, {"DOCUMENTOS_WEBHOOK_URL": "https://exemplo.com/hook"})
+    with pytest.raises(ErroDeDestino):  # http fora do localhost
+        destinos_do_ambiente(tmp_path, {"DOCUMENTOS_WEBHOOK_URL": "http://exemplo.com/hook", "DOCUMENTOS_WEBHOOK_SECRET": "segredo-bem-comprido-123"})
 
 
 def test_callback_recebe_o_resultado(tmp_path, audit):

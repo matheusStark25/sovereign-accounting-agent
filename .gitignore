@@ -1,110 +1,60 @@
-# .gitignore
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
 build/
-develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
 wheels/
 *.egg-info/
-.installed.cfg
 *.egg
 venv/
+.venv/
 env/
 ENV/
 
-# Node
-node_modules/
-npm-debug.log
-yarn-error.log
-.pnpm-debug.log
-
-# IDE
+# IDE / sistema operacional
 .vscode/
 .idea/
 *.swp
 *.swo
-*.sublime-*
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
-*.log
-logs/
-*.out
-
-# Uploads e documentos temporários
-uploads/*
-!uploads/.gitkeep
-documents/*
-!documents/.gitkeep
-documents_secure/*
-!documents_secure/.gitkeep
-
-# Chaves e secrets
-.env
-.env.local
-*.pem
-*.key
-*.crt
-
-# Testes
+# Testes e cobertura
 .pytest_cache/
 .coverage
 htmlcov/
 coverage/
-.nyc_output/
 
-# Temporários
-*.tmp
-temp_*.py
-temp_*.json
-*_backup.*
-*.bak
-
-# Docker
-docker-compose.override.yml
-
-# Segurança (gerado por setup_seguranca.py)
-.env.security
-logs/audit/
-
-# Ambiente virtual local
-.venv/
-
+# Segredos e chaves (nunca versionar)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+certs/
+chaves/
 
 # Dados de execução (nunca versionar)
-contabil_agente/data/backups/
-contabil_agente/data/audio/
-contabil_agente/data/*.jsonl
-contabil_agente/data/*.db
-contabil_agente/data/*.sqlite*
-contabil_agente/processed_sessions_*.jsonl
 *.db
+*.db-*
 *.sqlite
 *.sqlite3
+*.log
+*.out
+*.tmp
+*.bak
+logs/
 .sovereign_data/
 worm_audit_*.log
+docker-compose.override.yml
+contabil_agente/processed_sessions_*.jsonl
 contabil_agente/logs/
+contabil_agente/db/
 contabil_agente/documents/
 contabil_agente/temp_docs/
 contabil_agente/uploads/

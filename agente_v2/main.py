@@ -9,14 +9,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
-from collections import defaultdict, deque
 from pathlib import Path
-from typing import Any, Deque, Dict, Optional
+from typing import Any, Dict, Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
@@ -36,7 +33,7 @@ from contabil_agente.rpa.estado import StatusStore
 from contabil_agente.lgpd import FINALIDADES, ConsentimentoStore, PoliticaDeRetencao, ServicoLGPD, TratamentoSemBaseLegal
 from contabil_agente.documentos.leitura import TAMANHO_MAXIMO, ArquivoInvalido
 from contabil_agente.documentos.tipos import TIPOS as TIPOS_DOCUMENTO
-from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, HistoricoDocumentos, provedores_do_ambiente
+from contabil_agente.pipeline import DocumentDispatcher, HistoricoDocumentos, destinos_do_ambiente, provedores_do_ambiente
 from contabil_agente.security.worm_audit import WormAudit
 from contabil_agente.security.auth import (
     AuthSettings,
@@ -49,7 +46,6 @@ from contabil_agente.security.auth import (
 from contabil_agente.security.audit_trail_manager import AuditTrailManager
 from contabil_agente.security.rbac_manager import Permission
 
-from contabil_agente.governance.redaction import instalar_filtro_de_redacao
 from contabil_agente.governance_manager import (
     AssinaturaInvalida, DecisaoJaResolvida, DecisaoNaoEncontrada, GovernanceManager, GovernancaError, RegraDasDuasPessoas,
     carregar_limites, carregar_par_de_assinatura,
@@ -208,7 +204,7 @@ def create_app(
             HistoricoDocumentos(settings.DATA_DIR / "documentos.db"),
             worker_llm=provedores["worker"],
             revisor_llm=provedores["revisor"],
-            destinos=[ArquivoDestino(settings.DATA_DIR / "arquivo")],
+            destinos=destinos_do_ambiente(settings.DATA_DIR / "arquivo", segredos),
         )
     app.state.dispatcher = dispatcher
     app.state.rpa_status = StatusStore(settings.DATA_DIR / "rpa.db")
