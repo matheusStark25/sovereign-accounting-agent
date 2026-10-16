@@ -70,14 +70,14 @@ def exemplo_1_processamento_folha():
         {
             "id": "FUNC_001",
             "nome": "João Silva",
-            "cp": "12345678901",
+            "cpf": "12345678901",
             "salario": 5000.00,
             "email": "joao.silva@empresa.com",
         },
         {
             "id": "FUNC_002",
             "nome": "Maria Santos",
-            "cp": "98765432109",
+            "cpf": "98765432109",
             "salario": 6500.00,
             "email": "maria.santos@empresa.com",
         },
@@ -162,7 +162,7 @@ def exemplo_3_criptografia():
     dados_originais = {
         "funcionario_id": "FUNC_001",
         "nome": "João Silva",
-        "cp": "12345678901",
+        "cpf": "12345678901",
         "salario": 5000.00,
         "banco": "001 - Banco do Brasil",
         "conta": "12345-6",
@@ -175,7 +175,7 @@ def exemplo_3_criptografia():
     # Criptografa campos sensíveis
     print("\n🔐 Criptografando campos sensíveis...")
     dados_criptografados = service.encrypt_sensitive_data(
-        dados_originais, sensitive_fields=["cp", "salario", "conta"]
+        dados_originais, sensitive_fields=["cpf", "salario", "conta"]
     )
 
     print("\nDados criptografados:")

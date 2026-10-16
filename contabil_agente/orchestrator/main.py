@@ -426,7 +426,7 @@ class UniversalDPOrchestrator:
             send_audit(
                 "Contexto de usuário atualizado",
                 level="info",
-                context={"usuario_cp": usuario_cpf, "dados": dados},
+                context={"usuario_cpf": usuario_cpf, "dados": dados},
             )
 
         except Exception as e:

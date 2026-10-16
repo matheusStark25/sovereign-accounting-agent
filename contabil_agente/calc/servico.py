@@ -13,13 +13,15 @@ from typing import Any, Dict, List, Optional
 from .decimo_terceiro import calcular_decimo_terceiro
 from .errors import CalculoError, CompetenciaSemTabela, DadosInvalidos
 from .ferias import calcular_ferias
+from .fgts import calcular_fgts_mensal
+from .folha import calcular_folha
 from .inss import calcular_inss
 from .irrf import calcular_irrf_mensal
 from .money import D, q2
 from .rescisao import calcular_rescisao, dados_de_dict, ler_data
 from .texto import formatar_resultado
 
-TIPOS_CALCULO = ("rescisao", "ferias", "decimo_terceiro", "inss", "irrf")
+TIPOS_CALCULO = ("rescisao", "ferias", "decimo_terceiro", "inss", "irrf", "fgts", "folha")
 
 _ROTULOS = {
     "salario": "o salário base (valor mensal)",
@@ -42,7 +44,7 @@ def _pegar(dados: Dict[str, Any], *nomes):
 def campos_faltantes(tipo: str, dados: Dict[str, Any]) -> List[str]:
     """Campos obrigatórios que ainda não foram informados."""
     faltando: List[str] = []
-    if tipo in ("inss", "irrf", "ferias", "decimo_terceiro", "rescisao"):
+    if tipo in ("inss", "irrf", "ferias", "decimo_terceiro", "rescisao", "fgts", "folha"):
         if _pegar(dados, "salario_base", "salario") is None:
             faltando.append("salario")
     if tipo == "decimo_terceiro" and _pegar(dados, "meses") is None:
@@ -143,6 +145,21 @@ def calcular(tipo: str, dados: Dict[str, Any], hoje: Optional[date] = None) -> D
                 adiantamento=_pegar(dados, "adiantamento_13"),
             )
             resultado = r.to_dict()
+        elif tipo == "fgts":
+            resultado = calcular_fgts_mensal(salario, _pegar(dados, "categoria") or "empregado").to_dict()
+        elif tipo == "folha":
+            resultado = calcular_folha(
+                salario, competencia,
+                adicionais_mensais=adicionais,
+                horas_extras=_pegar(dados, "horas_extras") or 0,
+                dsr_horas_extras=_pegar(dados, "dsr_horas_extras") or 0,
+                outros_proventos=_pegar(dados, "outros_proventos") or 0,
+                dependentes=dependentes,
+                pensao_alimenticia=_pegar(dados, "pensao_alimenticia") or 0,
+                custo_vale_transporte=_pegar(dados, "custo_vale_transporte") or 0,
+                outros_descontos=_pegar(dados, "outros_descontos") or 0,
+                categoria_fgts=_pegar(dados, "categoria") or "empregado",
+            ).to_dict()
         else:  # rescisao
             resultado = calcular_rescisao(dados_de_dict(dados)).to_dict()
     except CompetenciaSemTabela as exc:

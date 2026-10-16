@@ -152,7 +152,7 @@ def listar_funcionarios():
         {
             "id": 1,
             "nome": "João Silva",
-            "cp": "12345678901",
+            "cpf": "12345678901",
             "email": "joao.silva@empresa.com",
             "telefone": "11987654321",
             "salario": 5000.00,
@@ -160,7 +160,7 @@ def listar_funcionarios():
         {
             "id": 2,
             "nome": "Maria Santos",
-            "cp": "98765432109",
+            "cpf": "98765432109",
             "email": "maria.santos@empresa.com",
             "telefone": "11912345678",
             "salario": 6500.00,
@@ -173,7 +173,7 @@ def listar_funcionarios():
         masked = mask_pii_in_response(
             data=func,
             pii_fields={
-                "cp": PIIType.CPF,
+                "cpf": PIIType.CPF,
                 "email": PIIType.EMAIL,
                 "telefone": PIIType.PHONE,
             },

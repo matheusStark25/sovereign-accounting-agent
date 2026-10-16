@@ -96,7 +96,7 @@ class ToolAdmissao:
 
         try:
             # Basic validations for required fields
-            cpf_raw = dados_funcionario.get("cp") or dados_funcionario.get("cpf")
+            cpf_raw = dados_funcionario.get("cpf") or dados_funcionario.get("cpf")
             cargo = dados_funcionario.get("cargo")
             data_admissao_raw = dados_funcionario.get("data_admissao")
 
@@ -173,7 +173,7 @@ class ToolAdmissao:
                 "status_geral": "em_andamento",
                 "funcionario": {
                     "nome": dados_funcionario.get("nome", ""),
-                    "cp": cpf_limpo,
+                    "cpf": cpf_limpo,
                     "cargo": dados_funcionario.get("cargo", ""),
                     "data_admissao": data_admissao_iso,
                     "salario": str(dados_funcionario.get("salario", "")),

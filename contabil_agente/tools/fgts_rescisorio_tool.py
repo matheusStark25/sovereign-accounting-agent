@@ -137,7 +137,7 @@ class FGTSInputModel(BaseModel):
     References: Lei 8.036/90 articles regarding multa rescisória e atualização.
     """
 
-    cpf: str = Field(..., min_length=11, max_length=14, alias="cp")
+    cpf: str = Field(..., min_length=11, max_length=14, alias="cpf")
     nome: str
     data_vencimento: date
     data_pagamento: date

@@ -260,7 +260,7 @@ class GeradorPDFAcroForm:
         # Nome do arquivo
         if nome_arquivo is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cpf_limpo = dados.get("cp", "").replace(".", "").replace("-", "")
+            cpf_limpo = dados.get("cpf", "").replace(".", "").replace("-", "")
             nome_arquivo = f"folha_pagamento_{cpf_limpo}_{timestamp}"
 
         caminho_completo = self.diretorio_saida / f"{nome_arquivo}.pdf"
@@ -446,7 +446,7 @@ class GeradorPDFAcroForm:
 
         if nome_arquivo is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cpf_limpo = dados.get("cp", "").replace(".", "").replace("-", "")
+            cpf_limpo = dados.get("cpf", "").replace(".", "").replace("-", "")
             nome_arquivo = f"recibo_ferias_{cpf_limpo}_{timestamp}"
 
         caminho_completo = self.diretorio_saida / f"{nome_arquivo}.pdf"
@@ -584,7 +584,7 @@ class GeradorPDFAcroForm:
 
         if nome_arquivo is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cpf_limpo = dados.get("cp", "").replace(".", "").replace("-", "")
+            cpf_limpo = dados.get("cpf", "").replace(".", "").replace("-", "")
             nome_arquivo = f"termo_rescisao_{cpf_limpo}_{timestamp}"
 
         caminho_completo = self.diretorio_saida / f"{nome_arquivo}.pdf"

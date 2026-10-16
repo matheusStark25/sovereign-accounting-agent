@@ -140,7 +140,7 @@ def gerar_trct(self, dados: Dict[str, Any]) -> Dict[str, Any]:
     send_audit("Gerando TRCT", level="info", context={"funcionario": dados.get("nome")})
 
     try:
-        cpf = dados.get("cp", "000000000").replace(".", "").replace("-", "")
+        cpf = dados.get("cpf", "000000000").replace(".", "").replace("-", "")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"TRCT_{cpf}_{timestamp}.pdf"
         filepath = self.documents_dir / filename
@@ -266,7 +266,7 @@ def gerar_holerite(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         "Gerando holerite", level="info", context={"funcionario": dados.get("nome")}
     )
     try:
-        cpf = dados.get("cp", "000000000").replace(".", "").replace("-", "")
+        cpf = dados.get("cpf", "000000000").replace(".", "").replace("-", "")
         mes_ref = dados.get("mes_referencia", datetime.now().strftime("%m_%Y"))
         filename = f"HOLERITE_{cpf}_{mes_ref}.pdf"
         filepath = self.documents_dir / filename

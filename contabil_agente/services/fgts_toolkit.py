@@ -184,7 +184,7 @@ class HybridSeeker:
                 pis = self.PIS_REGEX.findall(text)
                 cpf = self.CPF_REGEX.findall(text)
                 results.append(
-                    {"path": full, "pis": pis, "cp": cpf, "text_snippet": text[:200]}
+                    {"path": full, "pis": pis, "cpf": cpf, "text_snippet": text[:200]}
                 )
         return results
 

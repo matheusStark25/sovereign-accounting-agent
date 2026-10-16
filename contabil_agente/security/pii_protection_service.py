@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class PIIType(Enum):
     """Tipos de dados pessoais identificáveis."""
 
-    CPF = "cp"
+    CPF = "cpf"
     CNPJ = "cnpj"
     EMAIL = "email"
     PHONE = "phone"
@@ -81,7 +81,7 @@ class PIIProtectionService:
 
     # Campos que contêm PII (mapeamento)
     PII_FIELDS_MAP: Dict[str, PIIType] = {
-        "cp": PIIType.CPF,
+        "cpf": PIIType.CPF,
         "cnpj": PIIType.CNPJ,
         "email": PIIType.EMAIL,
         "telefone": PIIType.PHONE,

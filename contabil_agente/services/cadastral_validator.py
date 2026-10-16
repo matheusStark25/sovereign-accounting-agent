@@ -37,7 +37,7 @@ class CadastralValidator:
         # quick synchronous checks
         try:
             cnpj = payload.get("cnpj") or payload.get("company_cnpj")
-            cpf = payload.get("cp") or payload.get("person_cpf")
+            cpf = payload.get("cpf") or payload.get("person_cpf")
 
             if cnpj:
                 if not self._valid_cnpj(cnpj):
@@ -83,9 +83,9 @@ class CadastralValidator:
     def anonymize_pii(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Return a copy with CPF/CNPJ masked (keeps last 4 digits)."""
         out = dict(payload)
-        if "cp" in out and out["cp"]:
-            s = re.sub(r"\D", "", str(out["cp"]))
-            out["cp"] = ("*" * max(0, len(s) - 4)) + s[-4:]
+        if "cpf" in out and out["cpf"]:
+            s = re.sub(r"\D", "", str(out["cpf"]))
+            out["cpf"] = ("*" * max(0, len(s) - 4)) + s[-4:]
         if "cnpj" in out and out["cnpj"]:
             s = re.sub(r"\D", "", str(out["cnpj"]))
             out["cnpj"] = ("*" * max(0, len(s) - 4)) + s[-4:]

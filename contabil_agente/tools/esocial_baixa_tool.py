@@ -146,7 +146,7 @@ def _canonicalize_input(data: Dict[str, Any]) -> Dict[str, Any]:
     """Convert legacy v1 field names to canonical v2 names."""
     out = {}
     # v1: name/amount/date -> v2: full_name/value/timestamp
-    out["cp"] = data.get("cp") or data.get("documento")
+    out["cpf"] = data.get("cpf") or data.get("documento")
     out["full_name"] = data.get("full_name") or data.get("name")
     out["value"] = data.get("value") or data.get("amount") or 0.0
     out["timestamp"] = data.get("timestamp") or data.get("date")
@@ -217,7 +217,7 @@ def read_checkpoint(cpf: str) -> Optional[Dict[str, Any]]:
     con.close()
     if row:
         return {
-            "cp": row[0],
+            "cpf": row[0],
             "status": row[1],
             "last_step": row[2],
             "last_updated": row[3],
@@ -612,7 +612,7 @@ if __name__ == "__main__":
     cpfs = os.getenv("ESOCIAL_TEST_CPFS", "11111111111,22222222222").split(",")
     payloads = {
         c: {
-            "cp": c,
+            "cpf": c,
             "name": "Teste",
             "amount": 100.0,
             "date": "2026-01-01",

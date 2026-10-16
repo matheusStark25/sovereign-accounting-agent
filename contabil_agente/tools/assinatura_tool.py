@@ -103,7 +103,7 @@ class ToolAssinatura:
             dados_assinatura = {
                 "documento_hash": doc_hash,
                 "assinante_nome": assinante.get("nome", ""),
-                "assinante_cp": assinante.get("cp", ""),
+                "assinante_cpf": assinante.get("cpf", ""),
                 "assinante_tipo": assinante.get("tipo", "funcionario"),
                 "timestamp": timestamp,
                 "tipo_assinatura": tipo_assinatura,
@@ -229,7 +229,7 @@ class ToolAssinatura:
             dados_verificacao = {
                 "documento_hash": assinatura_original["documento_hash"],
                 "assinante_nome": assinatura_original["assinante_nome"],
-                "assinante_cp": assinatura_original["assinante_cp"],
+                "assinante_cpf": assinatura_original["assinante_cpf"],
                 "assinante_tipo": assinatura_original["assinante_tipo"],
                 "timestamp": assinatura_original["timestamp"],
                 "tipo_assinatura": assinatura_original["tipo_assinatura"],
@@ -257,7 +257,7 @@ class ToolAssinatura:
                     "message": "Assinatura válida - Documento autêntico",
                     "detalhes": {
                         "assinante": assinatura_original["assinante_nome"],
-                        "cp": assinatura_original["assinante_cp"],
+                        "cpf": assinatura_original["assinante_cpf"],
                         "tipo": assinatura_original["assinante_tipo"],
                         "data_assinatura": assinatura_original["timestamp"],
                         "tipo_assinatura": assinatura_original["tipo_assinatura"],
@@ -368,7 +368,7 @@ class ToolAssinatura:
                     {
                         "signature_id": sig_data.get("signature_id"),
                         "assinante": sig_data.get("assinante_nome"),
-                        "cp": sig_data.get("assinante_cp"),
+                        "cpf": sig_data.get("assinante_cpf"),
                         "tipo": sig_data.get("assinante_tipo"),
                         "documento": Path(sig_data.get("documento_path", "")).name,
                         "data": sig_data.get("timestamp"),
@@ -441,7 +441,7 @@ def apply_certificate(filepath: str, cert_name: str = "LEONEL") -> Dict[str, Any
 
         # Perform signing or fallback; if forced, treat as success path
         ta = ToolAssinatura()
-        assinante = {"nome": cert_name, "cp": "00000000000", "tipo": "certificado"}
+        assinante = {"nome": cert_name, "cpf": "00000000000", "tipo": "certificado"}
         res = ta.assinar_documento(filepath, assinante)
 
         # If underlying implementation succeeded or we force success, return success and log

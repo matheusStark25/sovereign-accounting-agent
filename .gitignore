@@ -102,3 +102,6 @@ contabil_agente/processed_sessions_*.jsonl
 *.db
 *.sqlite
 *.sqlite3
+.sovereign_data/
+worm_audit_*.log
+contabil_agente/logs/

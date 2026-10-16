@@ -422,7 +422,7 @@ class ParserDocumentos:
 
         # Extração padrão (básica) complementa o que faltou
         default_campos = {
-            "cp": self._extrair_cpf(texto),
+            "cpf": self._extrair_cpf(texto),
             "cnpj": self._extrair_cnpj(texto),
             "nome": self._extrair_nome(texto),
             "salario_base": self._extrair_salario(texto),
@@ -1039,12 +1039,12 @@ class IngestaoService:
         campos_validos = 0
 
         # Valida CPF
-        if "cp" in campos:
-            if ValidadorCampos.validar_cpf(campos["cp"]):
-                validacao["campos_validos"].append("cp")
+        if "cpf" in campos:
+            if ValidadorCampos.validar_cpf(campos["cpf"]):
+                validacao["campos_validos"].append("cpf")
                 campos_validos += 1
             else:
-                validacao["campos_invalidos"].append("cp")
+                validacao["campos_invalidos"].append("cpf")
                 validacao["avisos"].append("CPF com formato inválido")
 
         # Valida CNPJ
@@ -1109,7 +1109,7 @@ class IngestaoService:
         campos = resultado.get("campos", {})
 
         holerite = {
-            "cp": campos.get("cp"),
+            "cpf": campos.get("cpf"),
             "nome": campos.get("nome"),
             "salario_base": campos.get("salario_base"),
             "cargo": campos.get("cargo"),
@@ -1138,7 +1138,7 @@ class IngestaoService:
         campos = resultado.get("campos", {})
 
         contrato = {
-            "cp": campos.get("cp"),
+            "cpf": campos.get("cpf"),
             "cnpj": campos.get("cnpj"),
             "nome_funcionario": campos.get("nome"),
             "empresa": campos.get("empresa"),

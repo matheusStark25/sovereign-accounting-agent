@@ -1,311 +1,309 @@
-from datetime import timedelta
-from datetime import datetime
+"""API FastAPI do agente: login, chat, cálculos trabalhistas, documentos e saúde.
 
-# Minimal in-memory fallback metrics for environments without prometheus_client
-_METRICS = {"ingest_count": 0, "ingest_fallbacks": 0}
+Subir:  ``uvicorn agente_v2.main:app --host 0.0.0.0 --port 8000``
+(precisa de ``JWT_SECRET``; para desenvolvimento local use ``AGENTE_ENV=dev``).
+"""
 
-try:
-    from fastapi import Depends  # type: ignore[reportMissingImports]
-    from fastapi import FastAPI  # type: ignore[reportMissingImports]
-    from fastapi import HTTPException  # type: ignore[reportMissingImports]
-    from fastapi import Security  # type: ignore[reportMissingImports]
-    from fastapi.security import OAuth2PasswordRequestForm  # type: ignore[reportMissingImports]
-    from fastapi.security import HTTPAuthorizationCredentials  # type: ignore[reportMissingImports]
-    from fastapi.security import HTTPBearer  # type: ignore[reportMissingImports]
-    from fastapi import UploadFile  # type: ignore[reportMissingImports]
-    from fastapi import File  # type: ignore[reportMissingImports]
-except Exception:
-    # Minimal fallback shims for environments without FastAPI installed (tests/dev)
-    from typing import Any
-    import importlib.util
-    import os
+from __future__ import annotations
 
-    tc_path = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "tools",
-            "fastapi_local_disabled",
-            "testclient.py",
-        )
-    )
-    spec_tc = importlib.util.spec_from_file_location("fastapi_shim_testclient", tc_path)
-    shim_tc = None
-    if spec_tc is not None:
-        shim_tc = importlib.util.module_from_spec(spec_tc)
-        if getattr(spec_tc, "loader", None) is not None and shim_tc is not None:
-            spec_tc.loader.exec_module(shim_tc)
-    # Provide a minimal fallback shim object for TestClient when module couldn't be loaded
-    if shim_tc is None:
-        class _ShimTC:
-            class TestClient:
-                def __init__(self, *a, **k):
-                    pass
+import logging
+import os
+import time
+from collections import defaultdict, deque
+from pathlib import Path
+from typing import Any, Deque, Dict, Optional
 
-        shim_tc = _ShimTC()
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
-    # Minimal inline shim for FastAPI objects used by our tests
-    class FastAPI:
-        def __init__(self, *args, **kwargs):
-            self._routes = {}
-            self._startup_handlers = []
+from contabil_agente.calc import servico
+from contabil_agente.chat import ChatEngine, ChatError, ChatStore, llm_do_ambiente
+from contabil_agente.security.auth import (
+    PAPEIS_VALIDOS,
+    AuthError,
+    AuthLockedError,
+    AuthService,
+    Principal,
+)
+from contabil_agente.security.rbac_manager import Permission
 
-        def route(self, path=None, *args, **kwargs):
-            def _decor(f):
-                if path:
-                    self._routes[path] = f
-                return f
+from .auth import exigir, get_auth, token_da_requisicao, usuario_atual
+from .config import settings
+from .logging_setup import setup_logging
 
-            return _decor
+logger = logging.getLogger("agente_v2")
 
-        def include_router(self, *args, **kwargs):
-            return None
+LOGINS = Counter("agente_logins_total", "Tentativas de login", ["resultado"])
+CALCULOS = Counter("agente_calculos_total", "Cálculos executados", ["tipo", "resultado"])
+MENSAGENS = Counter("agente_chat_mensagens_total", "Mensagens de chat processadas")
 
-        def get(self, path=None, *args, **kwargs):
-            return self.route(path, *args, **kwargs)
-
-        def post(self, path=None, *args, **kwargs):
-            return self.route(path, *args, **kwargs)
-
-        def websocket(self, path=None, *args, **kwargs):
-            return self.route(path, *args, **kwargs)
-
-        def on_event(self, name: str):
-            def _decor(f):
-                # register startup/shutdown handlers; call immediately for shim
-                if name == "startup":
-                    try:
-                        f()
-                    except Exception:
-                        pass
-                return f
-
-            return _decor
-
-    class WebSocket:
-        def __init__(self, scope: Any = None):
-            self.scope = scope
-
-        async def accept(self):
-            return None
-
-        async def receive_text(self):
-            return ""
-
-        async def send_text(self, data: str):
-            return None
-
-    TestClient = shim_tc.TestClient
-
-    def Depends(x: Any = None):
-        return x
-
-    class HTTPException(Exception):
-        def __init__(self, status_code: int = 500, detail: str | None = None):
-            super().__init__(detail or "")
-
-    class Security:
-        def __init__(self, sec):
-            self.sec = sec
-
-    class OAuth2PasswordRequestForm:  # type: ignore
-        def __init__(self, username: str = "", password: str = ""):
-            self.username = username
-            self.password = password
-
-    class HTTPAuthorizationCredentials:  # type: ignore
-        def __init__(self, credentials: str):
-            self.credentials = credentials
-
-    class HTTPBearer:  # type: ignore
-        def __init__(self, *args, **kwargs):
-            pass
-
-    class UploadFile:  # type: ignore
-        def __init__(self, filename: str, file):
-            self.filename = filename
-            self._file = file
-
-        async def read(self):
-            return self._file.read()
-
-    def File(*args, **kwargs):
-        return None
+TAMANHO_MAXIMO_JSON = 1_000_000
+WEB_DIR = Path(__file__).resolve().parent / "web"
 
 
-try:
-    from pydantic import BaseModel  # type: ignore[reportMissingImports]
-except Exception:
-    # Minimal BaseModel fallback for environments without pydantic during tests
-    class BaseModel:
-        def __init__(self, **data):
-            for k, v in data.items():
-                setattr(self, k, v)
+# ---------------------------------------------------------------- limite de uso
+class LimiteDeUso:
+    """Janela deslizante em memória (por processo). Em vários workers, use também o proxy/WAF."""
 
-        def dict(self):
-            return self.__dict__
+    def __init__(self, maximo: int, janela_segundos: int):
+        self.maximo, self.janela = maximo, janela_segundos
+        self._eventos: Dict[str, Deque[float]] = defaultdict(deque)
 
-
-from .auth import create_access_token  # noqa: E402
-from .auth import decode_access_token  # noqa: E402
-from .auth import verify_password  # noqa: E402
-from .auth import get_password_hash  # noqa: E402
-from .config import settings  # noqa: E402
-from .logging_setup import setup_logging  # noqa: E402
-from .vault_client import VaultClient  # noqa: E402
-from .tasks import enqueue_document_job  # noqa: E402
-
-logger = setup_logging()
-
-app = FastAPI(title=settings.PROJECT_NAME)
-security = HTTPBearer()
-
-# Prometheus metrics (module-level). Optional: only active if prometheus_client is installed.
-try:
-    from prometheus_client import Counter  # type: ignore[reportMissingImports]
-    from prometheus_client import generate_latest, CollectorRegistry  # type: ignore[reportMissingImports]
-
-    METRIC_INGEST = Counter("agente_ingest_total", "Total ingests")
-    METRIC_INGEST_FALLBACKS = Counter(
-        "agente_ingest_fallbacks_total", "Ingests using fallback"
-    )
-except Exception:
-    METRIC_INGEST = None
-    METRIC_INGEST_FALLBACKS = None
+    def permitir(self, chave: str) -> bool:
+        agora = time.monotonic()
+        fila = self._eventos[chave]
+        while fila and agora - fila[0] > self.janela:
+            fila.popleft()
+        if len(fila) >= self.maximo:
+            return False
+        fila.append(agora)
+        return True
 
 
-# --- minimal user store (replace with real user DB / IAM) ---
-class User(BaseModel):
-    user_id: str
+# ---------------------------------------------------------------------- modelos
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    session_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class NovoUsuario(BaseModel):
     username: str
-    hashed_password: str
+    password: str
+    roles: list[str]
+    tenant_id: Optional[str] = None
 
 
-_USERS = {
-    "alice": User(
-        user_id="user-1", username="alice", hashed_password=get_password_hash("secret")
-    )
-}
-
-
-def get_vault() -> VaultClient:
-    return VaultClient(url=settings.VAULT_URL, token=settings.VAULT_TOKEN)
-
-
-@app.post("/token")
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = _USERS.get(form_data.username)
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = create_access_token(
-        subject=user.user_id, expires_delta=access_token_expires
-    )
-    return {"access_token": token, "token_type": "bearer"}
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-) -> User:
-    token = credentials.credentials
+# ------------------------------------------------------------------- utilidades
+def _auditar(request: Request, acao: str, principal: Optional[Principal], descricao: str, sucesso: bool = True, **meta):
+    """Registra na trilha de auditoria sem nunca derrubar a requisição (e sem conteúdo de mensagens)."""
+    audit = getattr(request.app.state, "audit", None)
+    if audit is None:
+        return
     try:
-        payload = decode_access_token(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    sub = payload.get("sub")
-    # Resolve user from subject
-    for u in _USERS.values():
-        if u.user_id == sub:
-            # attach audit_id to request context (simple example)
-            audit_id = f"audit::{u.user_id}::{payload.get('iat') or datetime.utcnow().isoformat()}"
-            logger.info(
-                "user_authenticated", extra={"user_id": u.user_id, "audit_id": audit_id}
-            )
-            return u
-    raise HTTPException(status_code=401, detail="User not found")
+        from contabil_agente.security.audit_trail_manager import AuditAction
 
-
-@app.get("/users/me")
-def read_users_me(current_user: User = Depends(get_current_user)):
-    return {"user_id": current_user.user_id, "username": current_user.username}
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.on_event("startup")
-def startup_event():
-    v = get_vault()
-    # example: load a certificate secret into memory (do not log private keys)
-    cert_pem = v.get_secret("secret/certs", "a1_cert")
-    if cert_pem:
-        logger.info("vault: cert loaded (present)")
-    else:
-        logger.info("vault: cert not found or vault not configured")
-
-
-@app.post("/ingest")
-async def ingest_file(
-    file: UploadFile = File(...),
-    webhook: str | None = None,
-    current_user: User = Depends(get_current_user),
-):
-    data = await file.read()
-    # generate audit id for this operation
-    audit_id = f"audit::{current_user.user_id}::{datetime.utcnow().isoformat()}"
-
-    # enqueue job asynchronously including user context
-    try:
-        if METRIC_INGEST is not None:
-            try:
-                METRIC_INGEST.inc()
-            except Exception:
-                pass
-        job_id = await enqueue_document_job(
-            data,
-            file.filename,
-            webhook,
-            user_id=current_user.user_id,
-            audit_id=audit_id,
+        audit.log(
+            tenant_id=principal.tenant_id if principal else "SYSTEM",
+            operator_id=principal.user_id if principal else "anonimo",
+            action=AuditAction(acao),
+            description=descricao,
+            success=sucesso,
+            metadata=meta,
+            ip_address=request.client.host if request.client else None,
         )
     except Exception:
-        # fallback: run inline (sync fallback for dev)
-        from .tasks import process_document
+        logger.error("Falha ao gravar auditoria (%s)", acao, exc_info=True)
 
-        res = await process_document(
-            None,
-            data,
-            file.filename,
-            webhook,
-            user_id=current_user.user_id,
-            audit_id=audit_id,
+
+def _bootstrap_admin(auth: AuthService) -> None:
+    """Cria o primeiro administrador a partir do ambiente, só se ainda não houver usuários."""
+    usuario = os.environ.get("ADMIN_USERNAME", "").strip()
+    senha = os.environ.get("ADMIN_PASSWORD", "")
+    if not usuario or not senha or auth.contar_usuarios() > 0:
+        return
+    auth.criar_usuario(usuario, senha, os.environ.get("ADMIN_TENANT", "default"), ["super_admin"])
+    logger.warning("Administrador inicial '%s' criado. Remova ADMIN_PASSWORD do ambiente.", usuario)
+
+
+# ------------------------------------------------------------------------- app
+def create_app(
+    auth: Optional[AuthService] = None,
+    engine: Optional[ChatEngine] = None,
+    store: Optional[ChatStore] = None,
+    audit: Any = None,
+) -> FastAPI:
+    app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs" if settings.ENV == "dev" else None, redoc_url=None)
+    app.state.auth = auth or AuthService()
+    app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente())
+    app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
+    app.state.audit = audit
+    app.state.limite_login = LimiteDeUso(maximo=10, janela_segundos=60)
+    app.state.limite_chat = LimiteDeUso(maximo=60, janela_segundos=60)
+    _bootstrap_admin(app.state.auth)
+
+    if settings.ALLOWED_ORIGINS:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.ALLOWED_ORIGINS,
+            allow_methods=["GET", "POST", "DELETE"],
+            allow_headers=["Authorization", "Content-Type"],
         )
-        if METRIC_INGEST_FALLBACKS is not None:
-            try:
-                METRIC_INGEST_FALLBACKS.inc()
-            except Exception:
-                pass
-        return {"job": None, "result": res}
-    return {"job": job_id, "audit_id": audit_id}
 
-
-@app.get("/metrics")
-def metrics():
-    try:
-        # simple registry and metrics example (process-global, for demo)
-        registry = CollectorRegistry()
-        c_ingest = Counter("agente_ingest_total", "Total ingests", registry=registry)
-        c_fallback = Counter(
-            "agente_ingest_fallbacks_total", "Ingests using fallback", registry=registry
+    @app.middleware("http")
+    async def protecoes(request: Request, call_next):
+        tamanho = request.headers.get("content-length")
+        if tamanho and tamanho.isdigit() and int(tamanho) > TAMANHO_MAXIMO_JSON and "multipart" not in request.headers.get(
+            "content-type", ""
+        ):
+            return JSONResponse({"detail": "Corpo da requisição grande demais."}, status_code=413)
+        resposta = await call_next(request)
+        resposta.headers["X-Content-Type-Options"] = "nosniff"
+        resposta.headers["X-Frame-Options"] = "DENY"
+        resposta.headers["Referrer-Policy"] = "no-referrer"
+        resposta.headers["Cache-Control"] = "no-store"
+        resposta.headers["Content-Security-Policy"] = (
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
         )
-        # mark created metrics as referenced so linters don't flag them as unused
-        assert c_ingest is not None and c_fallback is not None
-        # For now expose legacy JSON as fallback if prometheus_client not fully instrumented.
-        return generate_latest(registry)
-    except Exception:
+        return resposta
+
+    # ---------------------------------------------------------------- saúde
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    @app.get("/ready")
+    def ready(request: Request):
+        try:
+            request.app.state.auth.contar_usuarios()
+        except Exception:
+            raise HTTPException(status_code=503, detail="Banco de autenticação indisponível.")
+        return {"status": "ready", "llm": request.app.state.chat_engine._llm is not None}
+
+    @app.get("/metrics")
+    def metrics():
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+    # ---------------------------------------------------------- autenticação
+    @app.post("/token")
+    def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), auth: AuthService = Depends(get_auth)):
+        ip = request.client.host if request.client else "?"
+        if not request.app.state.limite_login.permitir(ip):
+            raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde um minuto.")
+        try:
+            principal = auth.autenticar(form.username, form.password)
+        except AuthLockedError as exc:
+            LOGINS.labels("bloqueado").inc()
+            _auditar(request, "access_denied", None, "Login em conta bloqueada", sucesso=False)
+            raise HTTPException(status_code=423, detail=str(exc))
+        except AuthError as exc:
+            LOGINS.labels("falha").inc()
+            _auditar(request, "access_denied", None, "Falha de login", sucesso=False)
+            raise HTTPException(status_code=401, detail=str(exc), headers={"WWW-Authenticate": "Bearer"})
+        LOGINS.labels("ok").inc()
+        _auditar(request, "login", principal, "Login realizado")
         return {
-            "ingest_count": _METRICS["ingest_count"],
-            "ingest_fallbacks": _METRICS["ingest_fallbacks"],
+            "access_token": auth.emitir_token(principal),
+            "token_type": "bearer",
+            "expires_in": auth.settings.access_minutes * 60,
         }
+
+    @app.post("/logout", status_code=204)
+    def logout(
+        request: Request,
+        token: str = Depends(token_da_requisicao),
+        usuario: Principal = Depends(usuario_atual),
+        auth: AuthService = Depends(get_auth),
+    ):
+        auth.revogar_token(token)
+        _auditar(request, "logout", usuario, "Logout realizado")
+
+    @app.get("/users/me")
+    def eu(usuario: Principal = Depends(usuario_atual)):
+        return usuario.to_dict()
+
+    @app.post("/users", status_code=201)
+    def criar_usuario(
+        dados: NovoUsuario,
+        request: Request,
+        admin: Principal = Depends(exigir(Permission.MANAGE_USERS)),
+        auth: AuthService = Depends(get_auth),
+    ):
+        papeis = set(dados.roles)
+        if "super_admin" not in admin.roles:
+            if "super_admin" in papeis:
+                raise HTTPException(status_code=403, detail="Só um super_admin cria outro super_admin.")
+            if dados.tenant_id not in (None, admin.tenant_id):
+                raise HTTPException(status_code=403, detail="Você só cria usuários do seu próprio tenant.")
+        if not papeis <= PAPEIS_VALIDOS:
+            raise HTTPException(status_code=422, detail=f"Papéis válidos: {sorted(PAPEIS_VALIDOS)}.")
+        try:
+            novo = auth.criar_usuario(dados.username, dados.password, dados.tenant_id or admin.tenant_id, sorted(papeis))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        _auditar(request, "user_created", admin, "Usuário criado", alvo=novo.user_id)
+        return novo.to_dict()
+
+    # ------------------------------------------------------------------ chat
+    @app.post("/api/chat")
+    def chat(
+        dados: ChatRequest,
+        request: Request,
+        usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL)),
+    ):
+        if not request.app.state.limite_chat.permitir(usuario.user_id):
+            raise HTTPException(status_code=429, detail="Muitas mensagens. Aguarde um momento.")
+        loja: ChatStore = request.app.state.chat_store
+        if dados.session_id:
+            estado = loja.carregar(dados.session_id, usuario.user_id, usuario.tenant_id)
+            if estado is None:
+                raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+            sid = dados.session_id
+        else:
+            sid, estado = loja.nova_sessao(usuario.user_id, usuario.tenant_id), {}
+        try:
+            resultado = request.app.state.chat_engine.responder(estado, dados.message)
+        except ChatError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        loja.salvar(sid, usuario.user_id, usuario.tenant_id, estado)
+        MENSAGENS.inc()
+        _auditar(request, "read", usuario, "Mensagem de chat", sessao=sid, tamanho=len(dados.message))
+        return {
+            "session_id": sid,
+            "response": resultado["resposta"],
+            "status": resultado.get("status", "ok"),
+            "tipo": resultado.get("tipo"),
+            "dados_calculados": resultado.get("dados_calculados"),
+        }
+
+    @app.get("/api/chat/{session_id}")
+    def historico(session_id: str, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        estado = request.app.state.chat_store.carregar(session_id, usuario.user_id, usuario.tenant_id)
+        if estado is None:
+            raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+        return {"session_id": session_id, "mensagens": estado.get("mensagens", [])}
+
+    # --------------------------------------------------------------- cálculo
+    @app.get("/api/v1/calculo/tipos")
+    def tipos(_: Principal = Depends(usuario_atual)):
+        return {"tipos": list(servico.TIPOS_CALCULO)}
+
+    @app.post("/api/v1/calculo/{tipo}")
+    def calcular(
+        tipo: str,
+        dados: Dict[str, Any],
+        request: Request,
+        usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL)),
+    ):
+        if tipo not in servico.TIPOS_CALCULO:
+            raise HTTPException(status_code=404, detail=f"Cálculo desconhecido. Use: {', '.join(servico.TIPOS_CALCULO)}.")
+        resposta = servico.calcular(tipo, dados)
+        CALCULOS.labels(tipo, resposta["status"]).inc()
+        _auditar(request, "process_payroll", usuario, f"Cálculo de {tipo}", sucesso=resposta["status"] == "ok")
+        if resposta["status"] == "ok":
+            return resposta
+        codigo = 422
+        return JSONResponse(resposta, status_code=codigo)
+
+    # ------------------------------------------------------------------- web
+    if WEB_DIR.is_dir():
+        app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")
+    return app
+
+
+_app: Optional[FastAPI] = None
+
+
+def __getattr__(nome: str):
+    """``uvicorn agente_v2.main:app`` cria o app na primeira leitura (e falha com mensagem clara sem JWT_SECRET)."""
+    global _app
+    if nome == "app":
+        if _app is None:
+            setup_logging()
+            _app = create_app()
+        return _app
+    raise AttributeError(nome)

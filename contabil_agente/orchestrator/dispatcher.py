@@ -43,7 +43,7 @@ class DocumentDispatcher:
         >>> # Extrai dados da mensagem
         >>> dados = dispatcher.extrair_dados_documento("João, CPF 123.456.789-00, cargo Analista")
         >>> print(dados["nome"])  # "João"
-        >>> print(dados["cp"])   # "123.456.789-00"
+        >>> print(dados["cpf"])   # "123.456.789-00"
     """
 
     def __init__(self, tool_pdf=None, tool_calculo=None):
@@ -326,7 +326,7 @@ class DocumentDispatcher:
             >>> print(dados)
             {
                 "nome": "João Silva",
-                "cp": "123.456.789-00",
+                "cpf": "123.456.789-00",
                 "cargo": "Analista",
                 "salario": "5000.00",
                 "local_atual": "",
@@ -343,7 +343,7 @@ class DocumentDispatcher:
 
         dados = {
             "nome": "",
-            "cp": "",
+            "cpf": "",
             "cargo": "",
             "salario": "0.00",
             "local_atual": "",
@@ -386,7 +386,7 @@ class DocumentDispatcher:
         # CPF (padrão XXX.XXX.XXX-XX ou números)
         match_cpf = re.search(r"(\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})", mensagem)
         if match_cpf:
-            dados["cp"] = match_cpf.group(1)
+            dados["cpf"] = match_cpf.group(1)
 
         # Cargo (busca "cargo: X")
         match_cargo = re.search(

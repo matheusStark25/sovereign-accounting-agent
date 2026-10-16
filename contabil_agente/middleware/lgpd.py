@@ -17,7 +17,7 @@ class PIIAnonymizer:
 
     # Patterns para detecção de PII
     PATTERNS = {
-        "cp": r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b",
+        "cpf": r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b",
         "cnpj": r"\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b",
         "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
         "telefone": r"\b(?:\+55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}\b",

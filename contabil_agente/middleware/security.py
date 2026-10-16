@@ -402,7 +402,7 @@ def mask_pii_in_response(data: dict, pii_fields: dict) -> dict:
 
     Exemplo:
         masked = mask_pii_in_response(
-            data={"nome": "João", "cp": "12345678901"},
+            data={"nome": "João", "cpf": "12345678901"},
             pii_fields={"cpf": PIIType.CPF}
         )
     """

@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import datas
 from .errors import DadosInvalidos, TipoNaoSuportado
+from .fgts import ALIQUOTA_FGTS, ALIQUOTA_MULTA
 from .inss import calcular_inss
 from .irrf import calcular_irrf_mensal
 from .money import ZERO, D, nao_negativo, q2
@@ -47,7 +48,7 @@ _SINONIMOS_TIPO = {
     "comum acordo": "acordo",
 }
 
-_OITO_POR_CENTO = Decimal("0.08")
+_OITO_POR_CENTO = ALIQUOTA_FGTS
 
 
 def ler_data(valor: Any, campo: str) -> date:
@@ -390,7 +391,7 @@ def calcular_rescisao(dados: DadosRescisao, caminho_tabelas: Optional[str] = Non
     # --- FGTS
     base_fgts = saldo + aviso_indenizado + valor_13
     fgts_rescisorio = q2(_OITO_POR_CENTO * base_fgts)
-    aliquota_multa = {"sem_justa_causa": Decimal("0.40"), "acordo": Decimal("0.20")}.get(tipo, ZERO)
+    aliquota_multa = ALIQUOTA_MULTA.get(tipo, ZERO)
     multa: Optional[Decimal] = None
     if aliquota_multa > 0:
         if dados.saldo_fgts is None:

@@ -282,7 +282,7 @@ class DocumentService:
             "posto",
             "para",
             "agora",
-            "cp",
+            "cpf",
             "data",
             "janeiro",
             "fevereiro",
@@ -385,12 +385,12 @@ class DocumentService:
             cpf_raw = cpf_match.group(1)
             # Formatar CPF
             if len(cpf_raw) == 11:
-                dados["cp"] = (
+                dados["cpf"] = (
                     f"{cpf_raw[:3]}.{cpf_raw[3:6]}.{cpf_raw[6:9]}-{cpf_raw[9:]}"
                 )
             elif len(cpf_raw) == 8:
                 # CPF sem os últimos dígitos - comum em conversas informais
-                dados["cp"] = cpf_raw
+                dados["cpf"] = cpf_raw
             else:
                 dados["cpf"] = cpf_raw
 
@@ -677,7 +677,7 @@ class DocumentService:
                 story.append(Spacer(1, 10))
 
                 nome_func = dados_extraidos.get("nome", "_______________")
-                cpf_func = dados_extraidos.get("cp", "_______________")
+                cpf_func = dados_extraidos.get("cpf", "_______________")
                 posto_de = dados_extraidos.get("posto_atual", "_______________")
                 posto_para = dados_extraidos.get("posto_novo", "_______________")
                 data_transf = dados_extraidos.get(
@@ -761,7 +761,7 @@ class DocumentService:
                 story.append(Spacer(1, 10))
 
                 nome_display = dados_extraidos.get("nome", "_" * 50)
-                cpf_display = dados_extraidos.get("cp", "_" * 20)
+                cpf_display = dados_extraidos.get("cpf", "_" * 20)
 
                 campos_dados = [
                     ["Nome Completo:", nome_display],

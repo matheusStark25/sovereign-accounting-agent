@@ -132,7 +132,7 @@ class IAService:
 
         # Simulate processing: produce output with model_dump_json for performance
         out = {
-            "cp": model.cpf,
+            "cpf": model.cpf,
             "period_days": (model.data_fim - model.data_inicio).days,
             "valor_base": str(model.valor_base),
         }

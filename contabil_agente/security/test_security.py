@@ -93,11 +93,11 @@ class TestEncryptionService(unittest.TestCase):
 
     def test_encrypt_dict(self):
         """Testa criptografia de dicionário."""
-        data = {"nome": "João", "cp": "12345678901", "salario": 5000.00}
-        encrypted = self.enc.encrypt_dict(data, ["cp", "salario"])
+        data = {"nome": "João", "cpf": "12345678901", "salario": 5000.00}
+        encrypted = self.enc.encrypt_dict(data, ["cpf", "salario"])
 
         # Campos criptografados devem ter prefixo ENC:
-        self.assertTrue(encrypted["cp"].startswith("ENC:"))
+        self.assertTrue(encrypted["cpf"].startswith("ENC:"))
         self.assertTrue(str(encrypted["salario"]).startswith("ENC:"))
 
         # Campo não criptografado permanece igual
@@ -105,10 +105,10 @@ class TestEncryptionService(unittest.TestCase):
 
     def test_decrypt_dict(self):
         """Testa descriptografia de dicionário."""
-        data = {"cp": "12345678901"}
-        encrypted = self.enc.encrypt_dict(data, ["cp"])
+        data = {"cpf": "12345678901"}
+        encrypted = self.enc.encrypt_dict(data, ["cpf"])
         decrypted = self.enc.decrypt_dict(encrypted)
-        self.assertEqual(decrypted["cp"], "12345678901")
+        self.assertEqual(decrypted["cpf"], "12345678901")
 
 
 class TestRBACManager(unittest.TestCase):
@@ -201,14 +201,14 @@ class TestPIIProtectionService(unittest.TestCase):
 
     def test_apply_pii_masking(self):
         """Testa masking em dicionário."""
-        data = {"nome": "João", "cp": "12345678901", "email": "joao@email.com"}
-        masked = self.pii.apply_pii_masking(data, ["cp", "email"])
+        data = {"nome": "João", "cpf": "12345678901", "email": "joao@email.com"}
+        masked = self.pii.apply_pii_masking(data, ["cpf", "email"])
 
         # Nome não deve ser mascarado
         self.assertEqual(masked["nome"], "João")
 
         # CPF e email devem ser mascarados
-        self.assertNotEqual(masked["cp"], "12345678901")
+        self.assertNotEqual(masked["cpf"], "12345678901")
         self.assertNotEqual(masked["email"], "joao@email.com")
 
 
@@ -290,10 +290,10 @@ class TestSecureAccountingService(unittest.TestCase):
 
     def test_mask_pii(self):
         """Testa masking de PII."""
-        data = {"cp": "12345678901", "nome": "João"}
-        masked = self.service.mask_pii_for_display(data, ["cp"])
+        data = {"cpf": "12345678901", "nome": "João"}
+        masked = self.service.mask_pii_for_display(data, ["cpf"])
 
-        self.assertEqual(masked["cp"], "123.***.***-01")
+        self.assertEqual(masked["cpf"], "123.***.***-01")
         self.assertEqual(masked["nome"], "João")
 
     def test_get_security_status(self):

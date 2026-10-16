@@ -889,13 +889,13 @@ class ChatCore:
             {
                 "event": "enqueue_pd",
                 "session": session_id,
-                "cp": redact(cpf),
+                "cpf": redact(cpf),
                 "quarantine_id": qid,
             }
         )
         # enqueue for asynchronous processing
         self.queue.enqueue_pdf(
-            {"cp": redact(cpf), "path": str(qpath), "quarantine_id": qid}
+            {"cpf": redact(cpf), "path": str(qpath), "quarantine_id": qid}
         )
         return {"status": 202, "quarantine_id": qid}
 

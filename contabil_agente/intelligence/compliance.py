@@ -38,7 +38,7 @@ class ComplianceChecker:
         geral = self.rules.get("general", {})
         integridade = self.rules.get("integrity", {})
 
-        cpf = data.get("cpf") or data.get("cp")
+        cpf = data.get("cpf")
         if cpf and not cpf_valido(cpf):
             issues.append({"field": "cpf", "issue": f"CPF inválido ({so_digitos(cpf)[:3]}...)"})
 

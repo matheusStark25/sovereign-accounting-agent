@@ -656,7 +656,7 @@ class ExportadorDIRF(IExportadorFiscal):
         # Registros de beneficiários
         beneficiarios = dados.get("beneficiarios", [])
         for benef in beneficiarios:
-            cpf = benef.get("cp", "").replace(".", "").replace("-", "")
+            cpf = benef.get("cpf", "").replace(".", "").replace("-", "")
             nome = benef.get("nome", "")
             rendimentos = benef.get("rendimentos", Decimal("0.00"))
             ir_retido = benef.get("ir_retido", Decimal("0.00"))
@@ -976,7 +976,7 @@ class ServicoESocial:
         info_adm = ET.SubElement(evento, "evtAdmissao")
 
         trabalhador = ET.SubElement(info_adm, "trabalhador")
-        ET.SubElement(trabalhador, "cpfTrab").text = dados.get("cp", "")
+        ET.SubElement(trabalhador, "cpfTrab").text = dados.get("cpf", "")
         ET.SubElement(trabalhador, "nmTrab").text = dados.get("nome", "")
         ET.SubElement(trabalhador, "dtNasc").text = dados.get("data_nascimento", "")
 
@@ -989,7 +989,7 @@ class ServicoESocial:
         """Adiciona dados de desligamento ao evento S-2299"""
         info_desl = ET.SubElement(evento, "evtDeslig")
 
-        ET.SubElement(info_desl, "cpfTrab").text = dados.get("cp", "")
+        ET.SubElement(info_desl, "cpfTrab").text = dados.get("cpf", "")
         ET.SubElement(info_desl, "dtDeslig").text = dados.get("data_desligamento", "")
         ET.SubElement(info_desl, "mtvDeslig").text = dados.get("motivo", "01")
 
@@ -997,7 +997,7 @@ class ServicoESocial:
         """Adiciona dados de remuneração ao evento S-1200"""
         info_remun = ET.SubElement(evento, "evtRemun")
 
-        ET.SubElement(info_remun, "cpfTrab").text = dados.get("cp", "")
+        ET.SubElement(info_remun, "cpfTrab").text = dados.get("cpf", "")
         ET.SubElement(info_remun, "perRe").text = dados.get("periodo_referencia", "")
         ET.SubElement(info_remun, "vlrRemun").text = str(
             dados.get("valor_remuneracao", "0.00")

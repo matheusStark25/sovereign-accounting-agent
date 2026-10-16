@@ -721,7 +721,7 @@ def assinar_via_tool(caminho_pdf: str, assinante: Optional[Dict] = None) -> Dict
 
         ta = ToolAssinatura()
         if assinante is None:
-            assinante = {"nome": "LEONEL", "cp": "00000000000", "tipo": "certificado"}
+            assinante = {"nome": "LEONEL", "cpf": "00000000000", "tipo": "certificado"}
 
         res = ta.assinar_documento(caminho_pdf, assinante)
         print("[SERVICE] -> Resultado recebido da Tool")

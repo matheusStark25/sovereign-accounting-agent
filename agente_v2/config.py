@@ -1,51 +1,70 @@
-try:
-    from pydantic import BaseSettings  # type: ignore[reportMissingImports]
+"""Configuração por variáveis de ambiente (lida no momento do uso, sem valores secretos padrão)."""
 
-    class Settings(BaseSettings):
-        PROJECT_NAME: str = "Agente Contabil V2"
-        SECRET_KEY: str = "dev-secret-change-me"
-        ALGORITHM: str = "HS256"
-        ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+from __future__ import annotations
 
-        VAULT_URL: str | None = "http://127.0.0.1:8200"
-        VAULT_TOKEN: str | None = None
+import os
+from pathlib import Path
+from typing import Optional
 
-        # Storage / infra placeholders
-        MINIO_ENDPOINT: str | None = None
-        MINIO_ACCESS_KEY: str | None = None
-        MINIO_SECRET_KEY: str | None = None
-        S3_BUCKET: str | None = None
-        POSTGRES_DSN: str | None = None
-        PROMETHEUS_ENABLED: bool = False
 
-        class Config:
-            env_file = ".env"
+def _bool(nome: str, padrao: bool = False) -> bool:
+    return os.environ.get(nome, str(padrao)).strip().lower() in ("1", "true", "yes", "sim")
 
-    settings = Settings()
-except Exception:
-    # Minimal fallback settings if pydantic isn't available during tests
-    import os
 
-    class _Settings:
-        PROJECT_NAME = os.environ.get("PROJECT_NAME", "Agente Contabil V2")
-        SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-        ALGORITHM = os.environ.get("ALGORITHM", "HS256")
-        ACCESS_TOKEN_EXPIRE_MINUTES = int(
-            os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
-        )
+class _Settings:
+    @property
+    def PROJECT_NAME(self) -> str:
+        return os.environ.get("PROJECT_NAME", "Sovereign Accounting Agent")
 
-        VAULT_URL = os.environ.get("VAULT_URL", "http://127.0.0.1:8200")
-        VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
+    @property
+    def ENV(self) -> str:
+        return os.environ.get("AGENTE_ENV", "production").lower()
 
-        MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT")
-        MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY")
-        MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY")
-        S3_BUCKET = os.environ.get("S3_BUCKET")
-        POSTGRES_DSN = os.environ.get("POSTGRES_DSN")
-        PROMETHEUS_ENABLED = os.environ.get("PROMETHEUS_ENABLED", "False").lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+    @property
+    def DATA_DIR(self) -> Path:
+        padrao = Path(__file__).resolve().parent.parent / "contabil_agente" / "data"
+        return Path(os.environ.get("DATA_DIR") or padrao)
 
-    settings = _Settings()
+    @property
+    def CHAT_DB_PATH(self) -> str:
+        return os.environ.get("CHAT_DB_PATH") or str(self.DATA_DIR / "chat.db")
+
+    @property
+    def ALLOWED_ORIGINS(self) -> list[str]:
+        bruto = os.environ.get("ALLOWED_ORIGINS", "")
+        return [o.strip() for o in bruto.split(",") if o.strip()]
+
+    @property
+    def VAULT_URL(self) -> Optional[str]:
+        return os.environ.get("VAULT_ADDR") or os.environ.get("VAULT_URL")
+
+    @property
+    def VAULT_TOKEN(self) -> Optional[str]:
+        return os.environ.get("VAULT_TOKEN")
+
+    @property
+    def MINIO_ENDPOINT(self) -> Optional[str]:
+        return os.environ.get("MINIO_ENDPOINT")
+
+    @property
+    def MINIO_ACCESS_KEY(self) -> Optional[str]:
+        return os.environ.get("MINIO_ACCESS_KEY")
+
+    @property
+    def MINIO_SECRET_KEY(self) -> Optional[str]:
+        return os.environ.get("MINIO_SECRET_KEY")
+
+    @property
+    def S3_BUCKET(self) -> Optional[str]:
+        return os.environ.get("S3_BUCKET")
+
+    @property
+    def POSTGRES_DSN(self) -> Optional[str]:
+        return os.environ.get("POSTGRES_DSN")
+
+    @property
+    def PROMETHEUS_ENABLED(self) -> bool:
+        return _bool("PROMETHEUS_ENABLED", True)
+
+
+settings = _Settings()

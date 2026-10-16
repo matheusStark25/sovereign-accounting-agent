@@ -877,7 +877,7 @@ def construir_pdf_profissional(
         if metadata and metadata.get("only_explicit"):
             # Respeitar somente valores passados em metadata
             nome = metadata.get("nome", "A preencher")
-            cpf = metadata.get("cp", "000.000.000-00")
+            cpf = metadata.get("cpf", "000.000.000-00")
             rg = metadata.get("rg", "00.000.000-0")
             cargo = metadata.get("cargo", "A definir")
             salario = metadata.get("salario", None)
@@ -918,8 +918,8 @@ def construir_pdf_profissional(
             if metadata:
                 if metadata.get("nome"):
                     nome = metadata.get("nome")
-                if metadata.get("cp"):
-                    cpf = metadata.get("cp")
+                if metadata.get("cpf"):
+                    cpf = metadata.get("cpf")
                 if metadata.get("rg"):
                     rg = metadata.get("rg")
                 if metadata.get("cargo"):
@@ -2228,7 +2228,7 @@ def processar_chat():
                 if nome_ex:
                     metadata["nome"] = nome_ex
                 if cpf_ex:
-                    metadata["cp"] = cpf_ex
+                    metadata["cpf"] = cpf_ex
                 if salario_ex:
                     metadata["salario"] = salario_ex
 

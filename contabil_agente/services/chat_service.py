@@ -353,7 +353,7 @@ class ChatService:
         if dados_extraidos:
             # Atualizar contexto com dados validados
             for chave, valor in dados_extraidos.items():
-                if chave == "cp" and not validar_cpf(valor):
+                if chave == "cpf" and not validar_cpf(valor):
                     logger.warning(f"CPF inválido detectado: {valor}")
                 elif chave == "data" and not validar_data(valor):
                     logger.warning(f"Data inválida detectada: {valor}")
@@ -523,7 +523,7 @@ class ChatService:
         cpf_match = re.search(r"(\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})", message)
         if cpf_match:
             cpf = re.sub(r"\D", "", cpf_match.group(0))
-            dados["cp"] = cpf
+            dados["cpf"] = cpf
 
         # Datas no formato DD/MM/YYYY, DD-MM-YYYY ou DD/MM
         date_match = re.search(r"\b(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b", message)

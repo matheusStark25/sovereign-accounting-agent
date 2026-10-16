@@ -441,7 +441,7 @@ class FGTSEngine:
         return {
             "nome": nome,
             "pis": pis[0] if pis else None,
-            "cp": cpf[0] if cpf else None,
+            "cpf": cpf[0] if cpf else None,
             "saldos": parsed_saldos,
         }
 
@@ -541,7 +541,7 @@ class FGTSEngine:
 
         # Attempt gov query (best-effort, may return None)
         gov_balance = None
-        search_id = parsed.get("pis") or parsed.get("cp")
+        search_id = parsed.get("pis") or parsed.get("cpf")
         if search_id:
             try:
                 gov_balance = self._query_gov_portal(search_id)
@@ -554,7 +554,7 @@ class FGTSEngine:
             "ts": datetime.now(timezone.utc).isoformat(),
             "funcionario_nome": parsed.get("nome"),
             "pis_encontrado": parsed.get("pis"),
-            "cpf_encontrado": parsed.get("cp"),
+            "cpf_encontrado": parsed.get("cpf"),
             "saldo_base": recon.get("local_balance"),
             "gov_balance": recon.get("gov_balance"),
             "dif": recon.get("dif"),

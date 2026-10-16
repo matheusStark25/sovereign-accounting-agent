@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 def _process_message(message: Dict[str, Any]) -> None:
     """Core processing for a single task message.
 
-    Expected message format: {"cp": "...,", "acoes": [...] }
+    Expected message format: {"cpf": "...,", "acoes": [...] }
     This function verifies the checkpoint and skips already-successful CPFs.
     """
-    cpf = message.get("cp")
+    cpf = message.get("cpf")
     try:
         from contabil_agente.tools.esocial_baixa_tool import (
             read_checkpoint,

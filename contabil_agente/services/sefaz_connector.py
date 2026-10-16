@@ -67,7 +67,7 @@ class SefazConnector:
             if cnpj:
                 params["cnpj"] = cnpj
             if cpf:
-                params["cp"] = cpf
+                params["cpf"] = cpf
             cert_path = os.getenv("SEFAZ_CERT_PATH")
             key_path = os.getenv("SEFAZ_KEY_PATH")
             cert = None

@@ -75,7 +75,7 @@ class StatusPagamento(Enum):
 class TipoChavePix(Enum):
     """Tipos de chave PIX"""
 
-    CPF = "cp"
+    CPF = "cpf"
     CNPJ = "cnpj"
     EMAIL = "email"
     TELEFONE = "telefone"
