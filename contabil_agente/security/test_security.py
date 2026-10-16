@@ -213,45 +213,51 @@ class TestPIIProtectionService(unittest.TestCase):
 
 
 class TestAuditTrailManager(unittest.TestCase):
-    """Testes do AuditTrailManager."""
+    """Testes do AuditTrailManager (trilha WORM encadeada)."""
 
     def setUp(self):
-        self.audit = AuditTrailManager()
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.audit = AuditTrailManager(base_directory=self._tmp.name, vault_manager=VaultManager())
+
+    def tearDown(self):
+        self._tmp.cleanup()
 
     def test_log_entry(self):
-        """Testa registro de entrada."""
-        # Registra evento
-        self.audit.log(
+        """Registra evento e lê de volta com o hash da cadeia."""
+        recibo = self.audit.log(
             tenant_id="TEST_TENANT",
             operator_id="TEST_OPERATOR",
             action=AuditAction.LOGIN,
             description="Teste de login",
+            metadata={"k": "v"},
         )
+        self.assertTrue(recibo.startswith("TEST_TENANT:1:"))
+        entradas = self.audit.read_audit_log("TEST_TENANT")
+        self.assertEqual(len(entradas), 1)
+        self.assertEqual(entradas[0].action, AuditAction.LOGIN)
+        self.assertEqual(entradas[0].metadata, {"k": "v"})
+        self.assertEqual(len(entradas[0].signature), 64)
 
-        # Deve estar no cache
-        self.assertGreater(len(self.audit._entry_cache), 0)
+    def test_integrity_and_tampering(self):
+        """Adulterar uma linha faz a verificação falhar."""
+        for i in range(3):
+            self.audit.log("TEST_TENANT", "OP", AuditAction.READ, description=f"leitura {i}")
+        self.assertTrue(self.audit.verify_log_integrity("TEST_TENANT")["integrity_ok"])
+        arquivo = self.audit.worm._caminho("TEST_TENANT")
+        linhas = arquivo.read_text(encoding="utf-8").splitlines()
+        linhas[1] = linhas[1].replace("leitura 1", "leitura X")
+        arquivo.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+        resultado = self.audit.verify_log_integrity("TEST_TENANT")
+        self.assertFalse(resultado["integrity_ok"])
+        self.assertGreater(resultado["invalid_signatures"], 0)
 
-    def test_entry_signature(self):
-        """Testa assinatura de entrada."""
-        from contabil_agente.security.audit_trail_manager import AuditEntry
-
-        entry = AuditEntry(tenant_id="TEST", operator_id="OP", action=AuditAction.LOGIN)
-
-        signature = self.audit._sign_entry(entry)
-        self.assertIsNotNone(signature)
-        self.assertGreater(len(signature), 0)
-
-    def test_verify_entry(self):
-        """Testa verificação de entrada."""
-        from contabil_agente.security.audit_trail_manager import AuditEntry
-
-        entry = AuditEntry(tenant_id="TEST", operator_id="OP", action=AuditAction.LOGIN)
-
-        # Assina
-        entry.signature = self.audit._sign_entry(entry)
-
-        # Verifica
-        self.assertTrue(self.audit.verify_entry(entry))
+    def test_search(self):
+        self.audit.log("TEST_TENANT", "A", AuditAction.LOGIN)
+        self.audit.log("TEST_TENANT", "B", AuditAction.READ)
+        achadas = self.audit.search_audit_log("TEST_TENANT", operator_id="B")
+        self.assertEqual([e.operator_id for e in achadas], ["B"])
 
 
 class TestSecureAccountingService(unittest.TestCase):

@@ -26,6 +26,10 @@ class _Settings:
         return Path(os.environ.get("DATA_DIR") or padrao)
 
     @property
+    def AUDIT_DIR(self) -> Path:
+        return Path(os.environ.get("AUDIT_DIR") or self.DATA_DIR / "audit")
+
+    @property
     def CHAT_DB_PATH(self) -> str:
         return os.environ.get("CHAT_DB_PATH") or str(self.DATA_DIR / "chat.db")
 

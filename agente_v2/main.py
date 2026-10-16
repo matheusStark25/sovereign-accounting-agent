@@ -31,6 +31,7 @@ from contabil_agente.security.auth import (
     AuthService,
     Principal,
 )
+from contabil_agente.security.audit_trail_manager import AuditTrailManager
 from contabil_agente.security.rbac_manager import Permission
 
 from .auth import exigir, get_auth, token_da_requisicao, usuario_atual
@@ -85,15 +86,19 @@ class NovoUsuario(BaseModel):
 
 
 # ------------------------------------------------------------------- utilidades
-def _auditar(request: Request, acao: str, principal: Optional[Principal], descricao: str, sucesso: bool = True, **meta):
-    """Registra na trilha de auditoria sem nunca derrubar a requisição (e sem conteúdo de mensagens)."""
-    audit = getattr(request.app.state, "audit", None)
-    if audit is None:
-        return
-    try:
-        from contabil_agente.security.audit_trail_manager import AuditAction
+AUDIT_FALHAS = Counter("agente_audit_falhas_total", "Falhas ao gravar a trilha de auditoria")
 
-        audit.log(
+
+def _auditar(
+    request: Request, acao: str, principal: Optional[Principal], descricao: str, sucesso: bool = True,
+    obrigatoria: bool = True, **meta,
+) -> Optional[str]:
+    """Grava na trilha WORM (sem conteúdo de mensagens). Se a trilha falhar, a operação falha com 503."""
+    from contabil_agente.security.audit_trail_manager import AuditAction, AuditoriaError
+
+    audit = request.app.state.audit
+    try:
+        return audit.log(
             tenant_id=principal.tenant_id if principal else "SYSTEM",
             operator_id=principal.user_id if principal else "anonimo",
             action=AuditAction(acao),
@@ -102,8 +107,12 @@ def _auditar(request: Request, acao: str, principal: Optional[Principal], descri
             metadata=meta,
             ip_address=request.client.host if request.client else None,
         )
-    except Exception:
-        logger.error("Falha ao gravar auditoria (%s)", acao, exc_info=True)
+    except (AuditoriaError, OSError, ValueError):
+        AUDIT_FALHAS.inc()
+        logger.critical("Falha ao gravar auditoria (%s)", acao, exc_info=True)
+        if obrigatoria:
+            raise HTTPException(status_code=503, detail="Trilha de auditoria indisponível: operação não realizada.")
+        return None
 
 
 _CONTEXTO_PERMITIDO = ("empresa", "nome_funcionario", "cpf", "protocolo")
@@ -144,7 +153,7 @@ def create_app(
     app.state.auth = auth or AuthService()
     app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente())
     app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
-    app.state.audit = audit
+    app.state.audit = audit or AuditTrailManager(base_directory=str(settings.AUDIT_DIR))
     app.state.limite_login = LimiteDeUso(maximo=10, janela_segundos=60)
     app.state.limite_chat = LimiteDeUso(maximo=60, janela_segundos=60)
     _bootstrap_admin(app.state.auth)
@@ -201,11 +210,11 @@ def create_app(
             principal = auth.autenticar(form.username, form.password)
         except AuthLockedError as exc:
             LOGINS.labels("bloqueado").inc()
-            _auditar(request, "access_denied", None, "Login em conta bloqueada", sucesso=False)
+            _auditar(request, "access_denied", None, "Login em conta bloqueada", sucesso=False, obrigatoria=False)
             raise HTTPException(status_code=423, detail=str(exc))
         except AuthError as exc:
             LOGINS.labels("falha").inc()
-            _auditar(request, "access_denied", None, "Falha de login", sucesso=False)
+            _auditar(request, "access_denied", None, "Falha de login", sucesso=False, obrigatoria=False)
             raise HTTPException(status_code=401, detail=str(exc), headers={"WWW-Authenticate": "Bearer"})
         LOGINS.labels("ok").inc()
         _auditar(request, "login", principal, "Login realizado")

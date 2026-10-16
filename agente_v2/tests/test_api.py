@@ -8,7 +8,9 @@ from fastapi.testclient import TestClient
 from agente_v2.main import create_app
 from contabil_agente.chat import ChatEngine, ChatStore
 from contabil_agente.chat.llm import LLMIndisponivel
+from contabil_agente.security.audit_trail_manager import AuditTrailManager
 from contabil_agente.security.auth import AuthService, AuthSettings
+from contabil_agente.security.worm_audit import WormAudit
 from contabil_agente.security.rbac_manager import RBACManager
 
 SENHA = "Senha-Forte-123"
@@ -22,6 +24,10 @@ class LLMFalso:
     def __call__(self, mensagens):
         self.recebido.append(mensagens)
         return "Resposta de teste do LLM."
+
+
+def nova_auditoria(tmp_path):
+    return AuditTrailManager(worm=WormAudit(tmp_path / "audit", "a" * 40, fsync=False))
 
 
 def novo_auth(tmp_path, nome="auth.db"):
@@ -44,6 +50,7 @@ def client(tmp_path, llm):
         auth=auth,
         engine=ChatEngine(llm=llm, hoje=HOJE),
         store=ChatStore(str(tmp_path / "chat.db")),
+        audit=nova_auditoria(tmp_path),
     )
     return TestClient(app)
 
@@ -130,7 +137,7 @@ def test_chat_conversa_geral_vai_pro_llm_com_pii_mascarado(client, llm):
 def test_chat_sem_llm_responde_o_que_sabe_fazer(tmp_path):
     auth = novo_auth(tmp_path)
     auth.criar_usuario("maria", SENHA, "t", ["accountant"])
-    c = TestClient(create_app(auth=auth, engine=ChatEngine(llm=None), store=ChatStore(str(tmp_path / "c.db"))))
+    c = TestClient(create_app(auth=auth, engine=ChatEngine(llm=None), store=ChatStore(str(tmp_path / "c.db")), audit=nova_auditoria(tmp_path)))
     r = c.post("/api/chat", json={"message": "bom dia"}, headers=entrar(c))
     assert "rescisão" in r.json()["response"].lower()
 
@@ -141,7 +148,7 @@ def test_llm_fora_do_ar_nao_derruba_o_chat(tmp_path):
 
     auth = novo_auth(tmp_path)
     auth.criar_usuario("maria", SENHA, "t", ["accountant"])
-    c = TestClient(create_app(auth=auth, engine=ChatEngine(llm=quebrado), store=ChatStore(str(tmp_path / "c.db"))))
+    c = TestClient(create_app(auth=auth, engine=ChatEngine(llm=quebrado), store=ChatStore(str(tmp_path / "c.db")), audit=nova_auditoria(tmp_path)))
     r = c.post("/api/chat", json={"message": "explique o DARF"}, headers=entrar(c))
     assert r.status_code == 200 and "Não consegui falar com a IA" in r.json()["response"]
 
@@ -244,3 +251,48 @@ def test_pdf_do_ultimo_calculo_da_conversa(client):
     assert client.get(f"/api/chat/{sem}/pdf", headers=h).status_code == 404
     # outro usuário não baixa
     assert client.get(f"/api/chat/{sid}/pdf", headers=entrar(client, "joao")).status_code == 404
+
+
+# ----------------------------------------------------------------- auditoria WORM
+def test_login_chat_e_calculo_geram_trilha_encadeada_sem_conteudo(client, tmp_path):
+    h = entrar(client)
+    client.post("/api/chat", json={"message": "meu segredo: CPF 529.982.247-25"}, headers=h)
+    client.post("/api/v1/calculo/inss", json={"salario": 3000}, headers=h)
+    worm = client.app.state.audit.worm
+    v = worm.verificar("empresa_a")
+    assert v.ok and v.entradas >= 3
+    texto = worm._caminho("empresa_a").read_text(encoding="utf-8")
+    assert "segredo" not in texto and "529.982.247-25" not in texto
+    assert '"evento":"login"' in texto
+
+
+def test_falha_de_login_vai_para_a_trilha_do_sistema(client):
+    client.post("/token", data={"username": "maria", "password": "errada-Errada-1"})
+    worm = client.app.state.audit.worm
+    assert worm.verificar("SYSTEM").entradas == 1
+
+
+def test_sem_trilha_a_operacao_nao_acontece(client, monkeypatch):
+    h = entrar(client)
+    audit = client.app.state.audit
+
+    def quebrada(*a, **k):
+        from contabil_agente.security.worm_audit import AuditoriaError
+
+        raise AuditoriaError("disco cheio")
+
+    monkeypatch.setattr(audit, "log", quebrada)
+    r = client.post("/api/v1/calculo/inss", json={"salario": 3000}, headers=h)
+    assert r.status_code == 503 and "auditoria" in r.json()["detail"].lower()
+
+
+def test_adulterar_a_trilha_e_detectado_pela_verificacao(client):
+    h = entrar(client)
+    client.post("/api/v1/calculo/inss", json={"salario": 3000}, headers=h)
+    client.post("/api/v1/calculo/inss", json={"salario": 4000}, headers=h)
+    worm = client.app.state.audit.worm
+    arq = worm._caminho("empresa_a")
+    linhas = arq.read_text(encoding="utf-8").splitlines()
+    del linhas[1]
+    arq.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    assert not worm.verificar("empresa_a").ok
