@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "descricao": "Fonte UNICA das tabelas de INSS e IRRF usadas pelo motor de calculo. Nenhum outro arquivo deve repetir estes valores.",
+  "como_atualizar": "Ao publicar nova portaria/lei, acrescente um novo registro com vigencia propria e feche a vigencia do anterior. O motor NUNCA reajusta valores sozinho: competencia sem tabela gera erro explicito.",
+  "niveis_de_verificacao": {
+    "primaria": "valores lidos no texto da lei publicada no site oficial (Planalto)",
+    "gov_br": "valores confirmados em paginas oficiais do gov.br (Previdencia, INSS, eSocial, Receita/Fazenda) e consistentes por aritmetica; texto integral da portaria nao foi aberto",
+    "conferir": "valores conhecidos e consistentes por aritmetica, sem fonte oficial aberta nesta revisao; conferir antes de uso em producao"
+  },
+  "inss_empregado": [
+    {
+      "vigencia_inicio": "2025-01-01",
+      "vigencia_fim": "2025-12-31",
+      "norma": "Portaria Interministerial MPS/MF nº 6, de 10/01/2025 (Anexo II - empregado, domestico e avulso)",
+      "verificacao": "conferir",
+      "salario_minimo": "1518.00",
+      "teto": "8157.41",
+      "faixas": [
+        {"ate": "1518.00", "aliquota": "0.075"},
+        {"ate": "2793.88", "aliquota": "0.09"},
+        {"ate": "4190.83", "aliquota": "0.12"},
+        {"ate": "8157.41", "aliquota": "0.14"}
+      ]
+    },
+    {
+      "vigencia_inicio": "2026-01-01",
+      "vigencia_fim": "2026-12-31",
+      "norma": "Portaria Interministerial MPS/MF nº 13, de 09/01/2026 (Anexo II - empregado, domestico e avulso)",
+      "verificacao": "gov_br",
+      "salario_minimo": "1621.00",
+      "teto": "8475.55",
+      "faixas": [
+        {"ate": "1621.00", "aliquota": "0.075"},
+        {"ate": "2902.84", "aliquota": "0.09"},
+        {"ate": "4354.27", "aliquota": "0.12"},
+        {"ate": "8475.55", "aliquota": "0.14"}
+      ],
+      "parcelas_a_deduzir_conferencia": ["0.00", "24.32", "111.40", "198.49"]
+    }
+  ],
+  "irrf_mensal": [
+    {
+      "vigencia_inicio": "2025-05-01",
+      "vigencia_fim": "2025-12-31",
+      "norma": "Lei nº 11.482/2007, art. 1º, XII (redação da Lei nº 15.191, de 11/08/2025)",
+      "verificacao": "primaria",
+      "faixas": [
+        {"ate": "2428.80", "aliquota": "0", "deducao": "0"},
+        {"ate": "2826.65", "aliquota": "0.075", "deducao": "182.16"},
+        {"ate": "3751.05", "aliquota": "0.15", "deducao": "394.16"},
+        {"ate": "4664.68", "aliquota": "0.225", "deducao": "675.49"},
+        {"ate": null, "aliquota": "0.275", "deducao": "908.73"}
+      ],
+      "deducao_dependente": "189.59",
+      "desconto_simplificado": "607.20",
+      "reducao": null
+    },
+    {
+      "vigencia_inicio": "2026-01-01",
+      "vigencia_fim": null,
+      "norma": "Tabela da Lei nº 11.482/2007, art. 1º, XII (Lei nº 15.191/2025) + redução do art. 3º-A da Lei nº 9.250/1995 (Lei nº 15.270, de 26/11/2025)",
+      "verificacao": "primaria",
+      "faixas": [
+        {"ate": "2428.80", "aliquota": "0", "deducao": "0"},
+        {"ate": "2826.65", "aliquota": "0.075", "deducao": "182.16"},
+        {"ate": "3751.05", "aliquota": "0.15", "deducao": "394.16"},
+        {"ate": "4664.68", "aliquota": "0.225", "deducao": "675.49"},
+        {"ate": null, "aliquota": "0.275", "deducao": "908.73"}
+      ],
+      "deducao_dependente": "189.59",
+      "desconto_simplificado": "607.20",
+      "reducao": {
+        "norma": "Lei nº 9.250/1995, art. 3º-A (incluído pela Lei nº 15.270/2025), inclusive para o 13º salário (§ 3º)",
+        "ate": "5000.00",
+        "valor_maximo": "312.89",
+        "parcial_ate": "7350.00",
+        "constante": "978.62",
+        "coeficiente": "0.133145"
+      }
+    }
+  ],
+  "observacoes": [
+    "deducao_dependente: R$ 189,59 por dependente (valor vigente desde 2016, conferir em Lei 9.250/1995 art. 4º, III).",
+    "desconto_simplificado: 25% do limite da primeira faixa (0,25 x 2.428,80 = 607,20), conforme divulgado pela Receita/Fazenda; substitui as deducoes legais quando mais vantajoso.",
+    "Competencias anteriores a 05/2025 (IRRF) e a 01/2025 (INSS) nao estao carregadas: o motor recusa o calculo em vez de estimar."
+  ]
+}
