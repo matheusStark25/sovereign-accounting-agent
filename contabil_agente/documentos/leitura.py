@@ -36,6 +36,7 @@ class Conteudo:
     xml: Optional[Element] = None
     avisos: List[str] = field(default_factory=list)
     sha256: str = ""
+    bruto: bytes = field(default=b"", repr=False)
 
     @property
     def linhas(self) -> List[str]:
@@ -114,4 +115,5 @@ def ler_documento(origem: Union[str, Path, bytes], nome: Optional[str] = None) -
     """Lê um caminho ou os bytes de um arquivo. ``nome`` ajuda a decidir o formato de bytes sem assinatura."""
     dados, conteudo = _ler(origem, nome)
     conteudo.sha256 = hashlib.sha256(dados).hexdigest()
+    conteudo.bruto = dados
     return conteudo

@@ -13,7 +13,8 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Deque, Dict, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
@@ -24,6 +25,9 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 from contabil_agente.calc import servico
 from contabil_agente.chat import ChatEngine, ChatError, ChatStore, llm_do_ambiente
 from contabil_agente.documentos import gerar_pdf_calculo, hash_do_resultado
+from contabil_agente.documentos.leitura import TAMANHO_MAXIMO, ArquivoInvalido
+from contabil_agente.documentos.tipos import TIPOS as TIPOS_DOCUMENTO
+from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, HistoricoDocumentos, provedores_do_ambiente
 from contabil_agente.security.auth import (
     PAPEIS_VALIDOS,
     AuthError,
@@ -148,12 +152,23 @@ def create_app(
     engine: Optional[ChatEngine] = None,
     store: Optional[ChatStore] = None,
     audit: Any = None,
+    dispatcher: Optional[DocumentDispatcher] = None,
 ) -> FastAPI:
     app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs" if settings.ENV == "dev" else None, redoc_url=None)
     app.state.auth = auth or AuthService()
     app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente())
     app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
     app.state.audit = audit or AuditTrailManager(base_directory=str(settings.AUDIT_DIR))
+    if dispatcher is None:
+        provedores = provedores_do_ambiente()
+        dispatcher = DocumentDispatcher(
+            app.state.audit.worm,
+            HistoricoDocumentos(settings.DATA_DIR / "documentos.db"),
+            worker_llm=provedores["worker"],
+            revisor_llm=provedores["revisor"],
+            destinos=[ArquivoDestino(settings.DATA_DIR / "arquivo")],
+        )
+    app.state.dispatcher = dispatcher
     app.state.limite_login = LimiteDeUso(maximo=10, janela_segundos=60)
     app.state.limite_chat = LimiteDeUso(maximo=60, janela_segundos=60)
     _bootstrap_admin(app.state.auth)
@@ -347,6 +362,49 @@ def create_app(
         if resposta["status"] != "ok":
             return JSONResponse(resposta, status_code=422)
         return _resposta_pdf(request, usuario, tipo, resposta["resultado"], pedido.contexto)
+
+    # ------------------------------------------------------------ documentos
+    @app.get("/api/v1/documentos/tipos")
+    def tipos_de_documento(_: Principal = Depends(usuario_atual)):
+        return {"tipos": [{"codigo": t.codigo, "nome": t.nome, "categoria": t.categoria} for t in TIPOS_DOCUMENTO.values()]}
+
+    @app.post("/api/v1/documentos")
+    async def processar_documento(
+        request: Request,
+        arquivo: UploadFile = File(...),
+        tipo: Optional[str] = Form(default=None, max_length=40),
+        persona: str = Form(default="MARCOS", max_length=20),
+        usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL)),
+    ):
+        dados = await arquivo.read(TAMANHO_MAXIMO + 1)
+        if len(dados) > TAMANHO_MAXIMO:
+            raise HTTPException(status_code=413, detail=f"Arquivo maior que {TAMANHO_MAXIMO // (1024 * 1024)} MB.")
+        nome = (arquivo.filename or "documento")[:120]
+        try:
+            resultado = await run_in_threadpool(
+                request.app.state.dispatcher.process,
+                conteudo=dados, nome=nome, document_type=tipo, persona=persona,
+                tenant=usuario.tenant_id, ator=usuario.user_id,
+            )
+        except ArquivoInvalido as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        corpo = resultado.to_dict()
+        if resultado.falha:
+            return JSONResponse(corpo, status_code=422)
+        return corpo
+
+    # -------------------------------------------------------------- auditoria
+    @app.get("/api/v1/auditoria/verificar")
+    def verificar_auditoria(
+        request: Request, usuario: Principal = Depends(exigir(Permission.VIEW_AUDIT_LOGS)),
+    ):
+        """Confere a cadeia HMAC da trilha do próprio tenant (e devolve a âncora para guardar fora do servidor)."""
+        worm = request.app.state.audit.worm
+        v = worm.verificar(usuario.tenant_id)
+        resposta = v.to_dict()
+        if v.head_seq:
+            resposta["ancora"] = worm.ancora(usuario.tenant_id)
+        return resposta
 
     # ------------------------------------------------------------------- web
     if WEB_DIR.is_dir():

@@ -43,6 +43,13 @@ class ResultadoDocumento:
     estado: str = "PROCESSING"
     resumo: str = ""
     etapas: List[Dict[str, Any]] = field(default_factory=list)
+    falha: Optional[str] = None
+    requer_revisao: bool = False
+    agentes: Dict[str, str] = field(default_factory=dict)
+    divergencias: List[Dict[str, Any]] = field(default_factory=list)
+    correcoes: List[Dict[str, Any]] = field(default_factory=list)
+    rejeitadas: List[Dict[str, Any]] = field(default_factory=list)
+    destinos: List[Dict[str, Any]] = field(default_factory=list)
 
     @property
     def tem_erro(self) -> bool:
@@ -65,6 +72,14 @@ class ResultadoDocumento:
             "audit_trail_id": self.audit_trail_id,
             "estado": self.estado,
             "resumo": self.resumo,
+            "etapas": self.etapas,
+            "falha": self.falha,
+            "requer_revisao": self.requer_revisao,
+            "agentes": self.agentes,
+            "divergencias": self.divergencias,
+            "correcoes": self.correcoes,
+            "rejeitadas": self.rejeitadas,
+            "destinos": self.destinos,
         }
 
 

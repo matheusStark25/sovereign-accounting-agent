@@ -30,6 +30,16 @@ def nova_auditoria(tmp_path):
     return AuditTrailManager(worm=WormAudit(tmp_path / "audit", "a" * 40, fsync=False))
 
 
+def novo_dispatcher(tmp_path, audit=None):
+    from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, HistoricoDocumentos
+
+    return DocumentDispatcher(
+        audit or WormAudit(tmp_path / "audit", "a" * 40, fsync=False),
+        HistoricoDocumentos(tmp_path / "hist.db"),
+        destinos=[ArquivoDestino(tmp_path / "arquivo")],
+    )
+
+
 def novo_auth(tmp_path, nome="auth.db"):
     return AuthService(AuthSettings(secret="s" * 40, db_path=str(tmp_path / nome)), rbac=RBACManager())
 
@@ -51,6 +61,7 @@ def client(tmp_path, llm):
         engine=ChatEngine(llm=llm, hoje=HOJE),
         store=ChatStore(str(tmp_path / "chat.db")),
         audit=nova_auditoria(tmp_path),
+        dispatcher=novo_dispatcher(tmp_path),
     )
     return TestClient(app)
 
