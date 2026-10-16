@@ -1,8 +1,8 @@
-"""Carregamento e validação das tabelas oficiais (fonte única: data/tabelas.json)."""
+"""Carregamento e validação das tabelas oficiais (fonte única: data/tabelas.yaml)."""
 
 from __future__ import annotations
 
-import json
+import yaml
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .errors import CompetenciaSemTabela, DadosInvalidos
 from .money import D
 
-ARQUIVO_PADRAO = Path(__file__).resolve().parent / "data" / "tabelas.json"
+ARQUIVO_PADRAO = Path(__file__).resolve().parent / "data" / "tabelas.yaml"
 
 
 @dataclass(frozen=True)
@@ -194,10 +194,10 @@ def carregar(caminho: Optional[str] = None) -> Tuple[Tuple[TabelaInss, ...], Tup
     """Lê e valida o arquivo de tabelas. Falha alto se houver qualquer inconsistência."""
     arquivo = Path(caminho) if caminho else ARQUIVO_PADRAO
     with open(arquivo, "r", encoding="utf-8") as fh:
-        bruto = json.load(fh)
+        bruto = yaml.safe_load(fh)
     problemas = validar(bruto)
     if problemas:
-        raise DadosInvalidos("tabelas.json inválido: " + "; ".join(problemas))
+        raise DadosInvalidos("tabelas.yaml inválido: " + "; ".join(problemas))
     inss = tuple(_construir_inss(r) for r in bruto["inss_empregado"])
     irrf = tuple(_construir_irrf(r) for r in bruto["irrf_mensal"])
     return inss, irrf
@@ -210,7 +210,7 @@ def _escolher(registros, competencia: date, nome: str):
     inicio = min(r.vigencia_inicio for r in registros)
     raise CompetenciaSemTabela(
         f"Não há tabela de {nome} carregada para {competencia:%m/%Y} "
-        f"(a mais antiga começa em {inicio:%m/%Y}). Atualize contabil_agente/calc/data/tabelas.json."
+        f"(a mais antiga começa em {inicio:%m/%Y}). Atualize contabil_agente/calc/data/tabelas.yaml."
     )
 
 

@@ -9,11 +9,23 @@ import pytest
 from agente_v2.vault_client import SegredoIndisponivel, VaultClient, carregar_segredos
 
 
+def _par_dsa_em_json():
+    import base64
+
+    from contabil_agente.security import pqc
+
+    par = pqc.DilithiumAssinatura.gerar_par()
+    return json.dumps({"pub": base64.b64encode(par.publica).decode(), "priv": base64.b64encode(par.privada).decode()})
+
+
+_CHAVE_DSA = _par_dsa_em_json()
+
+
 class FakeVault:
     """Servidor mínimo: /v1/auth/approle/login, /v1/secret/data/<path>, /v1/sys/health."""
 
     def __init__(self):
-        self.segredos = {"agente": {"jwt_secret": "j" * 40, "audit_hmac_key": "a" * 40, "gemini_api_key": "g-123"},
+        self.segredos = {"agente": {"jwt_secret": "j" * 40, "audit_hmac_key": "a" * 40, "gemini_api_key": "g-123", "governanca_dsa_key": _CHAVE_DSA},
                          "certs": {"a1_cert": "-----BEGIN CERTIFICATE-----x", "a1_key": "-----BEGIN PRIVATE KEY-----y"}}
         self.token_valido = {"s.token-fixo", "s.approle-1"}
         self.logins, self.leituras, self.selado, self.lease = 0, 0, False, 3600
@@ -183,6 +195,7 @@ def test_api_sobe_com_os_segredos_do_vault_e_o_login_funciona(vault_falso, tmp_p
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("AUTH_DB_PATH", str(tmp_path / "auth.db"))
     app = create_app()
+    assert app.state.governanca.par.publica  # a chave de assinatura da governança também veio do Vault
     assert app.state.auth.settings.secret == "j" * 40
     assert app.state.audit.worm._chave == b"a" * 40
     assert app.state.dispatcher.revisor_llm is not None  # gemini_api_key veio do Vault

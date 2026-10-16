@@ -1,7 +1,7 @@
 """ToolCalculo: fachada fina sobre o motor único ``contabil_agente.calc``.
 
 Não existe mais tabela de INSS/IRRF nem regra de rescisão neste arquivo. Tudo
-vem de ``calc`` (tabelas em ``calc/data/tabelas.json``). Se a competência não
+vem de ``calc`` (tabelas em ``calc/data/tabelas.yaml``). Se a competência não
 tem tabela, o cálculo falha com a explicação; nunca estima.
 """
 

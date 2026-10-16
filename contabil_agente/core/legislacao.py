@@ -2,7 +2,7 @@
 Base de conhecimento - legislação trabalhista e fiscal.
 
 Valores monetários (salário mínimo, teto e faixas do INSS, tabela do IRRF) NÃO ficam aqui:
-vêm de ``contabil_agente.calc`` (``calc/data/tabelas.json``), a fonte única. O texto abaixo é
+vêm de ``contabil_agente.calc`` (``calc/data/tabelas.yaml``), a fonte única. O texto abaixo é
 referência qualitativa; prazos e regras mudam, então confirme sempre na fonte oficial.
 """
 

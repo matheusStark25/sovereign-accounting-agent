@@ -25,7 +25,10 @@ except Exception:  # pragma: no cover - hvac é dependência obrigatória, mas o
 
 logger = logging.getLogger(__name__)
 
-SEGREDOS_CONHECIDOS = ("JWT_SECRET", "AUDIT_HMAC_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "ADMIN_PASSWORD")
+SEGREDOS_CONHECIDOS = (
+    "JWT_SECRET", "AUDIT_HMAC_KEY", "PII_HASH_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "ADMIN_PASSWORD",
+    "RPA_PQC_PUBLIC_KEY", "RPA_PQC_PRIVATE_KEY", "GOVERNANCA_DSA_KEY",
+)
 
 
 class SegredoIndisponivel(RuntimeError):
@@ -175,6 +178,9 @@ class VaultClient:
     def limpar_cache(self) -> None:
         with self._lock:
             self._cache.clear()
+
+    def health(self) -> bool:
+        return self.saudavel()
 
     def saudavel(self) -> bool:
         if self._memoria is not None:

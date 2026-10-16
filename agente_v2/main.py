@@ -49,6 +49,16 @@ from contabil_agente.security.auth import (
 from contabil_agente.security.audit_trail_manager import AuditTrailManager
 from contabil_agente.security.rbac_manager import Permission
 
+from contabil_agente.governance.redaction import instalar_filtro_de_redacao
+from contabil_agente.governance_manager import (
+    AssinaturaInvalida, DecisaoJaResolvida, DecisaoNaoEncontrada, GovernanceManager, GovernancaError, RegraDasDuasPessoas,
+    carregar_limites, carregar_par_de_assinatura,
+)
+from contabil_agente.middleware.limite_de_uso import LimiteDeUso
+from contabil_agente.middleware.observabilidade import instalar_observabilidade
+from contabil_agente.middleware.seguranca import aplicar_protecoes
+from contabil_agente.resilience.readiness import readiness_check
+
 from .auth import exigir, get_auth, token_da_requisicao, usuario_atual
 from .config import settings
 from .logging_setup import setup_logging
@@ -62,25 +72,6 @@ MENSAGENS = Counter("agente_chat_mensagens_total", "Mensagens de chat processada
 
 TAMANHO_MAXIMO_JSON = 1_000_000
 WEB_DIR = Path(__file__).resolve().parent / "web"
-
-
-# ---------------------------------------------------------------- limite de uso
-class LimiteDeUso:
-    """Janela deslizante em memória (por processo). Em vários workers, use também o proxy/WAF."""
-
-    def __init__(self, maximo: int, janela_segundos: int):
-        self.maximo, self.janela = maximo, janela_segundos
-        self._eventos: Dict[str, Deque[float]] = defaultdict(deque)
-
-    def permitir(self, chave: str) -> bool:
-        agora = time.monotonic()
-        fila = self._eventos[chave]
-        while fila and agora - fila[0] > self.janela:
-            fila.popleft()
-        if len(fila) >= self.maximo:
-            return False
-        fila.append(agora)
-        return True
 
 
 # ---------------------------------------------------------------------- modelos
@@ -106,6 +97,17 @@ class PedidoExclusao(BaseModel):
 
 class PedidoFGTS(BaseModel):
     cpf: str = Field(max_length=20)
+
+
+class PedidoDecisao(BaseModel):
+    tipo: str = Field(max_length=40)
+    valor: str = Field(max_length=30)
+    descricao: str = Field(default="", max_length=300)
+    referencia: str = Field(default="", max_length=120)
+
+
+class PedidoResolucao(BaseModel):
+    comentario: str = Field(default="", max_length=300)
 
 
 class NovoUsuario(BaseModel):
@@ -187,12 +189,13 @@ def create_app(
     audit: Any = None,
     dispatcher: Optional[DocumentDispatcher] = None,
     lgpd: Optional[ServicoLGPD] = None,
+    governanca: Optional[GovernanceManager] = None,
 ) -> FastAPI:
     app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs" if settings.ENV == "dev" else None, redoc_url=None)
     precisa_de_segredos = auth is None or audit is None or engine is None or dispatcher is None
     vault = VaultClient.do_ambiente() if precisa_de_segredos else None
     # Segredos: Vault (se configurado) por cima do ambiente. Vault configurado e fora do ar = a API não sobe.
-    segredos = carregar_segredos(vault) if precisa_de_segredos else {}
+    segredos = carregar_segredos(vault)
     app.state.vault = vault
     app.state.auth = auth or AuthService(AuthSettings.from_env(segredos))
     app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente(segredos))
@@ -212,6 +215,10 @@ def create_app(
     bruto_rpa = segredos.get("RPA_PQC_PUBLIC_KEY")
     app.state.rpa_chave_publica = json.loads(bruto_rpa) if bruto_rpa else None
     chave_pii = segredos.get("PII_HASH_KEY") or _hmac.new(app.state.auth.settings.secret.encode(), b"lgpd-pii-hash-v1", hashlib.sha256).hexdigest()
+    app.state.governanca = governanca or GovernanceManager(
+        settings.DATA_DIR / "governanca.db", app.state.audit.worm,
+        carregar_par_de_assinatura(segredos, settings.DATA_DIR), carregar_limites(env=segredos),
+    )
     app.state.lgpd = lgpd or ServicoLGPD(
         app.state.audit.worm,
         ConsentimentoStore(settings.DATA_DIR / "lgpd.db", chave_pii),
@@ -225,30 +232,8 @@ def create_app(
     app.state.limite_chat = LimiteDeUso(maximo=60, janela_segundos=60)
     _bootstrap_admin(app.state.auth)
 
-    if settings.ALLOWED_ORIGINS:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=settings.ALLOWED_ORIGINS,
-            allow_methods=["GET", "POST", "DELETE"],
-            allow_headers=["Authorization", "Content-Type"],
-        )
-
-    @app.middleware("http")
-    async def protecoes(request: Request, call_next):
-        tamanho = request.headers.get("content-length")
-        if tamanho and tamanho.isdigit() and int(tamanho) > TAMANHO_MAXIMO_JSON and "multipart" not in request.headers.get(
-            "content-type", ""
-        ):
-            return JSONResponse({"detail": "Corpo da requisição grande demais."}, status_code=413)
-        resposta = await call_next(request)
-        resposta.headers["X-Content-Type-Options"] = "nosniff"
-        resposta.headers["X-Frame-Options"] = "DENY"
-        resposta.headers["Referrer-Policy"] = "no-referrer"
-        resposta.headers["Cache-Control"] = "no-store"
-        resposta.headers["Content-Security-Policy"] = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
-        )
-        return resposta
+    aplicar_protecoes(app, TAMANHO_MAXIMO_JSON, settings.ALLOWED_ORIGINS, https=os.environ.get("HTTPS_ONLY", "").lower() in ("1", "true", "yes", "sim"))
+    instalar_observabilidade(app)
 
     # ---------------------------------------------------------------- saúde
     @app.get("/health")
@@ -262,8 +247,9 @@ def create_app(
         except Exception:
             raise HTTPException(status_code=503, detail="Banco de autenticação indisponível.")
         vault = request.app.state.vault
-        if vault is not None and not vault.saudavel():
-            raise HTTPException(status_code=503, detail="Vault indisponível.")
+        pronto = readiness_check({"vault": vault} if vault is not None else {}, disk_threshold=95.0)
+        if pronto["status"] != "ready":
+            raise HTTPException(status_code=503, detail=f"Indisponível: {pronto['reason']}.")
         return {"status": "ready", "llm": request.app.state.chat_engine._llm is not None, "vault": vault is not None}
 
     @app.get("/metrics")
@@ -420,6 +406,47 @@ def create_app(
         if resposta["status"] != "ok":
             return JSONResponse(resposta, status_code=422)
         return _resposta_pdf(request, usuario, tipo, resposta["resultado"], pedido.contexto)
+
+    # ------------------------------------------------------------- governança
+    def _erro_de_governanca(exc: Exception) -> HTTPException:
+        codigos = {DecisaoNaoEncontrada: 404, RegraDasDuasPessoas: 403, DecisaoJaResolvida: 409, AssinaturaInvalida: 409}
+        return HTTPException(status_code=codigos.get(type(exc), 422), detail=str(exc) or "Decisão não encontrada.")
+
+    @app.post("/api/v1/governanca/decisoes", status_code=201)
+    def registrar_decisao(pedido: PedidoDecisao, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        """Registra e assina uma decisão crítica; acima do limite do tipo ela fica PENDENTE até outra pessoa aprovar."""
+        try:
+            d = request.app.state.governanca.registrar(usuario.tenant_id, usuario.user_id, pedido.tipo, pedido.valor, pedido.descricao, pedido.referencia)
+        except GovernancaError as exc:
+            raise _erro_de_governanca(exc)
+        return d.to_dict()
+
+    @app.get("/api/v1/governanca/pendentes")
+    def decisoes_pendentes(request: Request, usuario: Principal = Depends(exigir(Permission.SIGN_DOCUMENTS))):
+        return {"pendentes": [d.to_dict() for d in request.app.state.governanca.pendentes(usuario.tenant_id)]}
+
+    @app.get("/api/v1/governanca/decisoes/{decisao_id}")
+    def ver_decisao(decisao_id: str, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        gov = request.app.state.governanca
+        try:
+            d = gov.obter(decisao_id, usuario.tenant_id)
+            return {**d.to_dict(), "assinatura_valida": gov.verificar_assinatura(decisao_id, usuario.tenant_id)}
+        except GovernancaError as exc:
+            raise _erro_de_governanca(exc)
+
+    @app.post("/api/v1/governanca/decisoes/{decisao_id}/aprovar")
+    def aprovar_decisao(decisao_id: str, pedido: PedidoResolucao, request: Request, usuario: Principal = Depends(exigir(Permission.SIGN_DOCUMENTS))):
+        try:
+            return request.app.state.governanca.aprovar(decisao_id, usuario.tenant_id, usuario.user_id, pedido.comentario).to_dict()
+        except GovernancaError as exc:
+            raise _erro_de_governanca(exc)
+
+    @app.post("/api/v1/governanca/decisoes/{decisao_id}/rejeitar")
+    def rejeitar_decisao(decisao_id: str, pedido: PedidoResolucao, request: Request, usuario: Principal = Depends(exigir(Permission.SIGN_DOCUMENTS))):
+        try:
+            return request.app.state.governanca.rejeitar(decisao_id, usuario.tenant_id, usuario.user_id, pedido.comentario).to_dict()
+        except GovernancaError as exc:
+            raise _erro_de_governanca(exc)
 
     # ------------------------------------------------------------------ LGPD
     @app.get("/api/v1/lgpd/finalidades")

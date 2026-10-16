@@ -30,4 +30,7 @@ def setup_logging(level: int = logging.INFO) -> Logger:
     for h in list(root.handlers):
         root.removeHandler(h)
     root.addHandler(handler)
+    from contabil_agente.governance.redaction import instalar_filtro_de_redacao
+
+    instalar_filtro_de_redacao(root)  # nenhum CPF, CNPJ ou e-mail chega ao log
     return root

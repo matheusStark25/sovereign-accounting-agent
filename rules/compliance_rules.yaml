@@ -14,7 +14,7 @@ metadata:
 # General & Limits
 # Baseado na Consolidação das Leis do Trabalho (CLT) e legislação correlata.
 general:
-  minimum_wage: "1412.00"           # Salário mínimo de referência (BRL)
+  # O salário mínimo NÃO fica aqui: vem de contabil_agente/calc/data/tabelas.yaml (fonte única, por competência).
   vt_max_discount: "6.00"           # Vale-transporte máximo descontável (Lei 7.418/85)
   max_discount_total: "70.00"       # Percentual máximo total de descontos
   alimony_max_percent: "30.00"      # Pensão alimentícia máxima percentual aplicada

@@ -1,7 +1,7 @@
 """ComplianceChecker: regras de conformidade sobre os dados e sobre o resultado do cálculo.
 
 As regras vêm de ``rules/compliance_rules.yaml``; o salário mínimo vem das tabelas oficiais
-(``calc/data/tabelas.json``), sem repetir valor.
+(``calc/data/tabelas.yaml``), sem repetir valor.
 """
 
 from __future__ import annotations

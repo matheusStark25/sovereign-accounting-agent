@@ -4,7 +4,7 @@ Cada valor esperado tem a conta escrita ao lado, para que um contador possa
 conferir sem rodar o código.
 """
 
-import json
+import yaml
 from datetime import date
 from decimal import Decimal
 
@@ -21,26 +21,26 @@ C2025 = date(2025, 6, 1)
 # ----------------------------------------------------------------- tabelas
 def test_arquivo_de_tabelas_e_consistente():
     with open(tables.ARQUIVO_PADRAO, encoding="utf-8") as fh:
-        assert tables.validar(json.load(fh)) == []
+        assert tables.validar(yaml.safe_load(fh)) == []
 
 
 def test_validacao_pega_parcela_a_deduzir_errada():
     with open(tables.ARQUIVO_PADRAO, encoding="utf-8") as fh:
-        bruto = json.load(fh)
+        bruto = yaml.safe_load(fh)
     bruto["inss_empregado"][1]["parcelas_a_deduzir_conferencia"][2] = "999.99"
     assert any("parcela a deduzir" in p for p in tables.validar(bruto))
 
 
 def test_validacao_pega_vigencias_sobrepostas():
     with open(tables.ARQUIVO_PADRAO, encoding="utf-8") as fh:
-        bruto = json.load(fh)
+        bruto = yaml.safe_load(fh)
     bruto["irrf_mensal"][0]["vigencia_fim"] = "2026-03-31"
     assert any("sobrep" in p for p in tables.validar(bruto))
 
 
 def test_validacao_pega_reducao_que_nao_zera():
     with open(tables.ARQUIVO_PADRAO, encoding="utf-8") as fh:
-        bruto = json.load(fh)
+        bruto = yaml.safe_load(fh)
     bruto["irrf_mensal"][1]["reducao"]["constante"] = "900.00"
     assert any("redução" in p for p in tables.validar(bruto))
 

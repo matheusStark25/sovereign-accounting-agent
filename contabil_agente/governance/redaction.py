@@ -1,35 +1,33 @@
+"""Redação de dados pessoais nos logs: filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados."""
+
 from __future__ import annotations
 
-import re
 import logging
 
-LOGGER = logging.getLogger("governance.redaction")
-
-# common patterns
-REDACT_PATTERNS = [
-    (re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b"), "[REDACTED]"),
-    (re.compile(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b"), "[REDACTED]"),
-    (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "[REDACTED]"),
-    (re.compile(r"\+?\d[\d\s\-()]{6,}\d"), "[REDACTED]"),
-]
+from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 
 
-def sanitize_text(s: str) -> str:
-    if not s:
-        return s
-    out = s
-    try:
-        for pat, repl in REDACT_PATTERNS:
-            out = pat.sub(repl, out)
-    except Exception:
-        LOGGER.exception("redaction failed")
-    return out
+def sanitize_text(texto: str) -> str:
+    return PIIAnonymizer.anonymize_text(texto) if texto else texto
 
 
 class RedactionFilter(logging.Filter):
-    def filter(self, record):
+    """Troca a mensagem já formatada por uma versão sem dados pessoais (e descarta os argumentos)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
         try:
-            record.msg = sanitize_text(str(record.getMessage()))
-        except Exception:
-            pass
+            record.msg = sanitize_text(record.getMessage())
+            record.args = ()
+        except Exception:  # noqa: BLE001 - log nunca pode derrubar a aplicação
+            record.msg = "[mensagem de log suprimida: falha na redação]"
+            record.args = ()
         return True
+
+
+def instalar_filtro_de_redacao(logger: logging.Logger | None = None) -> RedactionFilter:
+    """Instala o filtro nos *handlers* do logger (o filtro do logger não vale para mensagens de filhos)."""
+    alvo = logger or logging.getLogger()
+    filtro = RedactionFilter()
+    for handler in alvo.handlers:
+        handler.addFilter(filtro)
+    return filtro
