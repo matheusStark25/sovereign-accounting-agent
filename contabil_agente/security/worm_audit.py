@@ -32,7 +32,7 @@ from typing import Any, Dict, Iterator, List, Mapping, Optional
 
 import portalocker
 
-from contabil_agente.middleware.lgpd import PIIAnonymizer
+from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 
 logger = logging.getLogger(__name__)
 

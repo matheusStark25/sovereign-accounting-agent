@@ -17,7 +17,7 @@ from typing import Any, Dict, Mapping, Optional
 
 import httpx
 
-from contabil_agente.middleware.lgpd import PIIAnonymizer
+from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 from contabil_agente.resilience import ChamadaResiliente
 
 logger = logging.getLogger(__name__)

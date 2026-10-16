@@ -108,3 +108,5 @@ contabil_agente/logs/
 contabil_agente/documents/
 contabil_agente/temp_docs/
 contabil_agente/uploads/
+contabil_agente/data/*
+!contabil_agente/data/.gitkeep

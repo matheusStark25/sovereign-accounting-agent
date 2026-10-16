@@ -63,6 +63,7 @@ def client(tmp_path, llm):
         audit=nova_auditoria(tmp_path),
         dispatcher=novo_dispatcher(tmp_path),
     )
+    app.state.lgpd.registrar_consentimento("empresa_a", None, "envio_a_provedor_de_ia", True, "setup")
     return TestClient(app)
 
 
@@ -159,7 +160,9 @@ def test_llm_fora_do_ar_nao_derruba_o_chat(tmp_path):
 
     auth = novo_auth(tmp_path)
     auth.criar_usuario("maria", SENHA, "t", ["accountant"])
-    c = TestClient(create_app(auth=auth, engine=ChatEngine(llm=quebrado), store=ChatStore(str(tmp_path / "c.db")), audit=nova_auditoria(tmp_path)))
+    app = create_app(auth=auth, engine=ChatEngine(llm=quebrado), store=ChatStore(str(tmp_path / "c.db")), audit=nova_auditoria(tmp_path), dispatcher=novo_dispatcher(tmp_path))
+    app.state.lgpd.registrar_consentimento("t", None, "envio_a_provedor_de_ia", True, "setup")
+    c = TestClient(app)
     r = c.post("/api/chat", json={"message": "explique o DARF"}, headers=entrar(c))
     assert r.status_code == 200 and "Não consegui falar com a IA" in r.json()["response"]
 

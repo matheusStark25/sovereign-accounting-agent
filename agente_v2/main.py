@@ -24,11 +24,17 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 from contabil_agente.calc import servico
 from contabil_agente.chat import ChatEngine, ChatError, ChatStore, llm_do_ambiente
+import hashlib
+import hmac as _hmac
+
 from contabil_agente.documentos import gerar_pdf_calculo, hash_do_resultado
+from contabil_agente.lgpd import FINALIDADES, ConsentimentoStore, PoliticaDeRetencao, ServicoLGPD, TratamentoSemBaseLegal
 from contabil_agente.documentos.leitura import TAMANHO_MAXIMO, ArquivoInvalido
 from contabil_agente.documentos.tipos import TIPOS as TIPOS_DOCUMENTO
 from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, HistoricoDocumentos, provedores_do_ambiente
+from contabil_agente.security.worm_audit import WormAudit
 from contabil_agente.security.auth import (
+    AuthSettings,
     PAPEIS_VALIDOS,
     AuthError,
     AuthLockedError,
@@ -41,6 +47,7 @@ from contabil_agente.security.rbac_manager import Permission
 from .auth import exigir, get_auth, token_da_requisicao, usuario_atual
 from .config import settings
 from .logging_setup import setup_logging
+from .vault_client import VaultClient, carregar_segredos
 
 logger = logging.getLogger("agente_v2")
 
@@ -82,6 +89,16 @@ class PedidoPdf(BaseModel):
     contexto: Dict[str, Any] = Field(default_factory=dict)
 
 
+class PedidoConsentimento(BaseModel):
+    finalidade: str = Field(max_length=60)
+    concedido: bool
+    titular: Optional[str] = Field(default=None, max_length=20)
+
+
+class PedidoExclusao(BaseModel):
+    documento: str = Field(max_length=20)
+
+
 class NovoUsuario(BaseModel):
     username: str
     password: str
@@ -119,6 +136,13 @@ def _auditar(
         return None
 
 
+def _base_legal(request: Request, codigo: str, tenant: str) -> None:
+    try:
+        request.app.state.lgpd.exigir_base_legal(codigo, tenant)
+    except TratamentoSemBaseLegal as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+
 _CONTEXTO_PERMITIDO = ("empresa", "nome_funcionario", "cpf", "protocolo")
 
 
@@ -153,14 +177,20 @@ def create_app(
     store: Optional[ChatStore] = None,
     audit: Any = None,
     dispatcher: Optional[DocumentDispatcher] = None,
+    lgpd: Optional[ServicoLGPD] = None,
 ) -> FastAPI:
     app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs" if settings.ENV == "dev" else None, redoc_url=None)
-    app.state.auth = auth or AuthService()
-    app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente())
+    precisa_de_segredos = auth is None or audit is None or engine is None or dispatcher is None
+    vault = VaultClient.do_ambiente() if precisa_de_segredos else None
+    # Segredos: Vault (se configurado) por cima do ambiente. Vault configurado e fora do ar = a API não sobe.
+    segredos = carregar_segredos(vault) if precisa_de_segredos else {}
+    app.state.vault = vault
+    app.state.auth = auth or AuthService(AuthSettings.from_env(segredos))
+    app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente(segredos))
     app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
-    app.state.audit = audit or AuditTrailManager(base_directory=str(settings.AUDIT_DIR))
+    app.state.audit = audit or AuditTrailManager(worm=WormAudit.do_ambiente(settings.AUDIT_DIR, segredos))
     if dispatcher is None:
-        provedores = provedores_do_ambiente()
+        provedores = provedores_do_ambiente(segredos)
         dispatcher = DocumentDispatcher(
             app.state.audit.worm,
             HistoricoDocumentos(settings.DATA_DIR / "documentos.db"),
@@ -169,6 +199,15 @@ def create_app(
             destinos=[ArquivoDestino(settings.DATA_DIR / "arquivo")],
         )
     app.state.dispatcher = dispatcher
+    chave_pii = segredos.get("PII_HASH_KEY") or _hmac.new(app.state.auth.settings.secret.encode(), b"lgpd-pii-hash-v1", hashlib.sha256).hexdigest()
+    app.state.lgpd = lgpd or ServicoLGPD(
+        app.state.audit.worm,
+        ConsentimentoStore(settings.DATA_DIR / "lgpd.db", chave_pii),
+        PoliticaDeRetencao.carregar(),
+        raiz_arquivo=settings.DATA_DIR / "arquivo",
+        chat_store=app.state.chat_store,
+        historico=getattr(dispatcher, "historico", None),
+    )
     app.state.limite_login = LimiteDeUso(maximo=10, janela_segundos=60)
     app.state.limite_chat = LimiteDeUso(maximo=60, janela_segundos=60)
     _bootstrap_admin(app.state.auth)
@@ -209,7 +248,10 @@ def create_app(
             request.app.state.auth.contar_usuarios()
         except Exception:
             raise HTTPException(status_code=503, detail="Banco de autenticação indisponível.")
-        return {"status": "ready", "llm": request.app.state.chat_engine._llm is not None}
+        vault = request.app.state.vault
+        if vault is not None and not vault.saudavel():
+            raise HTTPException(status_code=503, detail="Vault indisponível.")
+        return {"status": "ready", "llm": request.app.state.chat_engine._llm is not None, "vault": vault is not None}
 
     @app.get("/metrics")
     def metrics():
@@ -284,6 +326,8 @@ def create_app(
     ):
         if not request.app.state.limite_chat.permitir(usuario.user_id):
             raise HTTPException(status_code=429, detail="Muitas mensagens. Aguarde um momento.")
+        _base_legal(request, "assistente_de_chat", usuario.tenant_id)
+        usar_ia = request.app.state.lgpd.pode_tratar("envio_a_provedor_de_ia", usuario.tenant_id)
         loja: ChatStore = request.app.state.chat_store
         if dados.session_id:
             estado = loja.carregar(dados.session_id, usuario.user_id, usuario.tenant_id)
@@ -293,7 +337,7 @@ def create_app(
         else:
             sid, estado = loja.nova_sessao(usuario.user_id, usuario.tenant_id), {}
         try:
-            resultado = request.app.state.chat_engine.responder(estado, dados.message)
+            resultado = request.app.state.chat_engine.responder(estado, dados.message, usar_llm=usar_ia)
         except ChatError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         loja.salvar(sid, usuario.user_id, usuario.tenant_id, estado)
@@ -340,6 +384,7 @@ def create_app(
     ):
         if tipo not in servico.TIPOS_CALCULO:
             raise HTTPException(status_code=404, detail=f"Cálculo desconhecido. Use: {', '.join(servico.TIPOS_CALCULO)}.")
+        _base_legal(request, "calculo_trabalhista", usuario.tenant_id)
         resposta = servico.calcular(tipo, dados)
         CALCULOS.labels(tipo, resposta["status"]).inc()
         _auditar(request, "process_payroll", usuario, f"Cálculo de {tipo}", sucesso=resposta["status"] == "ok")
@@ -363,6 +408,48 @@ def create_app(
             return JSONResponse(resposta, status_code=422)
         return _resposta_pdf(request, usuario, tipo, resposta["resultado"], pedido.contexto)
 
+    # ------------------------------------------------------------------ LGPD
+    @app.get("/api/v1/lgpd/finalidades")
+    def finalidades(_: Principal = Depends(usuario_atual)):
+        return {"finalidades": [
+            {"codigo": f.codigo, "descricao": f.descricao, "base_legal": f.base.value, "dados_sensiveis": f.dados_sensiveis}
+            for f in FINALIDADES.values()
+        ]}
+
+    @app.post("/api/v1/lgpd/consentimentos", status_code=201)
+    def registrar_consentimento(
+        pedido: PedidoConsentimento, request: Request, usuario: Principal = Depends(exigir(Permission.WRITE_DATA))
+    ):
+        if not pedido.titular and not ({"tenant_admin", "super_admin"} & set(usuario.roles)):
+            raise HTTPException(status_code=403, detail="Só o administrador do tenant registra consentimento de sistema.")
+        try:
+            n = request.app.state.lgpd.registrar_consentimento(usuario.tenant_id, pedido.titular, pedido.finalidade, pedido.concedido, usuario.user_id)
+        except TratamentoSemBaseLegal as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"id": n, "finalidade": pedido.finalidade, "concedido": pedido.concedido}
+
+    @app.get("/api/v1/lgpd/consentimentos")
+    def historico_de_consentimentos(
+        request: Request, titular: Optional[str] = None, usuario: Principal = Depends(exigir(Permission.READ_SENSITIVE_DATA))
+    ):
+        return {"historico": request.app.state.lgpd.consentimentos.historico(usuario.tenant_id, titular)}
+
+    @app.delete("/api/v1/lgpd/titular")
+    def excluir_titular(pedido: PedidoExclusao, request: Request, usuario: Principal = Depends(exigir(Permission.DELETE_DATA))):
+        """Direito de exclusão (LGPD art. 18, VI). O que a lei manda guardar fica retido e é listado."""
+        try:
+            return request.app.state.lgpd.excluir_titular(usuario.tenant_id, pedido.documento, usuario.user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
+    @app.get("/api/v1/lgpd/retencao")
+    def politica_de_retencao(request: Request, _: Principal = Depends(usuario_atual)):
+        return {"prazos_em_dias": request.app.state.lgpd.politica.para_dict()}
+
+    @app.post("/api/v1/lgpd/retencao/executar")
+    def executar_retencao(request: Request, usuario: Principal = Depends(exigir(Permission.DELETE_DATA))):
+        return {"removidos": request.app.state.lgpd.executar_retencao(usuario.tenant_id, usuario.user_id)}
+
     # ------------------------------------------------------------ documentos
     @app.get("/api/v1/documentos/tipos")
     def tipos_de_documento(_: Principal = Depends(usuario_atual)):
@@ -376,6 +463,8 @@ def create_app(
         persona: str = Form(default="MARCOS", max_length=20),
         usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL)),
     ):
+        _base_legal(request, "processamento_de_documentos", usuario.tenant_id)
+        usar_ia = request.app.state.lgpd.pode_tratar("envio_a_provedor_de_ia", usuario.tenant_id)
         dados = await arquivo.read(TAMANHO_MAXIMO + 1)
         if len(dados) > TAMANHO_MAXIMO:
             raise HTTPException(status_code=413, detail=f"Arquivo maior que {TAMANHO_MAXIMO // (1024 * 1024)} MB.")
@@ -384,7 +473,7 @@ def create_app(
             resultado = await run_in_threadpool(
                 request.app.state.dispatcher.process,
                 conteudo=dados, nome=nome, document_type=tipo, persona=persona,
-                tenant=usuario.tenant_id, ator=usuario.user_id,
+                tenant=usuario.tenant_id, ator=usuario.user_id, usar_ia=usar_ia,
             )
         except ArquivoInvalido as exc:
             raise HTTPException(status_code=422, detail=str(exc))

@@ -75,6 +75,7 @@ class DocumentDispatcher:
         nome: Optional[str] = None,
         tenant: str = "default",
         ator: str = "sistema",
+        usar_ia: bool = True,
     ) -> ResultadoDocumento:
         """Processa um documento (caminho ou bytes) e devolve o resultado com ``extracted_data``,
         ``calculations`` e ``audit_trail_id``. Levanta ``ArquivoInvalido`` se o arquivo não puder ser lido."""
@@ -111,9 +112,12 @@ class DocumentDispatcher:
             base.requer_revisao = True
             return base
 
+        worker_llm = self.worker_llm if usar_ia else None
+        revisor_llm = self.revisor_llm if usar_ia else None
+
         # CLASSIFYING ----------------------------------------------------------
         maquina.transitar(Estado.CLASSIFYING, "identificando o tipo do documento")
-        tipo_codigo, motivo_tipo = self._classificar(conteudo_lido, document_type, persona)
+        tipo_codigo, motivo_tipo = self._classificar(conteudo_lido, document_type, persona, worker_llm)
         if tipo_codigo is None:
             return falhar(motivo_tipo)
         contexto["tipo"] = tipo_codigo
@@ -122,14 +126,16 @@ class DocumentDispatcher:
         maquina.transitar(Estado.PROCESSING, f"extração e conferência de {tipo_codigo}")
         resultado = processar_conteudo(conteudo_lido, tipo_codigo)
         texto = corpus(conteudo_lido)
-        worker = AgenteWorker(self.worker_llm, persona or self.persona).processar(texto, tipo_codigo, resultado.extracted_data, resultado.resumo)
+        worker = AgenteWorker(worker_llm, persona or self.persona).processar(texto, tipo_codigo, resultado.extracted_data, resultado.resumo)
         resultado.agentes = {"worker": worker.origem}
+        if not usar_ia and (self.worker_llm or self.revisor_llm):
+            resultado.avisos.append("IA externa não usada: não há consentimento registrado para o envio a provedores de IA (LGPD).")
         if worker.erro:
             resultado.avisos.append(f"Worker em modo determinístico: {worker.erro}")
         resultado.resumo = worker.resumo
 
         # REVIEWING <-> CORRECTING --------------------------------------------
-        revisor = AgenteRevisor(self.revisor_llm)
+        revisor = AgenteRevisor(revisor_llm)
         sugestoes = dict(worker.sugestoes)
         pendentes: List[Divergencia] = []
         rodada = 0
@@ -196,7 +202,7 @@ class DocumentDispatcher:
         return resultado
 
     # ----------------------------------------------------------------- interno
-    def _classificar(self, c: Conteudo, tipo_informado: Optional[str], persona: Optional[str]):
+    def _classificar(self, c: Conteudo, tipo_informado: Optional[str], persona: Optional[str], llm: Any = None):
         if tipo_informado:
             try:
                 codigo = resolver_tipo_informado(tipo_informado)
@@ -210,9 +216,9 @@ class DocumentDispatcher:
         codigo, _, _ = classificar(c)
         if codigo:
             return codigo, ""
-        if self.worker_llm is not None:  # a IA pode sugerir, mas só vale se houver ao menos um indício no texto
+        if llm is not None:  # a IA pode sugerir, mas só vale se houver ao menos um indício no texto
             try:
-                resposta = self.worker_llm.gerar_json(
+                resposta = llm.gerar_json(
                     "Classifique o documento. Responda SOMENTE um JSON {\"tipo\": \"CODIGO\"} com um destes códigos: " + ", ".join(sorted(TIPOS)),
                     c.texto,
                 )

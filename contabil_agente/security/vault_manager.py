@@ -105,13 +105,14 @@ class VaultManager:
         """Carrega chaves HMAC para assinatura de logs de auditoria."""
         hmac_key = os.getenv("HMAC_SECRET_KEY")
         if not hmac_key or len(hmac_key) < 32:
-            # Gera chave temporária com warning severo
-            logger.error(
-                "HMAC_SECRET_KEY não configurada! Gerando chave temporária. "
-                "AUDIT LOGS NÃO SERÃO VÁLIDOS APÓS RESTART!"
-            )
+            if os.getenv("AGENTE_ENV", "production").lower() != "dev":
+                raise ValueError(
+                    "HMAC_SECRET_KEY ausente ou curta (mínimo 32 caracteres). Sem ela a assinatura dos logs não é "
+                    'verificável. Gere com: python -c "import secrets; print(secrets.token_hex(32))"'
+                )
             import secrets
 
+            logger.warning("HMAC_SECRET_KEY ausente: chave temporária gerada (AGENTE_ENV=dev); logs não verificam após reiniciar.")
             hmac_key = secrets.token_hex(32)
 
         self._secrets_cache["hmac_key_current"] = hmac_key

@@ -83,8 +83,8 @@ def test_verificacao_acusa_trilha_adulterada(client):
     adm = entrar(client, "admin")
     arq = client.app.state.audit.worm._caminho("empresa_a")
     linhas = arq.read_text(encoding="utf-8").splitlines()
-    assert '"evento":"login"' in linhas[0]
-    linhas[0] = linhas[0].replace('"evento":"login"', '"evento":"logout"')
+    assert '"concedido":true' in linhas[0]
+    linhas[0] = linhas[0].replace('"concedido":true', '"concedido":false')
     arq.write_text("\n".join(linhas) + "\n", encoding="utf-8")
     r = client.get("/api/v1/auditoria/verificar", headers=adm)
     assert r.status_code == 200 and r.json()["ok"] is False and r.json()["problemas"]

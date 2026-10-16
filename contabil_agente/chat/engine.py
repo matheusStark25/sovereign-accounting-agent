@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from contabil_agente.core.prompts import obter_prompt
 from contabil_agente.intelligence.dialogo_calculo import DialogoCalculo
-from contabil_agente.middleware.lgpd import PIIAnonymizer
+from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 
 from .llm import LLM, LLMIndisponivel
 
@@ -31,6 +31,10 @@ MENSAGEM_SEM_LLM = (
     "Posso calcular rescisão, férias, 13º salário, INSS, IRRF, FGTS e folha. "
     "Diga o que precisa, por exemplo: “calcular rescisão, salário de R$ 3.000, admitido em 10/03/2023, "
     "demitido em 15/09/2026 sem justa causa”."
+)
+MENSAGEM_SEM_CONSENTIMENTO = (
+    "A IA externa está desligada para esta empresa: falta o consentimento para enviar textos a provedores de IA (LGPD). "
+    "Os cálculos funcionam normalmente: diga, por exemplo, “calcular férias com salário de R$ 3.000”."
 )
 MENSAGEM_LLM_FORA = (
     "Não consegui falar com a IA agora. Os cálculos continuam funcionando: diga, por exemplo, "
@@ -48,7 +52,7 @@ class ChatEngine:
         self._dialogo = DialogoCalculo(hoje=hoje)
         self._prompt = obter_prompt(persona)
 
-    def responder(self, estado: Dict[str, Any], mensagem: str) -> Dict[str, Any]:
+    def responder(self, estado: Dict[str, Any], mensagem: str, usar_llm: bool = True) -> Dict[str, Any]:
         """Atualiza ``estado`` e devolve ``{resposta, status, tipo, dados_calculados}``."""
         texto = (mensagem or "").strip()
         if not texto:
@@ -61,12 +65,14 @@ class ChatEngine:
 
         resultado = self._dialogo.processar(estado, texto)
         if resultado is None:
-            resultado = self._conversa_geral(historico)
+            resultado = self._conversa_geral(historico, usar_llm)
         historico.append({"role": "assistant", "content": resultado["resposta"]})
         del historico[:-HISTORICO_MAXIMO]
         return resultado
 
-    def _conversa_geral(self, historico: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _conversa_geral(self, historico: List[Dict[str, str]], usar_llm: bool = True) -> Dict[str, Any]:
+        if self._llm is not None and not usar_llm:
+            return {"resposta": MENSAGEM_SEM_CONSENTIMENTO, "status": "ok", "origem": "padrao"}
         if self._llm is None:
             return {"resposta": MENSAGEM_SEM_LLM, "status": "ok", "origem": "padrao"}
         mensagens = [{"role": "system", "content": self._prompt}]
