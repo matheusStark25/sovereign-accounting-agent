@@ -23,6 +23,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 from contabil_agente.calc import servico
 from contabil_agente.chat import ChatEngine, ChatError, ChatStore, llm_do_ambiente
+from contabil_agente.documentos import gerar_pdf_calculo, hash_do_resultado
 from contabil_agente.security.auth import (
     PAPEIS_VALIDOS,
     AuthError,
@@ -71,6 +72,11 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = Field(default=None, max_length=64)
 
 
+class PedidoPdf(BaseModel):
+    dados: Dict[str, Any]
+    contexto: Dict[str, Any] = Field(default_factory=dict)
+
+
 class NovoUsuario(BaseModel):
     username: str
     password: str
@@ -98,6 +104,23 @@ def _auditar(request: Request, acao: str, principal: Optional[Principal], descri
         )
     except Exception:
         logger.error("Falha ao gravar auditoria (%s)", acao, exc_info=True)
+
+
+_CONTEXTO_PERMITIDO = ("empresa", "nome_funcionario", "cpf", "protocolo")
+
+
+def _resposta_pdf(request: Request, usuario: Principal, tipo: str, resultado: Dict[str, Any], contexto: Dict[str, Any]) -> Response:
+    contexto = {k: str(v)[:120] for k, v in contexto.items() if k in _CONTEXTO_PERMITIDO}
+    pdf = gerar_pdf_calculo(tipo, resultado, contexto)
+    _auditar(request, "process_payroll", usuario, f"PDF de {tipo}", tamanho=len(pdf))
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{tipo}.pdf"',
+            "X-Calculo-SHA256": hash_do_resultado(resultado),
+        },
+    )
 
 
 def _bootstrap_admin(auth: AuthService) -> None:
@@ -267,6 +290,18 @@ def create_app(
             raise HTTPException(status_code=404, detail="Conversa não encontrada.")
         return {"session_id": session_id, "mensagens": estado.get("mensagens", [])}
 
+    @app.get("/api/chat/{session_id}/pdf")
+    def pdf_da_conversa(
+        session_id: str, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))
+    ):
+        estado = request.app.state.chat_store.carregar(session_id, usuario.user_id, usuario.tenant_id)
+        if estado is None:
+            raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+        ultimo = estado.get("ultimo_calculo")
+        if not ultimo:
+            raise HTTPException(status_code=404, detail="Esta conversa ainda não tem um cálculo concluído.")
+        return _resposta_pdf(request, usuario, ultimo["tipo"], ultimo["resultado"], {"protocolo": session_id})
+
     # --------------------------------------------------------------- cálculo
     @app.get("/api/v1/calculo/tipos")
     def tipos(_: Principal = Depends(usuario_atual)):
@@ -288,6 +323,21 @@ def create_app(
             return resposta
         codigo = 422
         return JSONResponse(resposta, status_code=codigo)
+
+    @app.post("/api/v1/calculo/{tipo}/pdf")
+    def calcular_em_pdf(
+        tipo: str,
+        pedido: PedidoPdf,
+        request: Request,
+        usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL)),
+    ):
+        if tipo not in servico.TIPOS_CALCULO:
+            raise HTTPException(status_code=404, detail=f"Cálculo desconhecido. Use: {', '.join(servico.TIPOS_CALCULO)}.")
+        resposta = servico.calcular(tipo, pedido.dados)
+        CALCULOS.labels(tipo, resposta["status"]).inc()
+        if resposta["status"] != "ok":
+            return JSONResponse(resposta, status_code=422)
+        return _resposta_pdf(request, usuario, tipo, resposta["resultado"], pedido.contexto)
 
     # ------------------------------------------------------------------- web
     if WEB_DIR.is_dir():

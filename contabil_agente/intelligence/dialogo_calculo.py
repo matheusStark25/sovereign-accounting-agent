@@ -24,6 +24,8 @@ _NOMES_TIPO = {
     "decimo_terceiro": "13º salário",
     "inss": "INSS",
     "irrf": "IRRF",
+    "fgts": "FGTS mensal",
+    "folha": "folha de pagamento",
 }
 _EXEMPLOS = {
     "salario": 'Exemplo: "salário de R$ 3.000,00".',

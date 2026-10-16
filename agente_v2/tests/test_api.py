@@ -215,3 +215,32 @@ def test_app_sem_jwt_secret_falha_com_mensagem(monkeypatch):
     with pytest.raises(Exception) as exc:
         m.app
     assert "JWT_SECRET" in str(exc.value)
+
+
+def test_pdf_do_calculo_via_rest(client):
+    corpo = {
+        "dados": {"salario": 6000, "competencia": "2026-09-01"},
+        "contexto": {"empresa": "Empresa Teste", "nome_funcionario": "Fulano", "ignorado": "x"},
+    }
+    r = client.post("/api/v1/calculo/folha/pdf", json=corpo, headers=entrar(client))
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content.startswith(b"%PDF-") and len(r.headers["x-calculo-sha256"]) == 64
+
+
+def test_pdf_com_dados_faltando_nao_gera_documento_vazio(client):
+    r = client.post("/api/v1/calculo/ferias/pdf", json={"dados": {}}, headers=entrar(client))
+    assert r.status_code == 422 and r.json()["status"] == "faltam_dados"
+
+
+def test_pdf_do_ultimo_calculo_da_conversa(client):
+    h = entrar(client)
+    r1 = client.post("/api/chat", json={"message": "calcular INSS de um salário de R$ 5.000,00"}, headers=h).json()
+    sid = r1["session_id"]
+    pdf = client.get(f"/api/chat/{sid}/pdf", headers=h)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
+    # conversa sem cálculo concluído
+    sem = client.post("/api/chat", json={"message": "oi"}, headers=h).json()["session_id"]
+    assert client.get(f"/api/chat/{sem}/pdf", headers=h).status_code == 404
+    # outro usuário não baixa
+    assert client.get(f"/api/chat/{sid}/pdf", headers=entrar(client, "joao")).status_code == 404

@@ -196,6 +196,10 @@ def detectar_tipo_calculo(mensagem: str) -> Optional[str]:
         return "decimo_terceiro"
     if re.search(r"\bferias\b", norm):
         return "ferias"
+    if re.search(r"\bfolha\b|holerite|contracheque|contra cheque|recibo de pagamento", norm):
+        return "folha"
+    if re.search(r"\bfgts\b", norm) and re.search(r"mensal|deposito|quanto|calcul", norm):
+        return "fgts"
     if re.search(r"\birrf\b|imposto de renda|\birpf\b|\bimposto\b", norm):
         return "irrf"
     if re.search(r"\binss\b|previdencia|contribuicao previdenciaria", norm):

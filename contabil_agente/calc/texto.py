@@ -96,6 +96,29 @@ def formatar_resultado(tipo: str, r: Dict[str, Any]) -> str:
             f"• Redução da Lei 15.270/2025: {brl(r['reducao'])}",
             f"IRRF devido: {brl(r['irrf'])}",
         ]
+    elif tipo == "fgts":
+        linhas = [
+            f"FGTS mensal ({r['categoria']}) sobre {brl(r['base'])}",
+            f"• Alíquota: {r['aliquota'] * 100:.1f}%".replace(".", ","),
+            f"Depósito do empregador: {brl(r['fgts'])}",
+        ]
+    elif tipo == "folha":
+        linhas = [f"Folha de {r['competencia']}", "", "Proventos:"]
+        nomes = {
+            "salario_base": "Salário base", "adicionais": "Adicionais", "horas_extras": "Horas extras",
+            "dsr_horas_extras": "DSR sobre horas extras", "outros_proventos": "Outros proventos",
+        }
+        linhas += [f"• {nomes.get(k, k)}: {brl(v)}" for k, v in r["proventos"].items()]
+        linhas.append(f"Total de proventos: {brl(r['total_proventos'])}")
+        linhas += ["", "Descontos:"]
+        nomes_d = {
+            "inss": "INSS", "irrf": "IRRF", "vale_transporte": "Vale-transporte",
+            "pensao_alimenticia": "Pensão alimentícia", "outros_descontos": "Outros descontos",
+        }
+        linhas += [f"• {nomes_d.get(k, k)}: {brl(v)}" for k, v in r["descontos"].items()]
+        linhas.append(f"Total de descontos: {brl(r['total_descontos'])}")
+        linhas += ["", f"Líquido a receber: {brl(r['total_liquido'])}",
+                   f"FGTS do empregador (não desconta do empregado): {brl(r['fgts_empregador'])}"]
     else:
         linhas = [str(r)]
 

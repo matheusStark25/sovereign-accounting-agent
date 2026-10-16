@@ -3,7 +3,7 @@
 Fluxo de cada mensagem:
 
 1. ``DialogoCalculo`` reconhece pedido de cálculo, junta os dados e chama ``contabil_agente.calc``.
-2. Se não for cálculo e houver LLM, responde com o prompt da persona (dados pessoais mascarados).
+2. Se não for cálculo e houver LLM, responde com o prompt da persona (MARCOS ou Maria Helena), com dados pessoais mascarados.
 3. Sem LLM ou com o provedor fora do ar, devolve uma resposta padrão honesta.
 
 O estado da conversa é um dicionário JSON (``estado``), guardado por quem chama (ver ``ChatStore``).
@@ -15,6 +15,7 @@ import logging
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from contabil_agente.core.prompts import obter_prompt
 from contabil_agente.intelligence.dialogo_calculo import DialogoCalculo
 from contabil_agente.middleware.lgpd import PIIAnonymizer
 
@@ -25,15 +26,6 @@ logger = logging.getLogger(__name__)
 HISTORICO_MAXIMO = 40  # mensagens guardadas por conversa
 CONTEXTO_LLM = 10  # mensagens enviadas ao LLM
 TAMANHO_MAXIMO_MENSAGEM = 4000
-
-PROMPT_PERSONA = (
-    "Você é a Maria Helena, auditora sênior de Departamento Pessoal e contabilidade no Brasil. "
-    "Responda em português, de forma breve e técnica, sem emojis. "
-    "Regras: (1) nunca invente valores, alíquotas, datas ou artigos de lei; se não tiver certeza, diga que precisa "
-    "confirmar na fonte oficial; (2) você NÃO calcula: quando o usuário quiser um cálculo de rescisão, férias, 13º, "
-    "INSS, IRRF, FGTS ou folha, peça os dados (salário, datas, tipo) e diga que o sistema calcula; "
-    "(3) valores sempre em R$ 1.234,56; (4) não peça CPF nem dados que não sejam necessários."
-)
 
 MENSAGEM_SEM_LLM = (
     "Posso calcular rescisão, férias, 13º salário, INSS, IRRF, FGTS e folha. "
@@ -51,9 +43,10 @@ class ChatError(ValueError):
 
 
 class ChatEngine:
-    def __init__(self, llm: Optional[LLM] = None, hoje: Optional[date] = None):
+    def __init__(self, llm: Optional[LLM] = None, hoje: Optional[date] = None, persona: str = "MARCOS"):
         self._llm = llm
         self._dialogo = DialogoCalculo(hoje=hoje)
+        self._prompt = obter_prompt(persona)
 
     def responder(self, estado: Dict[str, Any], mensagem: str) -> Dict[str, Any]:
         """Atualiza ``estado`` e devolve ``{resposta, status, tipo, dados_calculados}``."""
@@ -76,7 +69,7 @@ class ChatEngine:
     def _conversa_geral(self, historico: List[Dict[str, str]]) -> Dict[str, Any]:
         if self._llm is None:
             return {"resposta": MENSAGEM_SEM_LLM, "status": "ok", "origem": "padrao"}
-        mensagens = [{"role": "system", "content": PROMPT_PERSONA}]
+        mensagens = [{"role": "system", "content": self._prompt}]
         for m in historico[-CONTEXTO_LLM:]:
             mensagens.append({"role": m["role"], "content": PIIAnonymizer.anonymize_text(m["content"])})
         try:

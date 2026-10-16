@@ -1,57 +1,52 @@
 """
-Base de Conhecimento - Legislação Trabalhista e Fiscal 2026
-Referências atualizadas para consulta rápida pela IA
+Base de conhecimento - legislação trabalhista e fiscal.
+
+Valores monetários (salário mínimo, teto e faixas do INSS, tabela do IRRF) NÃO ficam aqui:
+vêm de ``contabil_agente.calc`` (``calc/data/tabelas.json``), a fonte única. O texto abaixo é
+referência qualitativa; prazos e regras mudam, então confirme sempre na fonte oficial.
 """
 
+from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from contabil_agente.calc import calcular_inss as _calcular_inss
+from contabil_agente.calc import calcular_irrf_mensal as _calcular_irrf
+from contabil_agente.calc.tables import tabela_inss, tabela_irrf
+
+
+def _competencia(competencia: Optional[date]) -> date:
+    base = competencia or date.today()
+    return date(base.year, base.month, 1)
 
 
 class LegislacaoBrasileira:
-    """Base de conhecimento legislativo atualizada"""
+    """Base de conhecimento legislativo."""
 
-    # ==================== VALORES 2026 ====================
-    SALARIO_MINIMO_2026 = Decimal("1518.00")
-    TETO_INSS_2026 = Decimal("8157.41")
+    # ==================== VALORES (via motor de cálculo) ====================
 
-    # Tabela INSS progressiva 2026
-    TABELA_INSS_2026 = [
-        {"ate": Decimal("1518.00"), "aliquota": Decimal("0.075")},
-        {"ate": Decimal("2793.88"), "aliquota": Decimal("0.09")},
-        {"ate": Decimal("4190.83"), "aliquota": Decimal("0.12")},
-        {"ate": Decimal("8157.41"), "aliquota": Decimal("0.14")},
-    ]
+    @staticmethod
+    def salario_minimo(competencia: Optional[date] = None) -> Decimal:
+        return tabela_inss(_competencia(competencia)).salario_minimo
 
-    # Tabela IRRF mensal 2026
-    TABELA_IRRF_2026 = [
-        {
-            "ate": Decimal("2259.20"),
-            "aliquota": Decimal("0"),
-            "deducao": Decimal("0"),
-        },
-        {
-            "ate": Decimal("2826.65"),
-            "aliquota": Decimal("0.075"),
-            "deducao": Decimal("169.44"),
-        },
-        {
-            "ate": Decimal("3751.05"),
-            "aliquota": Decimal("0.15"),
-            "deducao": Decimal("381.44"),
-        },
-        {
-            "ate": Decimal("4664.68"),
-            "aliquota": Decimal("0.225"),
-            "deducao": Decimal("662.77"),
-        },
-        {
-            "ate": Decimal("999999.99"),
-            "aliquota": Decimal("0.275"),
-            "deducao": Decimal("896.00"),
-        },
-    ]
+    @staticmethod
+    def teto_inss(competencia: Optional[date] = None) -> Decimal:
+        return tabela_inss(_competencia(competencia)).teto
 
-    DEDUCAO_DEPENDENTE_IRRF = Decimal("189.59")
+    @staticmethod
+    def tabela_inss(competencia: Optional[date] = None) -> List[Dict[str, Decimal]]:
+        return [{"ate": f.ate, "aliquota": f.aliquota} for f in tabela_inss(_competencia(competencia)).faixas]
+
+    @staticmethod
+    def tabela_irrf(competencia: Optional[date] = None) -> List[Dict[str, Optional[Decimal]]]:
+        return [
+            {"ate": f.ate, "aliquota": f.aliquota, "deducao": f.deducao}
+            for f in tabela_irrf(_competencia(competencia)).faixas
+        ]
+
+    @staticmethod
+    def deducao_dependente_irrf(competencia: Optional[date] = None) -> Decimal:
+        return tabela_irrf(_competencia(competencia)).deducao_dependente
 
     # ==================== CLT - CASOS ESPECIAIS ====================
 
@@ -148,8 +143,8 @@ class LegislacaoBrasileira:
     }
 
     MICROEMPREENDEDOR_INDIVIDUAL = {
-        "limite_anual": Decimal("81000.00"),  # R$ 81mi
-        "contribuicao_mensal": Decimal("71.60"),  # 2026 (5% salário mínimo + R$ 1)
+        "limite_anual": Decimal("81000.00"),  # R$ 81 mil por ano
+        "contribuicao_inss": "5% do salário mínimo; some R$ 1,00 de ICMS (comércio/indústria) e/ou R$ 5,00 de ISS (serviços)",
         "restricoes": [
             "Apenas 1 empregado (salário mínimo ou piso categoria)",
             "Atividades permitidas (lista CGSIM)",
@@ -163,11 +158,11 @@ class LegislacaoBrasileira:
     PRAZOS_OBRIGACOES = {
         "eSocial_folha": "até dia 15 do mês seguinte",
         "GPS_INSS": "até dia 20 do mês seguinte",
-        "FGTS": "até dia 7 do mês seguinte",
+        "FGTS": "até dia 20 do mês seguinte, pelo FGTS Digital (confira o calendário oficial)",
         "DAS_Simples": "até dia 20 do mês seguinte",
         "DCTF_Web": "15º dia útil do mês seguinte",
         "EFD_Rein": "dia 15 do mês seguinte",
-        "DIRF": "último dia útil de fevereiro (anual)",
+        "DIRF": "extinta: a última (ano-calendário 2024) foi entregue em fevereiro de 2025; desde então a informação vai pelo eSocial e pela EFD-Reinf",
         "IRPF": "até 31 de maio (anual)",
         "DEFIS_MEI": "até 31 de maio (anual)",
     }
@@ -210,45 +205,18 @@ class LegislacaoBrasileira:
     # ==================== MÉTODOS AUXILIARES ====================
 
     @classmethod
-    def calcular_inss(cls, salario: Decimal) -> Decimal:
-        """Calcula INSS progressivo 2026"""
-        if salario > cls.TETO_INSS_2026:
-            salario = cls.TETO_INSS_2026
-
-        inss = Decimal("0")
-        base_anterior = Decimal("0")
-
-        for faixa in cls.TABELA_INSS_2026:
-            teto_faixa = faixa["ate"]
-            aliquota = faixa["aliquota"]
-
-            if salario > teto_faixa:
-                base_faixa = teto_faixa - base_anterior
-                inss += base_faixa * aliquota
-                base_anterior = teto_faixa
-            else:
-                base_faixa = salario - base_anterior
-                inss += base_faixa * aliquota
-                break
-
-        return inss.quantize(Decimal("0.01"))
+    def calcular_inss(cls, salario: Decimal, competencia: Optional[date] = None) -> Decimal:
+        """INSS do empregado (motor ``calc``); levanta erro se a competência não tiver tabela."""
+        return _calcular_inss(salario, _competencia(competencia)).valor
 
     @classmethod
-    def calcular_irrf(cls, base: Decimal, dependentes: int = 0) -> Decimal:
-        """Calcula IRRF mensal 2026"""
-        # Deduz dependentes
-        base_calc = base - (cls.DEDUCAO_DEPENDENTE_IRRF * dependentes)
-
-        if base_calc <= Decimal("0"):
-            return Decimal("0")
-
-        # Encontra faixa
-        for faixa in cls.TABELA_IRRF_2026:
-            if base_calc <= faixa["ate"]:
-                irrf = (base_calc * faixa["aliquota"]) - faixa["deducao"]
-                return max(Decimal("0"), irrf.quantize(Decimal("0.01")))
-
-        return Decimal("0")
+    def calcular_irrf(
+        cls, rendimentos: Decimal, dependentes: int = 0, competencia: Optional[date] = None
+    ) -> Decimal:
+        """IRRF mensal sobre o rendimento tributável bruto (calcula o INSS e aplica a redução da Lei 15.270/2025)."""
+        comp = _competencia(competencia)
+        inss = _calcular_inss(rendimentos, comp).valor
+        return _calcular_irrf(rendimentos, comp, inss=inss, dependentes=dependentes).valor
 
     @classmethod
     def get_info_estabilidade(cls, tipo: str) -> Dict[str, str]:

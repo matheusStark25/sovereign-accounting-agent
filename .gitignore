@@ -105,3 +105,6 @@ contabil_agente/processed_sessions_*.jsonl
 .sovereign_data/
 worm_audit_*.log
 contabil_agente/logs/
+contabil_agente/documents/
+contabil_agente/temp_docs/
+contabil_agente/uploads/

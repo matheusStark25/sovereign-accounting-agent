@@ -121,3 +121,21 @@ def test_competencia_sem_tabela_explica_e_nao_estima():
     assert r["status"] == "erro_calculo"
     assert "tabela" in r["resposta"].lower()
     assert "calculo" not in estado
+
+
+def test_fgts_mensal_pelo_chat():
+    d, estado = novo()
+    r = d.processar(estado, "quanto é o FGTS mensal de um salário de R$ 3.000,00?")
+    assert r["status"] == "ok" and r["tipo"] == "fgts"
+    assert r["dados_calculados"]["fgts"] == 240.00
+    assert "R$ 240,00" in r["resposta"]
+
+
+def test_folha_pelo_chat_pergunta_o_salario_e_calcula():
+    d, estado = novo()
+    r1 = d.processar(estado, "gerar o holerite de outubro")
+    assert r1["status"] == "aguardando_dados" and "salário" in r1["resposta"].lower()
+    r2 = d.processar(estado, "salário de 6000")
+    assert r2["status"] == "ok" and r2["tipo"] == "folha"
+    assert r2["dados_calculados"]["total_liquido"] == 4973.39
+    assert "Líquido a receber: R$ 4.973,39" in r2["resposta"]
