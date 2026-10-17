@@ -26,7 +26,18 @@ jobs:
       - name: Lint (erros reais e imports sem uso)
         run: flake8 agente_v2 contabil_agente --select=E9,F63,F7,F82,F401,F811,F841,F541
       - name: Testes
-        run: pytest
+        run: |
+          set -o pipefail
+          pytest --tb=short -rf 2>&1 | tee pytest.log
+      - name: Resumo dos testes (fica na página da execução, visível sem login)
+        if: always()
+        run: |
+          {
+            echo '### Resultado do pytest'
+            echo '```'
+            tail -n 120 pytest.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   seguranca:
     runs-on: ubuntu-latest
