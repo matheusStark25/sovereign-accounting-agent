@@ -78,30 +78,40 @@ graph LR
 | **LGPD** | Base legal (art. 7) exigida antes de tratar, consentimento por titular e por finalidade, retenção configurável, exclusão de titular respeitando a guarda legal (art. 16), mascaramento de PII em logs e auditoria. |
 | **Governança** | Decisões críticas assinadas com ML-DSA-65 (Dilithium); acima do limite do tipo ficam `PENDENTE` até outra pessoa aprovar (regra das duas pessoas); limites em `GOVERNANCA_LIMITES`. |
 | **Segredos** | Variáveis de ambiente ou HashiCorp Vault (token ou AppRole). Vault configurado e fora do ar → a API se recusa a subir (sem fallback silencioso). Sem `JWT_SECRET`, `AUDIT_HMAC_KEY` ou `GOVERNANCA_DSA_KEY` ela também não sobe. |
-| **Criptografia** | CPF cifrado com ML-KEM-768 + X25519 + AES-GCM antes de entrar na fila do Celery; mTLS no gateway (porta 8443) e utilitários mTLS/XML-DSig em `agente_v2/`. |
+| **Criptografia** | CPF cifrado com ML-KEM-768 + X25519 + AES-GCM (pacote `cryptography`) antes de entrar na fila do Celery; mTLS no gateway (porta 8443) e utilitários mTLS/XML-DSig em `agente_v2/`. |
 | **Resiliência** | Circuit breaker, retentativas com backoff exponencial, timeouts, degradação controlada, `/health` e `/ready`. |
 | **Observabilidade** | Métricas Prometheus em `/metrics`, log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados. |
 | **Interface web** | Login, conversa com atalhos, envio de documento, painel (extrato do FGTS, aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
-| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do Dilithium, e verifica a auditoria. |
+| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`) e grava a calibragem do portal do FGTS (`calibrar-fgts`). |
 
 ## Limites conhecidos (leia antes de usar)
 
 Estas são as coisas que o código **não** garante, ditas de frente:
 
-- **Robô do FGTS.** Os seletores padrão do portal da Caixa são palpites genéricos: o extrato exige login e o
-  site muda. Foi testado contra um portal falso local (login, captcha, redirecionamento, download), **não contra
-  o portal real**. Valide e ajuste os seletores em `FGTS_PORTAL_CONFIG` antes de depender dele.
+- **Robô do FGTS.** O caminho real até o extrato (login gov.br, menus, download) só existe nas telas do portal, que
+  exigem login. O robô foi testado contra um portal falso local (login, captcha, redirecionamento, download) e
+  **ainda não foi validado contra o portal real**. Para isso existe o gravador de calibragem:
+  `python -m agente_v2.cli calibrar-fgts` abre o portal, uma pessoa faz o caminho normal e ele grava só a
+  estrutura (hosts, botões, campos, seletores sugeridos, downloads); nada do que é digitado é gravado. Com esse
+  relatório se ajusta `FGTS_PORTAL_CONFIG`.
 - **Captcha.** O robô nunca tenta resolver captcha nem disfarçar a automação. Ele para e espera uma pessoa na
   janela do navegador.
-- **Docker.** `Dockerfile`, `docker-compose.yml` e `nginx/` têm testes de consistência (arquivos referenciados
-  existem, segredos obrigatórios, usuário não-root, mTLS exigido) e o CI constrói a imagem e testa o `/health`,
-  mas eu não pude subir os contêineres na máquina de desenvolvimento.
-- **Criptografia pós-quântica.** ML-KEM e ML-DSA vêm de implementações em Python puro (`kyber-py`,
-  `dilithium-py`), sem auditoria independente nem garantia de tempo constante. Servem para o que está descrito
-  acima; não as trate como biblioteca criptográfica auditada.
-- **LLMs.** Os adaptadores de DeepSeek, Gemini e Groq foram testados com respostas simuladas, não com as
-  contas reais. O GitHub Copilot não tem API para ser chamado de dentro de um sistema, então o Corretor não o
-  usa: ele aplica regras de evidência sobre as sugestões do Worker e do Revisor.
+- **Docker.** A cada push, o CI do GitHub constrói a imagem, sobe o contêiner e confere que o `/health` responde.
+  `docker-compose.yml` e `nginx/` têm testes de consistência (arquivos referenciados existem, segredos
+  obrigatórios, usuário não-root, mTLS exigido), mas a pilha completa (Redis + nginx com mTLS) ainda não é
+  subida automaticamente.
+- **Criptografia pós-quântica.** ML-KEM-768 e ML-DSA-65 vêm do pacote `cryptography` (código compilado, de tempo
+  constante). A cada execução da suíte (e do CI), duas implementações independentes escritas por outras pessoas
+  (`kyber-py` e `dilithium-py`, usadas só nos testes) geram as mesmas chaves a partir da mesma semente e aceitam
+  o que o projeto cifra e assina, e vice-versa (`contabil_agente/tests/test_pqc_independente.py`). Não há
+  auditoria formal externa do projeto.
+- **IA.** Os nomes dos modelos mudam e os antigos são desligados (o Gemini 2.0 Flash e o Llama 3.3 70B da Groq,
+  antigos padrões deste projeto, já saíram do ar). Os padrões atuais foram conferidos na documentação oficial de
+  cada provedor em 2026-10-17. Para conferir os **seus** de verdade (chave válida, modelo existente, uma chamada
+  real): `python -m agente_v2.cli verificar-ia --env-file .env`, ou `pytest contabil_agente/tests/test_ia_ao_vivo.py`
+  com as chaves em `.env.teste` (sem chave, esses testes são pulados). O GitHub Copilot não tem API para ser
+  chamado de dentro de um sistema, então o Corretor não o usa: ele aplica regras de evidência sobre as sugestões
+  do Worker e do Revisor.
 - **Sem OCR.** PDF escaneado (sem camada de texto) é sinalizado e não é lido; nada é inventado no lugar. Limites:
   25 MB e 300 páginas por arquivo.
 - **LGPD.** O projeto implementa os mecanismos (base legal, consentimento, retenção, exclusão, mascaramento).

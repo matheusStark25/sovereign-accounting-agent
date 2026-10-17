@@ -24,8 +24,10 @@ logger = logging.getLogger(__name__)
 
 DEEPSEEK_URL = "https://api.deepseek.com"
 GEMINI_URL = "https://generativelanguage.googleapis.com"
-MODELO_DEEPSEEK = "deepseek-chat"
-MODELO_GEMINI = "gemini-2.0-flash"
+# Nomes conferidos na documentação oficial em 2026-10-17 (os anteriores, deepseek-chat e gemini-2.0-flash, saíram do ar
+# ou foram renomeados). Sobrescreva por DEEPSEEK_MODEL / GEMINI_MODEL e confira com: python -m agente_v2.cli verificar-ia
+MODELO_DEEPSEEK = "deepseek-flash"
+MODELO_GEMINI = "gemini-3.8-flash"
 LIMITE_CARACTERES = 24000
 
 
@@ -68,6 +70,26 @@ class _Base:
     def _enviar(self, sistema: str, usuario: str) -> str:  # pragma: no cover - implementado nas subclasses
         raise NotImplementedError
 
+    def listar_modelos(self) -> list:  # pragma: no cover - implementado nas subclasses
+        raise NotImplementedError
+
+    def verificar(self) -> Dict[str, Any]:
+        """Confere de verdade com o provedor: a chave vale, o modelo configurado existe e uma chamada mínima volta em JSON."""
+        resultado: Dict[str, Any] = {"provedor": self.nome, "modelo": self.modelo, "chave_valida": False, "modelo_existe": False, "chamada_ok": False}
+        try:
+            modelos = self.listar_modelos()
+            resultado["chave_valida"] = True
+            resultado["modelo_existe"] = self.modelo in modelos
+            if not resultado["modelo_existe"]:
+                resultado["erro"] = f"O modelo {self.modelo!r} não está na lista do provedor."
+                resultado["alternativas"] = sorted(m for m in modelos if "flash" in m or "chat" in m or "pro" in m)[:12]
+                return resultado
+            resposta = self.gerar_json('Responda SOMENTE um JSON no formato {"ok": true}.', "Confirme.")
+            resultado["chamada_ok"] = isinstance(resposta, dict) and bool(resposta)
+        except Exception as exc:  # noqa: BLE001 - o diagnóstico nunca levanta; devolve o motivo
+            resultado["erro"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        return resultado
+
     def gerar_json(self, sistema: str, usuario: str) -> Dict[str, Any]:
         """Envia o texto (mascarado) e devolve o JSON da resposta."""
         try:
@@ -91,6 +113,7 @@ class DeepSeek(_Base):
                 "model": self.modelo,
                 "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}],
                 "temperature": 0,
+                "max_tokens": 4000,
                 "response_format": {"type": "json_object"},
             },
         )
@@ -99,6 +122,11 @@ class DeepSeek(_Base):
             return r.json()["choices"][0]["message"]["content"]
         except (KeyError, IndexError, ValueError) as exc:
             raise ProvedorIndisponivel("deepseek: resposta fora do formato esperado.") from exc
+
+    def listar_modelos(self) -> list:
+        r = self._http.get(f"{self._base}/models", headers={"Authorization": f"Bearer {self._chave}"})
+        r.raise_for_status()
+        return [m["id"] for m in r.json().get("data", [])]
 
 
 class Gemini(_Base):
@@ -122,6 +150,20 @@ class Gemini(_Base):
             return r.json()["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError, ValueError) as exc:
             raise ProvedorIndisponivel("gemini: resposta fora do formato esperado.") from exc
+
+    def listar_modelos(self) -> list:
+        nomes: list = []
+        pagina = ""
+        for _ in range(10):  # a lista vem paginada
+            r = self._http.get(f"{self._base}/v1beta/models", params={"pageSize": 1000, **({"pageToken": pagina} if pagina else {})},
+                               headers={"x-goog-api-key": self._chave})
+            r.raise_for_status()
+            corpo = r.json()
+            nomes += [m["name"].split("/", 1)[-1] for m in corpo.get("models", [])]
+            pagina = corpo.get("nextPageToken", "")
+            if not pagina:
+                break
+        return nomes
 
 
 def provedores_do_ambiente(env: Optional[Mapping[str, str]] = None) -> Dict[str, Optional[_Base]]:

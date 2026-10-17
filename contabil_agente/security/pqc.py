@@ -4,10 +4,13 @@
   quem quebrar só um dos algoritmos ainda não lê o dado. A cifra de dados é AES-256-GCM.
 * ``DilithiumAssinatura`` assina e verifica com ML-DSA-65.
 
-Aviso: as implementações de ML-KEM/ML-DSA vêm de ``kyber-py`` e ``dilithium-py``, em Python puro. São
-corretas (os tamanhos e os testes de ida e volta seguem o padrão), mas NÃO são de tempo constante e são
-lentas; para produção com adversário na mesma máquina troque por ``liboqs``. A interface deste módulo
-não muda com a troca.
+ML-KEM e ML-DSA vêm do pacote ``cryptography`` (backend em Rust/OpenSSL, o mesmo das demais primitivas
+usadas aqui). As chaves privadas são guardadas como *semente* (64 bytes no ML-KEM, 32 no ML-DSA), que é o
+formato recomendado pelos padrões; a chave expandida é derivada na hora de usar.
+
+Verificação independente: ``tests/test_pqc_independente.py`` confere, a cada execução, que ``kyber-py`` e
+``dilithium-py`` (duas implementações escritas por outras pessoas, só para teste) geram as mesmas chaves a
+partir da mesma semente e que cada lado decifra e verifica o que o outro produziu.
 """
 
 from __future__ import annotations
@@ -18,17 +21,17 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-from cryptography.exceptions import InvalidTag
+from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric.mldsa import MLDSA65PrivateKey, MLDSA65PublicKey
+from cryptography.hazmat.primitives.asymmetric.mlkem import MLKEM768PrivateKey, MLKEM768PublicKey
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from dilithium_py.ml_dsa import ML_DSA_65
-from kyber_py.ml_kem import ML_KEM_768
 
 ALG_KEM = "ML-KEM-768+X25519"
 ALG_ASSINATURA = "ML-DSA-65"
-TAMANHOS = {"kem_pk": 1184, "kem_sk": 2400, "kem_ct": 1088, "dsa_pk": 1952, "dsa_sk": 4032, "dsa_sig": 3309}
+TAMANHOS = {"kem_pk": 1184, "kem_sk": 64, "kem_ct": 1088, "dsa_pk": 1952, "dsa_sk": 32, "dsa_sig": 3309}  # sk = semente
 INFO_HKDF = b"sovereign-accounting-agent/hybrid-kem/v1"
 
 
@@ -81,10 +84,10 @@ class ChavesHibridas:
 
 
 def gerar_chaves_hibridas() -> ChavesHibridas:
-    pk, sk = ML_KEM_768.keygen()
+    kem = MLKEM768PrivateKey.generate()
     x = X25519PrivateKey.generate()
     return ChavesHibridas(
-        pk, sk,
+        kem.public_key().public_bytes_raw(), kem.private_bytes_raw(),
         x.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw),
         x.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()),
     )
@@ -101,7 +104,10 @@ def cifrar_hibrido(chave_publica: Dict[str, str], dados: bytes, aad: bytes = b""
     pk_kem, pk_x = _unb64(chave_publica["kem"]), _unb64(chave_publica["x25519"])
     if len(pk_kem) != TAMANHOS["kem_pk"]:
         raise PQCError("Chave pública ML-KEM com tamanho inválido.")
-    segredo_pq, kem_ct = ML_KEM_768.encaps(pk_kem)
+    try:
+        segredo_pq, kem_ct = MLKEM768PublicKey.from_public_bytes(pk_kem).encapsulate()
+    except ValueError as exc:
+        raise PQCError("Chave pública ML-KEM inválida.") from exc
     efemera = X25519PrivateKey.generate()
     efemera_pub = efemera.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     segredo_x = efemera.exchange(X25519PublicKey.from_public_bytes(pk_x))
@@ -122,8 +128,13 @@ def decifrar_hibrido(chave_privada: Dict[str, str], envelope: Dict[str, str], aa
         raise PQCError(f"Envelope incompleto: falta {exc.args[0]}.") from exc
     if len(kem_ct) != TAMANHOS["kem_ct"]:
         raise PQCError("Texto cifrado ML-KEM com tamanho inválido.")
-    segredo_pq = ML_KEM_768.decaps(sk_kem, kem_ct)
-    segredo_x = X25519PrivateKey.from_private_bytes(sk_x).exchange(X25519PublicKey.from_public_bytes(efemera_pub))
+    if len(sk_kem) != TAMANHOS["kem_sk"]:
+        raise PQCError("Chave privada ML-KEM com tamanho inválido.")
+    try:
+        segredo_pq = MLKEM768PrivateKey.from_seed_bytes(sk_kem).decapsulate(kem_ct)
+        segredo_x = X25519PrivateKey.from_private_bytes(sk_x).exchange(X25519PublicKey.from_public_bytes(efemera_pub))
+    except ValueError as exc:
+        raise PQCError("Chave ou envelope inválido.") from exc
     chave = _derivar(segredo_pq, segredo_x, kem_ct + efemera_pub)
     try:
         return AESGCM(chave).decrypt(nonce, cifrado, aad)
@@ -137,22 +148,23 @@ class DilithiumAssinatura:
 
     @staticmethod
     def gerar_par() -> ParDeChaves:
-        pk, sk = ML_DSA_65.keygen()
-        return ParDeChaves(pk, sk)
+        sk = MLDSA65PrivateKey.generate()
+        return ParDeChaves(sk.public_key().public_bytes_raw(), sk.private_bytes_raw())
 
     @staticmethod
     def assinar(chave_privada: bytes, mensagem: bytes) -> bytes:
         if len(chave_privada) != TAMANHOS["dsa_sk"]:
             raise PQCError("Chave privada ML-DSA com tamanho inválido.")
-        return ML_DSA_65.sign(chave_privada, mensagem)
+        return MLDSA65PrivateKey.from_seed_bytes(chave_privada).sign(mensagem)
 
     @staticmethod
     def verificar(chave_publica: bytes, mensagem: bytes, assinatura: bytes) -> bool:
         if len(chave_publica) != TAMANHOS["dsa_pk"] or len(assinatura) != TAMANHOS["dsa_sig"]:
             return False
         try:
-            return bool(ML_DSA_65.verify(chave_publica, mensagem, assinatura))
-        except Exception:  # noqa: BLE001 - assinatura malformada nunca deve levantar para o chamador
+            MLDSA65PublicKey.from_public_bytes(chave_publica).verify(assinatura, mensagem)
+            return True
+        except (InvalidSignature, ValueError):  # assinatura ou chave malformada nunca deve levantar para o chamador
             return False
 
 

@@ -18,8 +18,8 @@ def par():
 
 
 def test_tamanhos_batem_com_o_padrao_fips_203_e_204(chaves, par):
-    assert len(chaves.kem_publica) == 1184 and len(chaves.kem_privada) == 2400
-    assert len(par.publica) == 1952 and len(par.privada) == 4032
+    assert len(chaves.kem_publica) == 1184 and len(chaves.kem_privada) == 64  # semente (FIPS 203, d||z)
+    assert len(par.publica) == 1952 and len(par.privada) == 32  # semente (FIPS 204, xi)
     envelope = pqc.cifrar_hibrido(chaves.publica(), b"x")
     assert len(pqc._unb64(envelope["kem_ct"])) == 1088
     assert len(pqc._unb64(pqc.assinar_documento(par, b"x")["assinatura"])) == 3309

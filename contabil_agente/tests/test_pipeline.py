@@ -31,6 +31,7 @@ from contabil_agente.pipeline.agentes import AgenteCorretor, AgenteRevisor, Agen
 from contabil_agente.pipeline.anomalias import z_robusto
 from contabil_agente.pipeline.destinos import ErroDeDestino
 from contabil_agente.pipeline.evidencia import valor_aparece
+from contabil_agente.pipeline.provedores import MODELO_DEEPSEEK
 from contabil_agente.pipeline.provedores import extrair_json, mascarar
 from contabil_agente.resilience import ChamadaResiliente
 from contabil_agente.security.worm_audit import WormAudit
@@ -143,7 +144,7 @@ def test_deepseek_formato_da_requisicao_e_mascara_de_pii():
     assert req.url.path == "/chat/completions" and req.headers["authorization"] == "Bearer chave-secreta"
     corpo = json.loads(req.content)
     enviado = json.dumps(corpo)
-    assert corpo["model"] == "deepseek-chat" and "529.982.247-25" not in enviado and "joao@x.com" not in enviado
+    assert corpo["model"] == MODELO_DEEPSEEK and "529.982.247-25" not in enviado and "joao@x.com" not in enviado
     assert "***CPF***" in enviado
 
 
@@ -178,7 +179,7 @@ def test_disjuntor_abre_e_para_de_chamar_o_provedor():
 def test_sem_chave_nao_cria_provedor():
     assert provedores_do_ambiente({}) == {"worker": None, "revisor": None}
     com = provedores_do_ambiente({"DEEPSEEK_API_KEY": "a", "GEMINI_API_KEY": "b", "GEMINI_MODEL": "m"})
-    assert com["worker"].modelo == "deepseek-chat" and com["revisor"].modelo == "m"
+    assert com["worker"].modelo == MODELO_DEEPSEEK and com["revisor"].modelo == "m"
     with pytest.raises(ProvedorIndisponivel):
         DeepSeek("")
 
@@ -474,3 +475,27 @@ def test_do_ambiente_monta_tudo_com_dados_em_disco(tmp_path):
     r = d.process(conteudo=HOLERITE, tenant="t")
     assert r.estado == "ARCHIVED" and (tmp_path / "audit" / "t.worm.jsonl").exists() and (tmp_path / "documentos.db").exists()
     assert d.worker_llm is None and d.revisor_llm is None
+
+
+def _cliente_de_listas(rotas):
+    return httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=rotas[req.url.path])))
+
+
+def test_verificar_confere_chave_modelo_e_chamada_no_deepseek():
+    rotas = {"/models": {"data": [{"id": MODELO_DEEPSEEK}, {"id": "deepseek-v4-pro"}]},
+             "/chat/completions": {"choices": [{"message": {"content": '{"ok": true}'}}]}}
+    ok = DeepSeek("k", cliente=_cliente_de_listas(rotas), resiliencia=resiliencia_rapida("ds")).verificar()
+    assert ok == {"provedor": "deepseek", "modelo": MODELO_DEEPSEEK, "chave_valida": True, "modelo_existe": True, "chamada_ok": True}
+    velho = DeepSeek("k", modelo="deepseek-chat", cliente=_cliente_de_listas(rotas), resiliencia=resiliencia_rapida("ds")).verificar()
+    assert velho["chave_valida"] and not velho["modelo_existe"] and not velho["chamada_ok"]
+    assert MODELO_DEEPSEEK in velho["alternativas"] and "deepseek-chat" in velho["erro"]  # diz o que usar no lugar
+
+
+def test_verificar_gemini_lista_paginada_e_chave_invalida():
+    rotas = {"/v1beta/models": {"models": [{"name": "models/gemini-3.8-flash"}, {"name": "models/embedding-001"}]},
+             "/v1beta/models/gemini-3.8-flash:generateContent": {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]}}
+    v = Gemini("k", modelo="gemini-3.8-flash", cliente=_cliente_de_listas(rotas), resiliencia=resiliencia_rapida("g")).verificar()
+    assert v["modelo_existe"] and v["chamada_ok"]
+    negado = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(403, json={"error": "chave invalida"})))
+    v2 = Gemini("k", cliente=negado, resiliencia=resiliencia_rapida("g")).verificar()
+    assert v2["chave_valida"] is False and "HTTPStatusError" in v2["erro"]

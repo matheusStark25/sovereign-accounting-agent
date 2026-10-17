@@ -14,10 +14,8 @@ PyYAML>=6.0
 # --- Segurança ---
 PyJWT>=2.8
 bcrypt>=4.1
-cryptography>=43
+cryptography>=50.0      # inclui ML-KEM-768 e ML-DSA-65 (FIPS 203/204)
 hvac>=2.1
-kyber-py>=1.2          # ML-KEM-768 (Kyber)
-dilithium-py>=1.5      # ML-DSA-65 (Dilithium)
 signxml>=4.0
 lxml>=5.0
 defusedxml>=0.7

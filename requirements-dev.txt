@@ -1,3 +1,5 @@
 -r requirements.txt
 pytest>=8
 flake8>=7
+kyber-py>=1.2          # 2ª implementação de ML-KEM, só para a verificação cruzada (tests/test_pqc_independente.py)
+dilithium-py>=1.5      # 2ª implementação de ML-DSA, idem

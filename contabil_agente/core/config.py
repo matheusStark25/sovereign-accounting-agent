@@ -22,7 +22,7 @@ class Config:
     DB_PATH = str(Path(BASE_DIR) / "db" / "contabil_agent.db")
 
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    MODEL_NAME = os.getenv("AI_MODEL", "llama-3.3-70b-versatile")
+    MODEL_NAME = os.getenv("AI_MODEL", "openai/gpt-oss-120b")
     TEMPERATURE = float(os.getenv("AI_TEMPERATURE", "0.2"))
     VOSK_MODEL_PATH = os.getenv("VOSK_MODEL_PATH")
     TOM_VOZ = os.getenv("TOM_VOZ", "informal")

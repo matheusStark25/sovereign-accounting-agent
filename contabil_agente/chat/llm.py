@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 Mensagens = List[Dict[str, str]]
 LLM = Callable[[Mensagens], str]
 
-MODELO_PADRAO = "llama-3.3-70b-versatile"
+# O llama-3.3-70b-versatile foi desligado pela Groq em 2026-08-16; este é o substituto indicado na documentação oficial
+# (conferido em 2026-10-17). Sobrescreva por GROQ_MODEL e confira com: python -m agente_v2.cli verificar-ia
+MODELO_PADRAO = "openai/gpt-oss-120b"
 
 
 class LLMIndisponivel(Exception):
@@ -27,7 +29,7 @@ class GroqLLM:
         tentativas: int = 3,
         timeout: float = 25.0,
         temperatura: float = 0.2,
-        max_tokens: int = 700,
+        max_tokens: int = 2000,  # modelos de raciocínio gastam parte disso antes de responder
     ):
         if not api_key:
             raise LLMIndisponivel("GROQ_API_KEY não configurada.")
@@ -40,6 +42,25 @@ class GroqLLM:
         self.tentativas = max(1, tentativas)
         self.temperatura = temperatura
         self.max_tokens = max_tokens
+
+    def listar_modelos(self) -> List[str]:
+        return [m.id for m in self._cliente.models.list().data]
+
+    def verificar(self) -> Dict[str, object]:
+        """Confere de verdade com a Groq: a chave vale, o modelo existe e uma conversa mínima volta com texto."""
+        res: Dict[str, object] = {"provedor": "groq", "modelo": self.modelo, "chave_valida": False, "modelo_existe": False, "chamada_ok": False}
+        try:
+            modelos = self.listar_modelos()
+            res["chave_valida"] = True
+            res["modelo_existe"] = self.modelo in modelos
+            if not res["modelo_existe"]:
+                res["erro"] = f"O modelo {self.modelo!r} não está na lista da Groq."
+                res["alternativas"] = sorted(modelos)[:12]
+                return res
+            res["chamada_ok"] = bool(self([{"role": "user", "content": "Responda apenas com a palavra OK."}]))
+        except Exception as exc:  # noqa: BLE001 - o diagnóstico nunca levanta; devolve o motivo
+            res["erro"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        return res
 
     def __call__(self, mensagens: Mensagens) -> str:
         ultimo_erro: Optional[Exception] = None

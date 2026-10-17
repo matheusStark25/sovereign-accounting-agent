@@ -5,6 +5,8 @@
     python -m agente_v2.cli verificar-auditoria --tenant empresa_a
     python -m agente_v2.cli gerar-segredo
     python -m agente_v2.cli gerar-chave-governanca
+    python -m agente_v2.cli verificar-ia --env-file .env
+    python -m agente_v2.cli calibrar-fgts --canal msedge --saida ./calibragem
 """
 
 from __future__ import annotations
@@ -84,6 +86,53 @@ def gerar_segredo(_: argparse.Namespace) -> int:
     return 0
 
 
+def carregar_env(caminho: str) -> dict:
+    """Lê um arquivo ``CHAVE=valor`` (comentários com #, aspas opcionais) sem exportar nada para o ambiente."""
+    valores = {}
+    for linha in Path(caminho).read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#") or "=" not in linha:
+            continue
+        chave, valor = linha.split("=", 1)
+        valores[chave.strip()] = valor.strip().strip("\"'")
+    return valores
+
+
+def calibrar_fgts(args: argparse.Namespace) -> int:
+    """Abre o portal em um navegador de verdade; uma pessoa faz o caminho normal e o gravador anota só a estrutura."""
+    from contabil_agente.rpa.calibracao import calibrar
+
+    print("Vai abrir um navegador. Faça o caminho normal até baixar o extrato (login, captcha, menus, download).")
+    print("Nada do que você digitar é gravado. Feche a janela quando terminar.")
+    rel = calibrar(args.url, args.saida, canal=args.canal, user_data_dir=args.perfil)
+    print(json.dumps({"hosts": rel["hosts"], "cliques": rel["cliques"], "downloads": len(rel["downloads"]),
+                      "relatorio": str(Path(args.saida) / "calibragem.json")}, ensure_ascii=False))
+    return 0
+
+
+def verificar_ia(args: argparse.Namespace) -> int:
+    """Chama de verdade cada provedor de IA configurado: a chave vale, o modelo existe e uma chamada mínima funciona."""
+    from contabil_agente.chat.llm import GroqLLM, llm_do_ambiente
+    from contabil_agente.pipeline.provedores import provedores_do_ambiente
+
+    env = dict(os.environ)
+    if args.env_file:
+        env.update(carregar_env(args.env_file))
+    verificados = []
+    for p in provedores_do_ambiente(env).values():
+        if p is not None:
+            verificados.append(p.verificar())
+    groq = llm_do_ambiente(env)
+    if isinstance(groq, GroqLLM):
+        verificados.append(groq.verificar())
+    if not verificados:
+        print("Nenhuma chave de IA configurada (GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY).", file=sys.stderr)
+        return 2
+    for v in verificados:
+        print(json.dumps(v, ensure_ascii=False))
+    return 0 if all(v["chamada_ok"] for v in verificados) else 1
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agente_v2.cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -102,6 +151,15 @@ def main(argv=None) -> int:
     s.set_defaults(func=gerar_segredo)
     g = sub.add_parser("gerar-chave-governanca")
     g.set_defaults(func=gerar_chave_governanca)
+    v = sub.add_parser("verificar-ia", help="testa de verdade as chaves e os modelos de IA configurados")
+    v.add_argument("--env-file", help="arquivo CHAVE=valor com as chaves (ex.: .env)")
+    v.set_defaults(func=verificar_ia)
+    f = sub.add_parser("calibrar-fgts", help="grava a estrutura do portal do FGTS enquanto uma pessoa o percorre")
+    f.add_argument("--url", default="https://www.caixa.gov.br", help="página inicial do caminho")
+    f.add_argument("--saida", default="./calibragem")
+    f.add_argument("--canal", help="msedge ou chrome (navegador já instalado); padrão: Chromium do Playwright")
+    f.add_argument("--perfil", help="pasta do perfil do navegador (a sessão logada fica guardada nela)")
+    f.set_defaults(func=calibrar_fgts)
     args = p.parse_args(argv)
     return args.func(args)
 
