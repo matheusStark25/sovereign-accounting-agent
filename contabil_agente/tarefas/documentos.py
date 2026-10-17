@@ -14,6 +14,12 @@ from .contexto import obter_contexto
 LIMITE_DO_LOTE = 200
 
 
+def nome_simples(nome: str) -> bool:
+    """Só nome de arquivo, sem pasta: recusa barra e barra invertida em qualquer sistema (no Linux um nome com barra
+    invertida seria um nome comum, e o comportamento não pode mudar de um sistema para outro)."""
+    return bool(nome) and nome not in (".", "..") and not any(c in nome for c in ("/", "\\", "\0")) and os.path.basename(nome) == nome
+
+
 def _dentro_de(base: Path, alvo: Path) -> bool:
     try:
         alvo.resolve().relative_to(base.resolve())
@@ -36,7 +42,7 @@ def processar_lote(job_id: str, tenant: str, ator: str, pasta_de_entrada: str, n
     itens: List[Dict[str, Any]] = []
     for nome in nomes:
         caminho = base / nome
-        if os.path.basename(nome) != nome or not _dentro_de(base, caminho):
+        if not nome_simples(nome) or not _dentro_de(base, caminho):
             itens.append({"arquivo": nome, "status": "recusado", "motivo": "nome de arquivo inválido"})
             continue
         try:

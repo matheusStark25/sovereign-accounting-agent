@@ -261,3 +261,11 @@ def test_exclusao_do_titular_tambem_apaga_os_trabalhos_do_rpa(rpa):
     r = rpa.request("DELETE", "/api/v1/lgpd/titular", json={"documento": CPF}, headers=entrar(rpa, "admin"))
     assert r.status_code == 200 and r.json()["trabalhos_rpa"] == 1
     assert rpa.get(f"/api/v1/rpa/jobs/{job_id}", headers=h).status_code == 404
+
+
+def test_nome_simples_recusa_separadores_de_qualquer_sistema():
+    from contabil_agente.tarefas.documentos import nome_simples
+
+    assert nome_simples("000.pdf") and nome_simples("holerite 09-2026.txt")
+    for ruim in ("", ".", "..", "../x.txt", "..\\x.txt", "a/b.txt", "a\\b.txt", "/etc/passwd", "C:\\x.txt", "x\0.txt"):
+        assert not nome_simples(ruim), ruim
