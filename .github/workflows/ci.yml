@@ -29,15 +29,12 @@ jobs:
         run: |
           set -o pipefail
           pytest --tb=short -rf 2>&1 | tee pytest.log
-      - name: Resumo dos testes (fica na página da execução, visível sem login)
-        if: always()
+      - name: Erro do pytest como anotação (visível na página da execução, sem login)
+        if: failure()
         run: |
-          {
-            echo '### Resultado do pytest'
-            echo '```'
-            tail -n 120 pytest.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          corpo=$(tail -n 60 pytest.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=pytest falhou::${corpo}"
+          { echo '### Resultado do pytest'; echo '```'; tail -n 120 pytest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   seguranca:
     runs-on: ubuntu-latest
