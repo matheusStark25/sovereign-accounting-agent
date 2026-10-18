@@ -16,7 +16,8 @@ import pytest
 from agente_v2.cli import carregar_env
 from contabil_agente.chat.engine import ChatEngine
 from contabil_agente.chat.llm import GroqLLM
-from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, DeepSeek, Gemini, HistoricoDocumentos
+from contabil_agente.pipeline import ArquivoDestino, DocumentDispatcher, DeepSeek, Gemini, Groq, HistoricoDocumentos
+from contabil_agente.pipeline.provedores import MODELO_GROQ
 from contabil_agente.security.worm_audit import WormAudit
 
 from . import amostras_documentos as am
@@ -87,3 +88,21 @@ def test_pipeline_de_documentos_com_os_llms_reais(tmp_path):
         assert r.agentes["worker"] == "llm", r.agentes  # o DeepSeek respondeu e a resposta passou no nosso parser
     if revisor:
         assert r.agentes["revisor"] == "llm", r.agentes
+
+
+def _groq_http():
+    return Groq(ENV["GROQ_API_KEY"], ENV.get("GROQ_MODEL") or MODELO_GROQ)
+
+
+@_chave("GROQ_API_KEY")
+def test_groq_como_provedor_do_pipeline_chave_modelo_e_chamada_reais():
+    _confere(_groq_http().verificar())
+
+
+@_chave("GROQ_API_KEY")
+def test_pipeline_de_documentos_com_a_groq_como_worker_e_revisor(tmp_path):
+    g = _groq_http()
+    r = _dispatcher(tmp_path, g, g).process(conteudo=am.HOLERITE.encode("utf-8"), tenant="t1", usar_ia=True)
+    assert r.estado == "ARCHIVED" and r.tipo == "HOLERITE", r.to_dict()
+    assert r.extracted_data["liquido"] == "4973.39"  # o valor vem do texto, nunca do LLM
+    assert r.agentes["worker"] == "llm" and r.agentes["revisor"] == "llm", r.agentes  # as duas respostas reais passaram no nosso parser

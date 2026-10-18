@@ -19,6 +19,7 @@ from contabil_agente.pipeline import (
     DocumentDispatcher,
     Estado,
     Gemini,
+    Groq,
     HistoricoDocumentos,
     MaquinaDeEstados,
     ProvedorIndisponivel,
@@ -31,7 +32,7 @@ from contabil_agente.pipeline.agentes import AgenteCorretor, AgenteRevisor, Agen
 from contabil_agente.pipeline.anomalias import z_robusto
 from contabil_agente.pipeline.destinos import ErroDeDestino
 from contabil_agente.pipeline.evidencia import valor_aparece
-from contabil_agente.pipeline.provedores import MODELO_DEEPSEEK
+from contabil_agente.pipeline.provedores import MODELO_DEEPSEEK, MODELO_GROQ
 from contabil_agente.pipeline.provedores import extrair_json, mascarar
 from contabil_agente.resilience import ChamadaResiliente
 from contabil_agente.security.worm_audit import WormAudit
@@ -499,3 +500,20 @@ def test_verificar_gemini_lista_paginada_e_chave_invalida():
     negado = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(403, json={"error": "chave invalida"})))
     v2 = Gemini("k", cliente=negado, resiliencia=resiliencia_rapida("g")).verificar()
     assert v2["chave_valida"] is False and "HTTPStatusError" in v2["erro"]
+
+
+def test_groq_formato_da_requisicao_e_papeis_conforme_as_chaves():
+    pegos = []
+    cli = transporte({"choices": [{"message": {"content": '{"resumo": "ok"}'}}]}, capturar=pegos)
+    g = Groq("k", cliente=cli, resiliencia=resiliencia_rapida("g"))
+    assert g.gerar_json("sistema", "CPF 529.982.247-25") == {"resumo": "ok"}
+    req = pegos[0]
+    corpo = json.loads(req.content)
+    assert req.url.path == "/openai/v1/chat/completions" and req.headers["authorization"] == "Bearer k"
+    assert corpo["model"] == MODELO_GROQ and corpo["response_format"] == {"type": "json_object"} and "529.982.247-25" not in json.dumps(corpo)
+
+    so_groq = provedores_do_ambiente({"GROQ_API_KEY": "k"})
+    assert so_groq["worker"].nome == "groq" and so_groq["revisor"] is so_groq["worker"]  # a Groq faz os dois papéis
+    misto = provedores_do_ambiente({"GROQ_API_KEY": "k", "DEEPSEEK_API_KEY": "d"})
+    assert misto["worker"].nome == "deepseek" and misto["revisor"].nome == "groq"  # as chaves específicas têm prioridade
+    assert provedores_do_ambiente({}) == {"worker": None, "revisor": None}

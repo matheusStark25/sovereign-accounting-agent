@@ -1,4 +1,5 @@
-"""Provedores de LLM do pipeline: DeepSeek (worker) e Gemini (revisor), por HTTP.
+"""Provedores de LLM do pipeline: DeepSeek (worker) e Gemini (revisor), por HTTP; a Groq assume os dois papéis quando
+faltam as chaves deles.
 
 * Só são criados se a chave existir no ambiente (``DEEPSEEK_API_KEY`` e ``GEMINI_API_KEY``). Sem chave o
   pipeline roda em modo determinístico e diz isso no resultado.
@@ -24,10 +25,12 @@ logger = logging.getLogger(__name__)
 
 DEEPSEEK_URL = "https://api.deepseek.com"
 GEMINI_URL = "https://generativelanguage.googleapis.com"
+GROQ_URL = "https://api.groq.com"
 # Nomes conferidos na documentação oficial em 2026-10-17 (os anteriores, deepseek-chat e gemini-2.0-flash, saíram do ar
 # ou foram renomeados). Sobrescreva por DEEPSEEK_MODEL / GEMINI_MODEL e confira com: python -m agente_v2.cli verificar-ia
 MODELO_DEEPSEEK = "deepseek-flash"
 MODELO_GEMINI = "gemini-3.8-flash"
+MODELO_GROQ = "openai/gpt-oss-120b"  # conferido ao vivo em 2026-10-18 (chave, modelo e chamada)
 LIMITE_CARACTERES = 24000
 
 
@@ -166,9 +169,42 @@ class Gemini(_Base):
         return nomes
 
 
+class Groq(_Base):
+    """Groq (API compatível com a da OpenAI). Serve de Worker e de Revisor quando não há DeepSeek/Gemini."""
+
+    nome = "groq"
+
+    def __init__(self, api_key: str, modelo: str = MODELO_GROQ, base_url: str = GROQ_URL, **kw: Any):
+        super().__init__(api_key, modelo, base_url, **kw)
+
+    def _enviar(self, sistema: str, usuario: str) -> str:
+        r = self._http.post(
+            f"{self._base}/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {self._chave}"},
+            json={
+                "model": self.modelo,
+                "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}],
+                "temperature": 0,
+                "max_tokens": 4000,
+                "response_format": {"type": "json_object"},
+            },
+        )
+        r.raise_for_status()
+        try:
+            return r.json()["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, ValueError) as exc:
+            raise ProvedorIndisponivel("groq: resposta fora do formato esperado.") from exc
+
+    def listar_modelos(self) -> list:
+        r = self._http.get(f"{self._base}/openai/v1/models", headers={"Authorization": f"Bearer {self._chave}"})
+        r.raise_for_status()
+        return [m["id"] for m in r.json().get("data", [])]
+
+
 def provedores_do_ambiente(env: Optional[Mapping[str, str]] = None) -> Dict[str, Optional[_Base]]:
-    """``{"worker": DeepSeek|None, "revisor": Gemini|None}`` conforme as chaves configuradas."""
+    """``{"worker": ..., "revisor": ...}``: DeepSeek e Gemini se houver chave; sem elas, a Groq (se houver) faz o papel."""
     env = os.environ if env is None else env
-    worker = DeepSeek(env["DEEPSEEK_API_KEY"], env.get("DEEPSEEK_MODEL") or MODELO_DEEPSEEK) if env.get("DEEPSEEK_API_KEY") else None
-    revisor = Gemini(env["GEMINI_API_KEY"], env.get("GEMINI_MODEL") or MODELO_GEMINI) if env.get("GEMINI_API_KEY") else None
+    groq = Groq(env["GROQ_API_KEY"], env.get("GROQ_MODEL") or MODELO_GROQ) if env.get("GROQ_API_KEY") else None
+    worker = DeepSeek(env["DEEPSEEK_API_KEY"], env.get("DEEPSEEK_MODEL") or MODELO_DEEPSEEK) if env.get("DEEPSEEK_API_KEY") else groq
+    revisor = Gemini(env["GEMINI_API_KEY"], env.get("GEMINI_MODEL") or MODELO_GEMINI) if env.get("GEMINI_API_KEY") else groq
     return {"worker": worker, "revisor": revisor}

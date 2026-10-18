@@ -152,8 +152,10 @@ def verificar_ia(args: argparse.Namespace) -> int:
     if args.env_file:
         env.update(carregar_env(args.env_file))
     verificados = []
-    for p in provedores_do_ambiente(env).values():
-        if p is not None:
+    vistos = set()
+    for p in provedores_do_ambiente(env).values():  # a Groq pode ocupar os dois papéis: verifica uma vez só
+        if p is not None and id(p) not in vistos:
+            vistos.add(id(p))
             verificados.append(p.verificar())
     groq = llm_do_ambiente(env)
     if isinstance(groq, GroqLLM):

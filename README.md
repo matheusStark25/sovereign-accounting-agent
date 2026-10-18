@@ -60,7 +60,7 @@ graph LR
   mascarados e apenas se a empresa registrou o consentimento `envio_a_provedor_de_ia`. Sem chave de LLM o
   sistema continua funcionando para cálculos e regras.
 - **Pipeline de documentos:** `RECEIVED → CLASSIFYING → PROCESSING → REVIEWING → CORRECTING → DISPATCHING →
-  ARCHIVED`. Worker e Revisor têm modo determinístico (sempre disponível) e usam DeepSeek/Gemini quando há
+  ARCHIVED`. Worker e Revisor têm modo determinístico (sempre disponível) e usam DeepSeek/Gemini (ou a Groq) quando há
   chave **e** consentimento. O Corretor só aceita um valor sugerido se ele aparecer no texto do documento
   (regra de evidência): o LLM sugere, o documento decide.
 - **Auditoria:** cada evento é gravado com PII mascarada numa cadeia HMAC-SHA256 por empresa, com cabeça
@@ -105,12 +105,15 @@ Estas são as coisas que o código **não** garante, ditas de frente:
   o que o projeto cifra e assina, e vice-versa (`contabil_agente/tests/test_pqc_independente.py`). Não há
   auditoria formal externa do projeto.
 - **IA.** Os nomes dos modelos mudam e os antigos são desligados (o Gemini 2.0 Flash e o Llama 3.3 70B da Groq,
-  antigos padrões deste projeto, já saíram do ar). Os padrões atuais foram conferidos na documentação oficial de
-  cada provedor em 2026-10-17. Para conferir os **seus** de verdade (chave válida, modelo existente, uma chamada
-  real): `python -m agente_v2.cli verificar-ia --env-file .env`, ou `pytest contabil_agente/tests/test_ia_ao_vivo.py`
-  com as chaves em `.env.teste` (sem chave, esses testes são pulados). O GitHub Copilot não tem API para ser
-  chamado de dentro de um sistema, então o Corretor não o usa: ele aplica regras de evidência sobre as sugestões
-  do Worker e do Revisor.
+  antigos padrões deste projeto, já saíram do ar). **Verificado ao vivo em 2026-10-18 com a Groq** (modelo
+  `openai/gpt-oss-120b`): chave válida, modelo existente, chat respondendo pelo LLM real e o pipeline de documentos
+  com a Groq como Worker e Revisor (o valor extraído continua vindo do texto do documento, nunca do LLM). **DeepSeek
+  e Gemini ainda não foram rodados ao vivo** (sem chave); os modelos padrão deles vêm da documentação oficial. Para
+  conferir os **seus** (chave válida, modelo existente, uma chamada real):
+  `python -m agente_v2.cli verificar-ia --env-file .env`, ou `pytest contabil_agente/tests/test_ia_ao_vivo.py`
+  com as chaves em `.env.teste` (sem chave, esses testes são pulados). Sem as chaves do DeepSeek e do Gemini, a
+  Groq assume os papéis de Worker e de Revisor. O GitHub Copilot não tem API para ser chamado de dentro de um
+  sistema, então o Corretor não o usa: ele aplica regras de evidência sobre as sugestões do Worker e do Revisor.
 - **Sem OCR.** PDF escaneado (sem camada de texto) é sinalizado e não é lido; nada é inventado no lugar. Limites:
   25 MB e 300 páginas por arquivo.
 - **LGPD.** O projeto implementa os mecanismos (base legal, consentimento, retenção, exclusão, mascaramento).
