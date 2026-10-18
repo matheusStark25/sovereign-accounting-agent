@@ -164,6 +164,43 @@ def test_portal_sem_resposta_de_humano_termina_falhou(rpa, portal):
     assert job["estado"] == "FALHOU" and "captcha" in job["mensagem"]
 
 
+def test_portal_que_bloqueia_o_robo_termina_falhou_com_a_saida_certa_para_o_usuario(rpa):
+    bloqueador = PortalFalso(com_captcha=False, variante="bloqueado")
+    try:
+        rpa.ctx.config_fgts = rpa.ctx.config_fgts.com(url=bloqueador.url, espera_elemento_s=3)
+        h = consentir(rpa)
+        job_id = rpa.post("/api/v1/rpa/fgts", json={"cpf": CPF}, headers=h).json()["job_id"]
+        job = rpa.get(f"/api/v1/rpa/jobs/{job_id}", headers=h).json()
+    finally:
+        bloqueador.parar()
+    assert job["estado"] == "FALHOU" and "bloqueou o navegador automatizado" in job["mensagem"] and "/api/v1/documentos" in job["mensagem"]
+    assert bloqueador.visitas_raiz == 1  # sem nova tentativa
+
+
+def test_pessoa_que_faz_uma_etapa_que_o_robo_nao_achou_aparece_como_aguardando_humano_e_o_job_conclui(rpa):
+    estranho = PortalFalso(com_captcha=False, variante="link_sem_pistas")
+    estados = []
+    try:
+        def pessoa(motivo, seletor, page):
+            estados.append((seletor, rpa.app.state.rpa_status.obter(job["id"], "empresa_a")["estado"] if job else None))
+            page.click("a#x")
+
+        rpa.ctx.ao_pausar = pessoa
+        rpa.ctx.config_fgts = rpa.ctx.config_fgts.com(url=estranho.url, espera_elemento_s=3)
+        h = consentir(rpa)
+        job = {"id": None}
+        job["id"] = rpa.app.state.rpa_status.criar("empresa_a", "u", "extrato_fgts")
+        from contabil_agente.tarefas import rpa as tarefa
+
+        env = tarefa.envelope_do_cpf(rpa.app.state.rpa_chave_publica, CPF, "empresa_a", job["id"])
+        res = tarefa.extrato_fgts.apply(args=[job["id"], "empresa_a", "u", env]).get()
+    finally:
+        estranho.parar()
+    assert res["status"] == "concluido" and estados and estados[0][0] == "assistencia"
+    assert estados[0][1] == "AGUARDANDO_HUMANO"  # o painel mostra que é a vez da pessoa
+    del h
+
+
 def test_estados_do_status_nao_voltam_atras(tmp_path):
     s = StatusStore(tmp_path / "s.db")
     j = s.criar("t", "u", "x")

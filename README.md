@@ -24,7 +24,7 @@ auditoria à prova de adulteração.
 - [Começando](#começando)
 - [API](#api)
 - [Documentos](#documentos)
-- [RPA do FGTS](#rpa-do-fgts)
+- [RPA: extrato do FGTS e do PGMEI](#rpa-extrato-do-fgts-e-do-pgmei)
 - [Segurança e LGPD](#segurança-e-lgpd)
 - [Docker, gateway e Vault](#docker-gateway-e-vault)
 - [Estrutura do projeto](#estrutura-do-projeto)
@@ -82,18 +82,17 @@ graph LR
 | **Resiliência** | Circuit breaker, retentativas com backoff exponencial, timeouts, degradação controlada, `/health` e `/ready`. |
 | **Observabilidade** | Métricas Prometheus em `/metrics`, log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados. |
 | **Interface web** | Login, conversa com atalhos, envio de documento, painel (extrato do FGTS, aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
-| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`) e grava a calibragem do portal do FGTS (`calibrar-fgts`). |
+| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI com a pessoa resolvendo só o captcha (`baixar-extrato`). |
 
 ## Limites conhecidos (leia antes de usar)
 
 Estas são as coisas que o código **não** garante, ditas de frente:
 
-- **Robô do FGTS.** O caminho real até o extrato (login gov.br, menus, download) só existe nas telas do portal, que
-  exigem login. O robô foi testado contra um portal falso local (login, captcha, redirecionamento, download) e
-  **ainda não foi validado contra o portal real**. Para isso existe o gravador de calibragem:
-  `python -m agente_v2.cli calibrar-fgts` abre o portal, uma pessoa faz o caminho normal e ele grava só a
-  estrutura (hosts, botões, campos, seletores sugeridos, downloads); nada do que é digitado é gravado. Com esse
-  relatório se ajusta `FGTS_PORTAL_CONFIG`.
+- **Robôs de portal.** Os portais reais da Receita (PGMEI) e da Caixa (FGTS) reprovam navegador automatizado
+  (veja a seção RPA), então o download 100% automático não é garantido; os robôs foram validados contra portais
+  falsos que mudam de layout, demoram, usam `iframe` ou bloqueiam. O caminho sempre garantido é você baixar o PDF e
+  enviá-lo ao sistema. O gravador `python -m agente_v2.cli calibrar-fgts` registra a estrutura de qualquer portal
+  enquanto uma pessoa o percorre (nada digitado é gravado) para ajustar a configuração.
 - **Captcha.** O robô nunca tenta resolver captcha nem disfarçar a automação. Ele para e espera uma pessoa na
   janela do navegador.
 - **Docker.** A cada push, o CI do GitHub constrói a imagem, sobe o contêiner e confere que o `/health` responde.
@@ -226,17 +225,41 @@ resultado de **todas** as empresas da instalação, então aponte só para um se
 vira alerta e não impede o arquivamento. Também existe `CallbackDestino` (uma função Python), disponível só
 pela API Python ao montar o `DocumentDispatcher`.
 
-## RPA do FGTS
+## RPA: extrato do FGTS e do PGMEI
 
-O robô (Playwright) abre o portal, **pausa** quando encontra captcha ou tela de login e espera uma pessoa
-resolver na janela, depois baixa o PDF do extrato e o envia ao pipeline de documentos.
+Dois robôs (Playwright) com o mesmo princípio: **a pessoa só resolve o captcha (ou o login); o resto é do robô**, e o
+robô não trava por bobeira.
 
-- Só baixa PDF de verdade (confere o tipo e o tamanho), calcula o SHA-256 e guarda `0600`.
-- A lista de hosts permitidos é conferida de novo depois de cada redirecionamento.
-- O CPF nunca vai em claro para o broker (cifrado com ML-KEM + X25519 + AES-GCM) e na auditoria só entra o hash.
-- Sem captcha solver, sem flags para esconder a automação.
+- **FGTS** (extrato por CPF) e **PGMEI** (extrato/DAS do MEI por CNPJ, portal público da Receita). O PDF baixado
+  entra no pipeline de documentos.
+- Só baixa PDF de verdade (confere a assinatura e o tamanho), calcula o SHA-256 e guarda `0600`.
+- Só navega nos hosts permitidos, conferidos de novo depois de cada redirecionamento.
+- O CPF/CNPJ nunca vai em claro para o broker (cifrado com ML-KEM + X25519 + AES-GCM) e na auditoria só entra o hash.
+- Sem captcha solver e sem flags para esconder a automação (um teste confere que não existem no código).
 
-Como rodar:
+**Quando o site muda ou demora** (para não travar por bobeira):
+
+1. **Espera** o elemento aparecer (`espera_elemento_s`, 15 s): páginas lentas ou que montam a tela por JavaScript.
+2. Procura em **todos os quadros** da página, inclusive `iframe`.
+3. Se o seletor configurado não acha nada, acha **pelo que o elemento é**: rótulo, placeholder, nome/id, texto do
+   botão ou do link (`rotulo_campo`, `rotulo_envio`, `rotulo_download`). Anota na trilha o passo `seletor_alternativo`
+   com o seletor que você deve pôr na configuração.
+4. Se ainda assim não achar, **pede ajuda na própria janela** em vez de abortar: aparece um aviso amarelo com o botão
+   "Terminei esta etapa". A pessoa faz o passo (ou clica no link do PDF, que o robô pega) e o robô continua dali
+   (`ajuda_humana`, ligado por padrão). Em todos os casos ele salva um `diagnostico_<etapa>_<hora>.json` com a
+   estrutura da página (botões, campos, links; números e e-mails mascarados), sem nada digitado.
+5. Se o portal **reprova o navegador automatizado** (ex.: "Comportamento de Robô"), ele falha na hora, com
+   mensagem clara e **sem nova tentativa** (insistir só piora): baixe o PDF no seu navegador normal e envie por
+   `POST /api/v1/documentos`.
+
+Como rodar, direto da linha de comando (abre a janela; você resolve o captcha e só):
+
+```bash
+python -m agente_v2.cli baixar-extrato --portal pgmei --documento 11.222.333/0001-81 --ano 2026 --canal msedge
+python -m agente_v2.cli baixar-extrato --portal fgts  --documento 529.982.247-25 --canal msedge
+```
+
+Ou pela API (fila `rpa`, com a pessoa na máquina do worker):
 
 ```bash
 python -m agente_v2.cli gerar-chaves-rpa --saida ./chaves   # coloque RPA_PQC_PUBLIC_KEY na API e RPA_PQC_PRIVATE_KEY no worker
@@ -247,8 +270,20 @@ celery -A contabil_agente.tarefas worker -Q rpa --pool=solo --loglevel=info
 O worker `rpa` precisa rodar **em uma máquina com tela** (a pessoa resolve o captcha na janela) e enxergar o
 mesmo `DATA_DIR` e os mesmos segredos da API (status das tarefas, auditoria e LGPD ficam em arquivos ali). O
 caminho mais simples é rodar API e worker no mesmo computador. Ele **não** está no `docker-compose.yml`, de
-propósito. Configuração do portal: `FGTS_CAIXA_URL`, `FGTS_PORTAL_CONFIG` (YAML com seletores e tempos),
-`FGTS_BROWSER_CHANNEL`, `FGTS_BROWSER_USER_DATA_DIR`.
+propósito. Configuração: `FGTS_CAIXA_URL`, `FGTS_PORTAL_CONFIG`, `FGTS_BROWSER_CHANNEL`, `FGTS_BROWSER_USER_DATA_DIR`
+(e `PGMEI_PORTAL_CONFIG`, `PGMEI_BROWSER_CHANNEL`, `PGMEI_BROWSER_USER_DATA_DIR`); o YAML aceita seletores,
+rótulos, tempos, `ajuda_humana` e `capturar_tela_na_falha` (a captura de tela pode mostrar dados pessoais, por
+isso vem desligada).
+
+**O que foi conferido nos portais reais (2026-10-17):** a tela de identificação do PGMEI (`#cnpj`, `#hcaptcha`,
+`#continuar`) e o formulário da consulta de regularidade do FGTS da Caixa (`mainForm:txtInscricao1`,
+`mainForm:btnConsultar`). Ao mesmo tempo, **os dois portais reprovaram um navegador controlado por automação**: o
+PGMEI respondeu "13896 - Impedido por proteção Captcha. Comportamento de Robô" (e o desafio nem aparece na tela) e
+a Caixa devolveu uma página de captcha do ShieldSquare no lugar dos scripts. Contornar isso (extensão que resolve
+captcha, flags que escondem a automação) está fora do escopo e não existe no código. Por isso o caminho que sempre
+funciona é o PDF baixado pela pessoa no navegador normal entrar pelo sistema (`POST /api/v1/documentos`, que
+classifica, extrai, confere e arquiva); os robôs funcionam quando o portal aceita a sessão e foram testados de ponta
+a ponta contra portais falsos que reproduzem mudança de layout, demora, `iframe` e bloqueio.
 
 ## Segurança e LGPD
 

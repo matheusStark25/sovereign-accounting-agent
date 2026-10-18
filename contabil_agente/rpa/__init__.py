@@ -1,10 +1,11 @@
-"""RPA com Playwright: extrato do FGTS com pausa para a pessoa resolver captcha ou login."""
+"""RPA com Playwright: extrato do FGTS e do PGMEI, com pausa para a pessoa resolver captcha ou login."""
 
-from .config import ConfigInvalida, ConfigPortalFGTS
-from .humano import HumanoNaoRespondeu, PortaDoHumano, RequerAcaoHumana
-from .robo_fgts import ErroDoRobo, ResultadoExtrato, RoboExtratoFGTS, SovereignRPAWorker
+from .config import ConfigInvalida, ConfigPortalFGTS, ConfigPortalPGMEI
+from .humano import HumanoNaoRespondeu, PortaDoHumano, RequerAcaoHumana, hcaptcha_resolvido
+from .robo_fgts import ErroDoRobo, PortalBloqueouAutomacao, ResultadoExtrato, RoboExtratoFGTS, SovereignRPAWorker
+from .robo_pgmei import RoboExtratoPGMEI
 
 __all__ = [
-    "ConfigInvalida", "ConfigPortalFGTS", "HumanoNaoRespondeu", "PortaDoHumano", "RequerAcaoHumana",
-    "ErroDoRobo", "ResultadoExtrato", "RoboExtratoFGTS", "SovereignRPAWorker",
+    "ConfigInvalida", "ConfigPortalFGTS", "ConfigPortalPGMEI", "HumanoNaoRespondeu", "PortaDoHumano", "RequerAcaoHumana",
+    "hcaptcha_resolvido", "ErroDoRobo", "PortalBloqueouAutomacao", "ResultadoExtrato", "RoboExtratoFGTS", "RoboExtratoPGMEI", "SovereignRPAWorker",
 ]

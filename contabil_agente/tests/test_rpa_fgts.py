@@ -170,13 +170,27 @@ def test_cpf_invalido_nem_abre_o_navegador(portal, canal, tmp_path):
     assert portal.cpfs_recebidos == []
 
 
-def test_seletor_errado_pede_ajuste_de_configuracao(canal, tmp_path):
+def test_seletor_errado_o_robo_acha_pelo_que_o_elemento_e_e_sugere_o_seletor_certo(canal, tmp_path):
     p = PortalFalso(com_captcha=False)
     try:
-        cfg = config(p, canal).com(seletores_cpf=("#nao-existe",))
+        cfg = config(p, canal, espera_elemento_s=2).com(seletores_cpf=("#nao-existe",), seletores_envio=("#tambem-nao-existe",))
+        r = RoboExtratoFGTS(cfg, tmp_path).executar(CPF)
+        alternativos = {x["etapa"]: x for x in r.passos if x["passo"] == "seletor_alternativo"}
+        assert alternativos["cpf"]["achou_por"] == "por placeholder" and alternativos["cpf"]["sugestao"] == "#cpf"
+        assert alternativos["envio"]["achou_por"] == "botão pelo texto"
+        assert any("52998224725" in c for c in p.cpfs_recebidos) and open(r.caminho, "rb").read().startswith(b"%PDF-")
+    finally:
+        p.parar()
+
+
+def test_sem_nada_parecido_e_sem_ajuda_humana_falha_dizendo_o_que_ajustar(canal, tmp_path):
+    p = PortalFalso(com_captcha=False, variante="campo_desconhecido")
+    try:
+        cfg = config(p, canal, espera_elemento_s=2, ajuda_humana=False).com(seletores_cpf=("#nao-existe",))
         with pytest.raises(ErroDoRobo) as e:
             RoboExtratoFGTS(cfg, tmp_path).executar(CPF)
         assert e.value.motivo == "campo_cpf_nao_encontrado"
+        assert list(tmp_path.glob("diagnostico_campo_cpf_*.json"))  # e deixou a estrutura da página para ajustar a configuração
     finally:
         p.parar()
 

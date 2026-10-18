@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
-SCRIPT = r"""
+JS_ESTRUTURA = r"""
 (() => {
-  if (window.__calibragemAtiva) return;
-  window.__calibragemAtiva = true;
+  if (window.__estruturaAtiva) return;
+  window.__estruturaAtiva = true;
   const mascara = (s) => String(s || '').replace(/\s+/g, ' ').trim()
     .replace(/\d{4,}/g, '####').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '***@***').slice(0, 60);
   const visivel = (el) => !!(el.offsetParent || (el.getClientRects && el.getClientRects().length));
@@ -60,10 +60,18 @@ SCRIPT = r"""
   window.__instantaneo = () => Array.from(document.querySelectorAll(
     'input,button,a[href],select,textarea,[role=button],[role=link],[role=menuitem],[role=tab]'))
     .filter(visivel).slice(0, 150).map(descreve);
+  window.__descreve = descreve;
+})();
+"""
+
+SCRIPT = JS_ESTRUTURA + r"""
+(() => {
+  if (window.__calibragemAtiva) return;
+  window.__calibragemAtiva = true;
   document.addEventListener('click', (e) => {
     const alvo = e.target.closest ? e.target.closest('a,button,input,select,textarea,label,[role=button],[role=link],[role=menuitem],[role=tab],[onclick]') : null;
     const el = alvo || e.target;
-    if (el && el.nodeType === 1) window.__registrar({ evento: 'clique', ...descreve(el) });
+    if (el && el.nodeType === 1) window.__registrar({ evento: 'clique', ...window.__descreve(el) });
   }, true);
 })();
 """

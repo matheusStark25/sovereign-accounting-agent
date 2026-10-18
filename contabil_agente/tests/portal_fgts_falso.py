@@ -1,4 +1,14 @@
-"""Portal de FGTS falso para testar o robô: formulário com CPF, captcha de mentira e extrato em PDF."""
+"""Portal de FGTS falso para testar o robô: formulário com CPF, captcha de mentira e extrato em PDF.
+
+``variante`` simula o que acontece quando o site muda ou se comporta mal:
+* ``padrao``: o formulário de sempre;
+* ``layout_novo``: ids, nomes e textos renomeados (os seletores configurados deixam de valer);
+* ``tardia``: o formulário só aparece 2 s depois, montado por JavaScript;
+* ``iframe``: o formulário (e o resultado) ficam dentro de um iframe;
+* ``campo_desconhecido``: dois campos de texto sem rótulo nenhum (o robô não tem como adivinhar qual é o CPF);
+* ``link_sem_pistas``: o link do PDF não tem texto nem endereço reconhecíveis;
+* ``bloqueado``: ao enviar, o portal responde que o comportamento é de robô (como o PGMEI real, erro 13896).
+"""
 
 from __future__ import annotations
 
@@ -24,21 +34,45 @@ def pdf_extrato(saldo: str = "12.000,00") -> bytes:
     return buf.getvalue()
 
 
+FORM_PADRAO = """<form id="f" action="/consulta" method="post" onsubmit="return !document.getElementById('captcha');">
+  <input id="cpf" name="cpf" placeholder="CPF"><button type="submit">Consultar</button>
+</form>"""
+
+FORM_NOVO = """<form id="formulario-x" action="/consulta" method="post" onsubmit="return !document.getElementById('captcha');">
+  <input id="campo-documento" name="doc" placeholder="Digite seu CPF"><button id="btn-x" type="submit">Consultar</button>
+</form>"""
+
+FORM_DESCONHECIDO = """<form id="f" action="/consulta" method="post">
+  <input name="x1"><input name="x2"><button type="submit">Consultar</button>
+</form>"""
+
 PAGINA = """<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Portal FGTS (falso)</title></head><body>
 <h1>Consulta FGTS</h1>
 {desafio}
-<form id="f" action="/consulta" method="post" onsubmit="return !document.getElementById('captcha');">
-  <input id="cpf" name="cpf" placeholder="CPF"><button type="submit">Consultar</button>
-</form></body></html>"""
+{corpo}</body></html>"""
 
 CAPTCHA = """<div id="captcha" data-sitekey="mock"><p>Confirme que você não é um robô</p>
 <button id="humano-ok" type="button" onclick="document.getElementById('captcha').remove()">Não sou um robô</button></div>"""
 
+TARDIA = """<div id="raiz">Carregando…</div>
+<script>setTimeout(function () { document.getElementById('raiz').innerHTML = %s; }, 2000);</script>"""
+
+BLOQUEIO = '<!doctype html><html><body><p>\n13896 - Impedido por proteção Captcha. Comportamento de Robô.</p></body></html>'
+
+LINKS = {
+    "padrao": '<a href="/extrato.pdf">Extrato</a>',
+    "layout_novo": '<a href="/extrato?formato=pdf">Comprovante em PDF</a>',
+    "link_sem_pistas": '<a id="x" href="/arquivo?id=7">Clique aqui</a>',
+}
+
 
 class PortalFalso:
-    def __init__(self, com_captcha: bool = True, pdf: bytes | None = None, download_malicioso: bool = False, redireciona: str | None = None):
+    def __init__(self, com_captcha: bool = True, pdf: bytes | None = None, download_malicioso: bool = False,
+                 redireciona: str | None = None, variante: str = "padrao"):
         self.com_captcha, self.pdf, self.malicioso, self.redireciona = com_captcha, pdf or pdf_extrato(), download_malicioso, redireciona
+        self.variante = variante
         self.cpfs_recebidos: List[str] = []
+        self.visitas_raiz = 0
         portal = self
 
         class H(BaseHTTPRequestHandler):
@@ -54,21 +88,42 @@ class PortalFalso:
                 self.end_headers()
                 self.wfile.write(corpo)
 
+            def _formulario(self):
+                v = portal.variante
+                return {"layout_novo": FORM_NOVO, "campo_desconhecido": FORM_DESCONHECIDO}.get(v, FORM_PADRAO)
+
+            def _pdf(self):
+                corpo = b"isto nao e um pdf" if portal.malicioso else portal.pdf
+                return self._enviar(200, "application/pdf", corpo, {"Content-Disposition": 'attachment; filename="extrato.pdf"'})
+
             def do_GET(self):
-                if self.path == "/":
+                caminho = self.path.split("?")[0]
+                if caminho == "/":
+                    portal.visitas_raiz += 1
                     if portal.redireciona:
                         return self._enviar(302, "text/plain", b"", {"Location": portal.redireciona})
-                    return self._enviar(200, "text/html; charset=utf-8", PAGINA.format(desafio=CAPTCHA if portal.com_captcha else "").encode())
-                if self.path == "/extrato.pdf":
-                    corpo = b"isto nao e um pdf" if portal.malicioso else portal.pdf
-                    return self._enviar(200, "application/pdf", corpo, {"Content-Disposition": 'attachment; filename="extrato.pdf"'})
+                    desafio = CAPTCHA if portal.com_captcha else ""
+                    if portal.variante == "tardia":
+                        corpo = TARDIA % repr(FORM_PADRAO.replace("\n", " "))
+                    elif portal.variante == "iframe":
+                        corpo = '<iframe src="/form" width="600" height="300"></iframe>'
+                    else:
+                        corpo = self._formulario()
+                    return self._enviar(200, "text/html; charset=utf-8", PAGINA.format(desafio=desafio, corpo=corpo).encode())
+                if caminho == "/form":
+                    return self._enviar(200, "text/html; charset=utf-8", PAGINA.format(desafio="", corpo=FORM_PADRAO).encode())
+                if caminho in ("/extrato.pdf", "/extrato", "/arquivo"):
+                    return self._pdf()
                 self._enviar(404, "text/plain", b"nao encontrado")
 
             def do_POST(self):
                 tam = int(self.headers.get("Content-Length") or 0)
                 corpo = self.rfile.read(tam).decode()
                 portal.cpfs_recebidos.append(corpo)
-                html = '<!doctype html><html><body><h1>Resultado</h1><a href="/extrato.pdf">Extrato</a></body></html>'
+                if portal.variante == "bloqueado":
+                    return self._enviar(200, "text/html; charset=utf-8", BLOQUEIO.encode())
+                link = LINKS.get(portal.variante, LINKS["padrao"])
+                html = f'<!doctype html><html><body><h1>Resultado</h1>{link}</body></html>'
                 self._enviar(200, "text/html; charset=utf-8", html.encode())
 
         self.srv = ThreadingHTTPServer(("127.0.0.1", 0), H)

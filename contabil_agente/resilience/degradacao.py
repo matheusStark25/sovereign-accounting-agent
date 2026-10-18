@@ -27,11 +27,13 @@ class ChamadaResiliente:
         excecoes: Tuple[Type[BaseException], ...] = (Exception,),
         disjuntor: Optional[CircuitBreaker] = None,
         dormir: Optional[Callable[[float], None]] = None,
+        nao_repetir: Tuple[Type[BaseException], ...] = (),
     ):
         self.nome = nome
         self.disjuntor = disjuntor or CircuitBreaker(nome, limite_falhas, janela_reset, excecoes)
         self.timeout, self.tentativas, self.atraso_inicial, self.excecoes = timeout, tentativas, atraso_inicial, excecoes
         self._dormir = dormir
+        self._nao_repetir = tuple(nao_repetir)  # falhas em que tentar de novo só piora (ex.: o portal bloqueou o robô)
 
     def _uma_tentativa(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         if self.timeout:
@@ -46,7 +48,7 @@ class ChamadaResiliente:
             return com_retry(
                 self._uma_tentativa, func, *args,
                 tentativas=self.tentativas, atraso_inicial=self.atraso_inicial,
-                excecoes=self.excecoes, nao_repetir=(CircuitoAberto,), **extra, **kwargs,
+                excecoes=self.excecoes, nao_repetir=(CircuitoAberto,) + self._nao_repetir, **extra, **kwargs,
             )
         except BaseException as exc:
             if fallback is None or not isinstance(exc, self.excecoes + (CircuitoAberto,)):

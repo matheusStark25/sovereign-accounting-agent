@@ -8,7 +8,7 @@ from typing import Any, Dict
 from contabil_agente.lgpd import TratamentoSemBaseLegal
 from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 from contabil_agente.resilience import CircuitoAberto
-from contabil_agente.rpa import ErroDoRobo, HumanoNaoRespondeu, RoboExtratoFGTS
+from contabil_agente.rpa import ErroDoRobo, HumanoNaoRespondeu, PortalBloqueouAutomacao, RoboExtratoFGTS
 from contabil_agente.rpa import estado as st
 from contabil_agente.security import pqc
 
@@ -68,6 +68,8 @@ def extrato_fgts(self, job_id: str, tenant: str, ator: str, envelope: Dict[str, 
         return falhar("Ninguém resolveu o captcha/login a tempo.")
     except CircuitoAberto as exc:
         return falhar(f"Portal temporariamente suspenso após falhas seguidas: {exc}")
+    except PortalBloqueouAutomacao:
+        return falhar("O portal bloqueou o navegador automatizado. Baixe o extrato no seu navegador normal e envie o PDF pelo sistema (POST /api/v1/documentos).")
     except ErroDoRobo as exc:
         return falhar(f"Robô: {exc.motivo}")
 
