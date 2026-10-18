@@ -241,3 +241,25 @@ def test_exclusao_acha_o_documento_tambem_em_arquivo_original_sem_pontuacao(lgpd
     antigo = time.time() - 6 * 365 * DIA
     os.utime(orig, (antigo, antigo))
     assert lgpd.excluir_titular("t1", CPF, ator="dpo")["apagados"] and not orig.exists()
+
+
+@pytest.mark.parametrize("ident", [
+    "91767398-b00a-4c14-be43-8f63052f2b16",  # os 8 primeiros caracteres são só dígitos: parecem telefone/RG
+    "12345678-1234-1234-1234-123456789012",  # UUID só de dígitos
+    "a" * 64,
+    "0123456789" * 6 + "abcd",  # hash em hexadecimal
+])
+def test_identificadores_tecnicos_nao_sao_mascarados_como_pii(ident):
+    from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
+
+    assert PIIAnonymizer.anonymize_text(ident) == ident
+    assert PIIAnonymizer.anonymize_text(f"pedido {ident} do cliente joao@x.com tel 99999-9999") == f"pedido {ident} do cliente ***EMAIL*** tel ***TELEFONE***"
+
+
+def test_request_id_com_cara_de_telefone_chega_inteiro_na_trilha(tmp_path):
+    audit = WormAudit(tmp_path / "audit", "k" * 40, fsync=False)
+    for rid in ("91767398-b00a-4c14-be43-8f63052f2b16", "12345678-1234-1234-1234-123456789012"):
+        audit.append("intelligence.pedido", {"request_id": rid, "entrada": "CPF 529.982.247-25"}, tenant="t")
+    dados = [e["dados"] for e in audit.ler("t")]
+    assert [d["request_id"] for d in dados] == ["91767398-b00a-4c14-be43-8f63052f2b16", "12345678-1234-1234-1234-123456789012"]
+    assert all("52998224725" not in json.dumps(d) and "529.982.247-25" not in json.dumps(d) for d in dados)  # e o CPF segue mascarado

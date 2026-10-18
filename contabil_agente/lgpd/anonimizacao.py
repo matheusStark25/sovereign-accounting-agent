@@ -15,6 +15,11 @@ _ROTULOS_NOME = r"nome(?:\s+completo)?|funcion[aá]rio|empregado|colaborador|ben
 _RE_NOME = re.compile(rf"(?i:\b(?:{_ROTULOS_NOME})(?![A-Za-zÀ-ÿ]))(\s*[:\-]?\s*)({_PALAVRA}(?:\s+{_LIGACAO}{_PALAVRA}){{1,5}})")
 
 
+# Identificadores técnicos (UUID de pedido, hash SHA-256/SHA-1 em hexadecimal) não são dado pessoal. Sem protegê-los, os
+# padrões de telefone e RG casam com os 8 primeiros dígitos de um UUID e estragam a rastreabilidade (request_id, job, trilha).
+_ID_TECNICO = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b|\b[0-9a-fA-F]{40,128}\b")
+
+
 class PIIAnonymizer:
     """Troca dados pessoais por marcadores (``***CPF***``) ou ``***``."""
 
@@ -34,12 +39,20 @@ class PIIAnonymizer:
         if not text:
             return text
         marcador = (lambda t: f"***{t.upper()}***") if preserve_type else (lambda t: "***")
-        resultado = text
+        guardados: list = []
+
+        def guardar(m: "re.Match[str]") -> str:
+            guardados.append(m.group(0))
+            return f"@@ID{len(guardados) - 1}@@"
+
+        resultado = _ID_TECNICO.sub(guardar, text)
         for tipo in PIIAnonymizer._ORDEM:
             resultado = re.sub(PIIAnonymizer.PATTERNS[tipo], marcador(tipo), resultado)
         resultado = _RE_NOME.sub(lambda m: f"{m.group(0)[: m.start(1) - m.start(0)]}{m.group(1)}{marcador('nome')}", resultado)
         for nome in sorted({n.strip() for n in nomes_conhecidos if n and len(n.strip()) >= 3}, key=len, reverse=True):
             resultado = re.sub(re.escape(nome), marcador("nome"), resultado, flags=re.IGNORECASE)
+        for i, original in enumerate(guardados):
+            resultado = resultado.replace(f"@@ID{i}@@", original)
         return resultado
 
     @staticmethod
