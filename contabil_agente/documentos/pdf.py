@@ -30,6 +30,10 @@ TITULOS = {
     "inss": "Cálculo de INSS",
     "irrf": "Cálculo de IRRF",
     "fgts": "Cálculo de FGTS",
+    "prolabore": "Cálculo de Pró-labore",
+    "gps": "Cálculo de GPS",
+    "das_mei": "Cálculo do DAS do MEI",
+    "darf": "Cálculo de DARF em atraso",
 }
 AVISO_LEGAL = (
     "Documento gerado automaticamente a partir do cálculo indicado. Confira os dados e as premissas antes de "
@@ -152,6 +156,24 @@ def _blocos(tipo: str, r: Dict[str, Any], estilo: ParagraphStyle, largura: float
     elif tipo == "fgts":
         linhas = [["Item", "Valor"], ["Base", brl(r["base"])], ["Alíquota", f"{r['aliquota'] * 100:.1f}%"], ["Depósito do empregador", brl(r["fgts"])]]
         out.append(_tabela(linhas, [largura * 0.75, largura * 0.25]))
+    elif tipo == "prolabore":
+        linhas = [["Item", "Valor"], ["Pró-labore", brl(r["prolabore"])], [f"INSS do sócio (11% sobre {brl(r['base_inss_socio'])})", brl(r["inss_socio"])],
+                  ["IRRF", brl(r["irrf"])], ["Líquido do sócio", brl(r["liquido"])], ["Contribuição patronal da empresa", brl(r["inss_patronal"])],
+                  ["Custo total para a empresa", brl(r["custo_total_empresa"])]]
+        out.append(_tabela(linhas, [largura * 0.75, largura * 0.25]))
+    elif tipo == "gps":
+        linhas = [["Item", "Valor"], ["Tipo", r["tipo"]], ["Base", brl(r["base"])], ["Alíquota", f"{r['aliquota'] * 100:.0f}%"],
+                  ["Valor a pagar", brl(r["valor"])], ["Vencimento", _data_br(r["vencimento"])]]
+        out.append(_tabela(linhas, [largura * 0.55, largura * 0.45]))
+    elif tipo == "das_mei":
+        linhas = [["Item", "Valor"], ["Atividade", r["atividade"]], ["INSS", brl(r["inss"])], ["ICMS", brl(r["icms"])], ["ISS", brl(r["iss"])],
+                  ["Valor a pagar", brl(r["valor"])], ["Vencimento", _data_br(r["vencimento"])]]
+        out.append(_tabela(linhas, [largura * 0.55, largura * 0.45]))
+    elif tipo == "darf":
+        linhas = [["Item", "Valor"], ["Valor principal", brl(r["valor_principal"])], ["Dias de atraso", str(r["dias_de_atraso"])],
+                  [f"Multa de mora ({r['taxa_multa'] * 100:.2f}%)", brl(r["multa"])], [f"Juros ({r['taxa_juros'] * 100:.2f}%)", brl(r["juros"])],
+                  ["Total a pagar", brl(r["total"])]]
+        out.append(_tabela(linhas, [largura * 0.75, largura * 0.25]))
     return out
 
 
@@ -165,6 +187,10 @@ def _destaque(tipo: str, r: Dict[str, Any]) -> Dict[str, str]:
         "inss": ("inss",),
         "irrf": ("irrf",),
         "fgts": ("fgts",),
+        "prolabore": ("liquido", "custo_total_empresa"),
+        "gps": ("valor",),
+        "das_mei": ("valor",),
+        "darf": ("total",),
     }[tipo]
     return {k: brl(r[k]) for k in chaves if k in r}
 

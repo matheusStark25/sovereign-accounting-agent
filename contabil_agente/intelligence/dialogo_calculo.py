@@ -25,6 +25,10 @@ _NOMES_TIPO = {
     "irrf": "IRRF",
     "fgts": "FGTS mensal",
     "folha": "folha de pagamento",
+    "prolabore": "pró-labore",
+    "gps": "GPS",
+    "das_mei": "DAS do MEI",
+    "darf": "DARF em atraso",
 }
 _EXEMPLOS = {
     "salario": 'Exemplo: "salário de R$ 3.000,00".',
@@ -34,6 +38,14 @@ _EXEMPLOS = {
     "aviso_previo": "O aviso prévio foi trabalhado ou indenizado?",
     "aviso_previo_pedido": "O aviso prévio foi trabalhado ou não cumprido?",
     "meses": "Quantos meses (1 a 12)? Exemplo: 8 meses.",
+    "prolabore": 'Exemplo: "pró-labore de R$ 5.000,00".',
+    "tipo_gps": "É contribuinte individual, facultativo, plano simplificado ou baixa renda?",
+    "base": 'Exemplo: "remuneração de R$ 4.000,00".',
+    "atividade_mei": "A atividade é comércio, serviços, comércio e serviços ou caminhoneiro?",
+    "valor_principal": 'Exemplo: "DARF de R$ 1.000,00".',
+    "vencimento": 'Exemplo: "venceu em 20/08/2026".',
+    "pagamento": 'Exemplo: "pago em 15/10/2026".',
+    "selic_acumulada": 'Exemplo: "SELIC acumulada de 5,2%".',
 }
 
 
@@ -136,8 +148,29 @@ class DialogoCalculo:
             elif falta_adm and falta_dem and pergunta in ("data_admissao", "data_demissao"):
                 dados[pergunta] = soltas[0]
 
+        # DARF: data solta responde à data que acabou de ser perguntada
+        pergunta_darf = ativo.get("ultima_pergunta")
+        if pergunta_darf in ("vencimento", "pagamento") and pergunta_darf not in dados and len(soltas) == 1:
+            dados[pergunta_darf] = soltas[0]
+
         # resposta curta ao que acabou de ser perguntado
         pergunta = ativo.get("ultima_pergunta")
+        if pergunta == "atividade_mei" and "atividade_mei" not in dados:
+            atividade = ex.extrair_atividade_mei(norm)
+            if atividade:
+                dados["atividade_mei"] = atividade
+        elif pergunta == "tipo_gps" and "tipo_gps" not in dados:
+            tipo_gps = ex.extrair_tipo_gps(norm)
+            if tipo_gps:
+                dados["tipo_gps"] = tipo_gps
+        if pergunta in ("prolabore", "base", "valor_principal") and pergunta not in dados:
+            v = ex.parse_valor_br(mensagem)
+            if v is not None and v > 0 and re.fullmatch(r"[\sr$\d.,kmil]+", norm):
+                dados[pergunta] = _guardavel(v)
+        elif pergunta == "selic_acumulada" and "selic_acumulada" not in dados:
+            m = re.fullmatch(r"\s*(\d+(?:[.,]\d+)?)\s*%?\s*", mensagem or "")
+            if m:
+                dados["selic_acumulada"] = _guardavel(ex.parse_valor_br(m.group(1)))
         if pergunta == "salario" and "salario" not in dados:
             v = ex.parse_valor_br(mensagem)
             if v is not None and v > 0:

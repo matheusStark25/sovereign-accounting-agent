@@ -111,12 +111,85 @@ def _valor_apos(norm: str, padrao: str) -> Optional[Decimal]:
     return parse_valor_br(m.group(m.lastindex)) if m else None
 
 
+_MODO_DARF = re.compile(r"\bdarf\b|vencimento|venceu|\bvence\b|paguei|pagou|pago em|pagamento em")
+_CTX_VENCIMENTO = re.compile(r"(vencimento|venceu|vence)")
+_CTX_PAGAMENTO = re.compile(r"(pag|quit|recolh)")
+
+
+def extrair_datas_darf(norm: str) -> Dict[str, Any]:
+    """Vencimento e pagamento do DARF pelo contexto da frase; data solta só se for a única."""
+    saida: Dict[str, Any] = {}
+    soltas: List[date] = []
+    for ini, _fim, d in _datas_no_texto(norm):
+        janela = norm[max(0, ini - 24): ini]
+        if _CTX_VENCIMENTO.search(janela) and "vencimento" not in saida:
+            saida["vencimento"] = d.isoformat()
+        elif _CTX_PAGAMENTO.search(janela) and "pagamento" not in saida:
+            saida["pagamento"] = d.isoformat()
+        else:
+            soltas.append(d)
+    if soltas:
+        saida["datas_sem_contexto"] = [d.isoformat() for d in soltas]
+    return saida
+
+
+def extrair_atividade_mei(norm: str) -> Optional[str]:
+    if re.search(r"caminhone", norm):
+        return "caminhoneiro"
+    tem_comercio = re.search(r"comerc|industria|\bvenda", norm)
+    tem_servico = re.search(r"servic", norm)
+    if tem_comercio and tem_servico:
+        return "comercio_e_servicos"
+    if tem_servico:
+        return "servicos"
+    if tem_comercio:
+        return "comercio"
+    return None
+
+
+def extrair_tipo_gps(norm: str) -> Optional[str]:
+    if re.search(r"plano simplificado|simplificado|11 ?%", norm):
+        return "plano_simplificado"
+    if re.search(r"baixa renda|5 ?%", norm):
+        return "baixa_renda"
+    if re.search(r"facultativ", norm):
+        return "facultativo"
+    if re.search(r"contribuinte individual|autonom|\bci\b|20 ?%", norm):
+        return "contribuinte_individual"
+    return None
+
+
+def extrair_regime(norm: str) -> Optional[str]:
+    if re.search(r"simples nacional.{0,20}anexo (iv|4)|anexo (iv|4)", norm):
+        return "simples_anexo_iv"
+    if re.search(r"lucro presumido|presumido", norm):
+        return "presumido"
+    if re.search(r"lucro real", norm):
+        return "real"
+    if re.search(r"simples", norm):
+        return "simples"
+    return None
+
+
 def extrair_dados(mensagem: str) -> Dict[str, Any]:
     """Devolve apenas o que foi dito na mensagem. Chaves compatíveis com ``calc.servico``."""
     norm = normalizar(mensagem)
     dados: Dict[str, Any] = {}
 
-    dados.update(extrair_datas(mensagem))
+    modo_darf = bool(_MODO_DARF.search(norm))
+    dados.update(extrair_datas_darf(norm) if modo_darf else extrair_datas(mensagem))
+    atividade = extrair_atividade_mei(norm) if re.search(r"\bmei\b|microempreendedor|das\b", norm) else None
+    if atividade:
+        dados["atividade_mei"] = atividade
+    tipo_gps = extrair_tipo_gps(norm) if re.search(r"\bgps\b|guia da previdencia|contribuinte|facultativ|autonom|simplificado|baixa renda", norm) else None
+    if tipo_gps:
+        dados["tipo_gps"] = tipo_gps
+    regime = extrair_regime(norm) if re.search(r"pro.?labore|socio|regime|simples|presumido|lucro", norm) else None
+    if regime:
+        dados["regime"] = regime
+    m = re.search(r"selic[^\d]{0,30}(\d+(?:[.,]\d+)?) ?%?", norm)
+    if m:
+        dados["selic_acumulada"] = parse_valor_br(m.group(1))
 
     # saldo do FGTS (antes do salário para não confundir os valores)
     texto_sem_fgts = norm
@@ -187,9 +260,24 @@ def extrair_dados(mensagem: str) -> Dict[str, Any]:
     return dados
 
 
+_PEDE_CALCULO = re.compile(r"\b(calcul|quanto|quero|preciso|faz|fazer|simul|gerar|emitir|valor|paguei|pagou|pago em|venceu|vencimento|atras|multa|juros)")
+_PEDE_EXPLICACAO = re.compile(r"\b(explic|o que e|oque e|como funciona|para que serve|significa|me ensin)")
+
+
 def detectar_tipo_calculo(mensagem: str) -> Optional[str]:
     """Qual cálculo o usuário pediu, ou None se a mensagem não pede cálculo."""
     norm = normalizar(mensagem)
+    # os tipos de encargos só disparam quando a mensagem PEDE cálculo; "me explique o DARF" é conversa e vai para o LLM
+    pede_calculo = bool(_PEDE_CALCULO.search(norm) or re.search(r"r\$ ?\d", norm)) and not _PEDE_EXPLICACAO.search(norm)
+    if pede_calculo:
+        if re.search(r"\bdarf\b", norm):
+            return "darf"
+        if re.search(r"\bmei\b|microempreendedor", norm):
+            return "das_mei"
+        if re.search(r"\bgps\b|guia da previdencia", norm):
+            return "gps"
+        if re.search(r"pro.?labore", norm):
+            return "prolabore"
     if re.search(r"rescis|demiss|demitid|demitir|demiti\b|desligad|desligament|dispensad|mandar embora|mandei embora|acerto|verbas rescis", norm):
         return "rescisao"
     if re.search(r"13|decimo terceiro|13o", norm) and not re.search(r"\b13\d{2,}", norm):

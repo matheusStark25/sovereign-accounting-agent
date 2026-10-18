@@ -57,6 +57,11 @@ def _linhas_rescisao(r: Dict[str, Any]) -> List[str]:
     return linhas
 
 
+def _data_br(iso: str) -> str:
+    ano, mes, dia = str(iso)[:10].split("-")
+    return f"{dia}/{mes}/{ano}"
+
+
 def formatar_resultado(tipo: str, r: Dict[str, Any]) -> str:
     """Texto pronto para o usuário. Nunca esconde pendências nem premissas."""
     if tipo == "rescisao":
@@ -119,6 +124,40 @@ def formatar_resultado(tipo: str, r: Dict[str, Any]) -> str:
         linhas.append(f"Total de descontos: {brl(r['total_descontos'])}")
         linhas += ["", f"Líquido a receber: {brl(r['total_liquido'])}",
                    f"FGTS do empregador (não desconta do empregado): {brl(r['fgts_empregador'])}"]
+    elif tipo == "prolabore":
+        linhas = [
+            f"Pró-labore de {brl(r['prolabore'])} — {r['regime']} (competência {r['competencia']})",
+            f"• INSS do sócio (11% sobre {brl(r['base_inss_socio'])}): {brl(r['inss_socio'])}",
+            f"• IRRF: {brl(r['irrf'])}",
+            f"Líquido do sócio: {brl(r['liquido'])}",
+            "",
+            f"Contribuição patronal da empresa: {brl(r['inss_patronal'])}",
+            f"Custo total para a empresa: {brl(r['custo_total_empresa'])}",
+        ]
+    elif tipo == "gps":
+        linhas = [
+            f"GPS — {r['tipo']} (competência {r['competencia']})",
+            f"• Base: {brl(r['base'])}",
+            f"• Alíquota: {r['aliquota'] * 100:.0f}%",
+            f"Valor a pagar: {brl(r['valor'])}",
+            f"Vencimento: {_data_br(r['vencimento'])}",
+        ]
+    elif tipo == "das_mei":
+        linhas = [
+            f"DAS do MEI — {r['atividade']} (competência {r['competencia']})",
+            f"• INSS: {brl(r['inss'])}",
+            f"• ICMS: {brl(r['icms'])}  ·  ISS: {brl(r['iss'])}",
+            f"Valor a pagar: {brl(r['valor'])}",
+            f"Vencimento: {_data_br(r['vencimento'])}",
+        ]
+    elif tipo == "darf":
+        linhas = [
+            f"DARF pago em {_data_br(r['pagamento'])} (vencimento {_data_br(r['vencimento'])}, {r['dias_de_atraso']} dia(s) de atraso)",
+            f"• Valor principal: {brl(r['valor_principal'])}",
+            f"• Multa de mora ({r['taxa_multa'] * 100:.2f}%): {brl(r['multa'])}".replace(".", ","),
+            f"• Juros ({r['taxa_juros'] * 100:.2f}%): {brl(r['juros'])}".replace(".", ","),
+            f"Total a pagar: {brl(r['total'])}",
+        ]
     else:
         linhas = [str(r)]
 

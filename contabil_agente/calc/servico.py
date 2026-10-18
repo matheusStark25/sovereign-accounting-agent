@@ -11,6 +11,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from .decimo_terceiro import calcular_decimo_terceiro
+from .encargos import FaltamDados, calcular_darf, calcular_das_mei, calcular_gps, calcular_prolabore
 from .errors import CalculoError, CompetenciaSemTabela, DadosInvalidos
 from .ferias import calcular_ferias
 from .fgts import calcular_fgts_mensal
@@ -21,7 +22,7 @@ from .money import D, q2
 from .rescisao import calcular_rescisao, dados_de_dict, ler_data
 from .texto import formatar_resultado
 
-TIPOS_CALCULO = ("rescisao", "ferias", "decimo_terceiro", "inss", "irrf", "fgts", "folha")
+TIPOS_CALCULO = ("rescisao", "ferias", "decimo_terceiro", "inss", "irrf", "fgts", "folha", "prolabore", "gps", "das_mei", "darf")
 
 _ROTULOS = {
     "salario": "o salário base (valor mensal)",
@@ -31,6 +32,14 @@ _ROTULOS = {
     "aviso_previo": "se o aviso prévio foi trabalhado ou indenizado",
     "aviso_previo_pedido": "se o aviso prévio foi trabalhado ou não cumprido",
     "meses": "quantos meses o 13º deve considerar (1 a 12)",
+    "prolabore": "o valor do pró-labore mensal",
+    "tipo_gps": "o tipo de contribuinte da GPS (contribuinte individual, facultativo, plano simplificado ou baixa renda)",
+    "base": "o valor da remuneração ou do salário de contribuição",
+    "atividade_mei": "a atividade do MEI (comércio, serviços, comércio e serviços ou caminhoneiro)",
+    "valor_principal": "o valor principal do DARF",
+    "vencimento": "a data de vencimento do DARF (DD/MM/AAAA)",
+    "pagamento": "a data do pagamento do DARF (DD/MM/AAAA)",
+    "selic_acumulada": "a taxa SELIC acumulada em % (do mês seguinte ao vencimento até o mês anterior ao pagamento)",
 }
 
 
@@ -49,6 +58,22 @@ def campos_faltantes(tipo: str, dados: Dict[str, Any]) -> List[str]:
             faltando.append("salario")
     if tipo == "decimo_terceiro" and _pegar(dados, "meses") is None:
         faltando.append("meses")
+    if tipo == "prolabore" and _pegar(dados, "prolabore", "salario") is None:
+        faltando.append("prolabore")
+    if tipo == "gps":
+        tipo_gps = str(_pegar(dados, "tipo_gps", "tipo_contribuinte") or "").lower()
+        if not tipo_gps:
+            faltando.append("tipo_gps")
+        elif tipo_gps in ("contribuinte_individual", "facultativo") and _pegar(dados, "base", "salario", "remuneracao") is None:
+            faltando.append("base")
+    if tipo == "das_mei" and _pegar(dados, "atividade_mei", "atividade") is None:
+        faltando.append("atividade_mei")
+    if tipo == "darf":
+        if _pegar(dados, "valor_principal", "principal", "valor", "salario") is None:
+            faltando.append("valor_principal")
+        for campo in ("vencimento", "pagamento"):
+            if _pegar(dados, campo) is None:
+                faltando.append(campo)
     if tipo == "rescisao":
         tipo_resc = str(_pegar(dados, "tipo_rescisao", "tipo") or "").lower()
         if not tipo_resc:
@@ -160,8 +185,21 @@ def calcular(tipo: str, dados: Dict[str, Any], hoje: Optional[date] = None) -> D
                 outros_descontos=_pegar(dados, "outros_descontos") or 0,
                 categoria_fgts=_pegar(dados, "categoria") or "empregado",
             ).to_dict()
+        elif tipo == "prolabore":
+            resultado = calcular_prolabore(_pegar(dados, "prolabore", "salario"), competencia, regime=_pegar(dados, "regime") or "simples", dependentes=dependentes)
+        elif tipo == "gps":
+            resultado = calcular_gps(_pegar(dados, "tipo_gps", "tipo_contribuinte"), competencia, base=_pegar(dados, "base", "salario", "remuneracao"))
+        elif tipo == "das_mei":
+            resultado = calcular_das_mei(_pegar(dados, "atividade_mei", "atividade"), competencia)
+        elif tipo == "darf":
+            resultado = calcular_darf(
+                _pegar(dados, "valor_principal", "principal", "valor", "salario"), _pegar(dados, "vencimento"), _pegar(dados, "pagamento"),
+                selic_acumulada=_pegar(dados, "selic_acumulada", "selic"), codigo_receita=_pegar(dados, "codigo_receita"),
+            )
         else:  # rescisao
             resultado = calcular_rescisao(dados_de_dict(dados)).to_dict()
+    except FaltamDados as exc:
+        return {"status": "faltam_dados", "tipo": tipo, "faltando": exc.faltando, "pergunta": exc.pergunta}
     except CompetenciaSemTabela as exc:
         return {"status": "erro", "tipo": tipo, "codigo": "competencia_sem_tabela", "mensagem": str(exc)}
     except DadosInvalidos as exc:
