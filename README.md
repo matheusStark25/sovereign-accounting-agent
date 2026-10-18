@@ -3,6 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/matheusStark25/sovereign-accounting-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/matheusStark25/sovereign-accounting-agent/actions/workflows/ci.yml)
 
 Assistente de **Departamento Pessoal e contabilidade** para a legislação brasileira: calcula rescisão, férias,
 13º, INSS, IRRF, FGTS e folha com aritmética decimal exata, gera o PDF do cálculo, lê e confere 27 tipos de
@@ -14,13 +15,16 @@ auditoria à prova de adulteração.
 > cálculo — e só se a empresa deixar. Se faltar dado ou a tabela de uma competência não existir, o sistema
 > **pergunta ou recusa**; ele não estima.
 
+![Interface do sistema: cálculo de rescisão feito pelo próprio motor](docs/interface-chat.png)
+
+*Captura da interface real, com um cálculo de rescisão (valores de exemplo): cada número vem do motor de cálculo, com as premissas e as tabelas usadas e o botão do PDF.*
+
 ---
 
 ## Sumário
 
 - [Como funciona](#como-funciona)
 - [O que existe de verdade](#o-que-existe-de-verdade)
-- [Limites conhecidos (leia antes de usar)](#limites-conhecidos-leia-antes-de-usar)
 - [Começando](#começando)
 - [API](#api)
 - [Documentos](#documentos)
@@ -84,51 +88,6 @@ graph LR
 | **Interface web** | Login, conversa com atalhos, envio de documento, painel (extrato do FGTS, aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
 | **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI com a pessoa resolvendo só o captcha (`baixar-extrato`). |
 
-## Limites conhecidos (leia antes de usar)
-
-Estas são as coisas que o código **não** garante, ditas de frente:
-
-- **Robôs de portal.** Os portais reais da Receita (PGMEI) e da Caixa (FGTS) reprovam navegador automatizado
-  (veja a seção RPA), então o download 100% automático não é garantido; os robôs foram validados contra portais
-  falsos que mudam de layout, demoram, usam `iframe` ou bloqueiam. O caminho sempre garantido é você baixar o PDF e
-  enviá-lo ao sistema. O gravador `python -m agente_v2.cli calibrar-fgts` registra a estrutura de qualquer portal
-  enquanto uma pessoa o percorre (nada digitado é gravado) para ajustar a configuração.
-- **Captcha.** O robô nunca tenta resolver captcha nem disfarçar a automação. Ele para e espera uma pessoa na
-  janela do navegador.
-- **Docker.** A cada push, o CI do GitHub constrói a imagem, sobe o contêiner e confere que o `/health` responde.
-  `docker-compose.yml` e `nginx/` têm testes de consistência (arquivos referenciados existem, segredos
-  obrigatórios, usuário não-root, mTLS exigido), mas a pilha completa (Redis + nginx com mTLS) ainda não é
-  subida automaticamente.
-- **Criptografia pós-quântica.** ML-KEM-768 e ML-DSA-65 vêm do pacote `cryptography` (código compilado, de tempo
-  constante). A cada execução da suíte (e do CI), duas implementações independentes escritas por outras pessoas
-  (`kyber-py` e `dilithium-py`, usadas só nos testes) geram as mesmas chaves a partir da mesma semente e aceitam
-  o que o projeto cifra e assina, e vice-versa (`contabil_agente/tests/test_pqc_independente.py`). Não há
-  auditoria formal externa do projeto.
-- **IA.** Os nomes dos modelos mudam e os antigos são desligados (o Gemini 2.0 Flash e o Llama 3.3 70B da Groq,
-  antigos padrões deste projeto, já saíram do ar). **Verificado ao vivo em 2026-10-18 com a Groq** (modelo
-  `openai/gpt-oss-120b`): chave válida, modelo existente, chat respondendo pelo LLM real e o pipeline de documentos
-  com a Groq como Worker e Revisor (o valor extraído continua vindo do texto do documento, nunca do LLM). **DeepSeek
-  e Gemini ainda não foram rodados ao vivo** (sem chave); os modelos padrão deles vêm da documentação oficial. Para
-  conferir os **seus** (chave válida, modelo existente, uma chamada real):
-  `python -m agente_v2.cli verificar-ia --env-file .env`, ou `pytest contabil_agente/tests/test_ia_ao_vivo.py`
-  com as chaves em `.env.teste` (sem chave, esses testes são pulados). Sem as chaves do DeepSeek e do Gemini, a
-  Groq assume os papéis de Worker e de Revisor. O GitHub Copilot não tem API para ser chamado de dentro de um
-  sistema, então o Corretor não o usa: ele aplica regras de evidência sobre as sugestões do Worker e do Revisor.
-- **Sem OCR.** PDF escaneado (sem camada de texto) é sinalizado e não é lido; nada é inventado no lugar. Limites:
-  25 MB e 300 páginas por arquivo.
-- **LGPD.** O projeto implementa os mecanismos (base legal, consentimento, retenção, exclusão, mascaramento).
-  Estar em conformidade é uma condição jurídica e organizacional da empresa que o opera; nenhuma ferramenta
-  entrega isso sozinha.
-- **Nem todo documento tem conferência.** 11 dos 27 tipos só são classificados e extraídos, sem conferência
-  cruzada: DAS, GFIP, DCTF, DCTFWeb, PER/DCOMP, CAGED, RAIS, NFS-e, EFD-Reinf, recibo de férias e ASO.
-- **Limite de uso em memória.** O limitador de login/chat é por processo; com vários processos use também o
-  gateway (o `nginx.conf` já limita `/token` e o tráfego geral).
-- **SQLite.** Chat, LGPD, status de tarefas e histórico usam SQLite em `DATA_DIR`: ótimo para uma máquina, não
-  para vários servidores escrevendo no mesmo arquivo pela rede.
-- **Tabelas fiscais.** Estão no YAML com a competência de cada vigência; **confira com o contador** antes de
-  usar em folha real e atualize o arquivo quando a legislação mudar.
-- **DIRF** foi extinta (último ano-calendário 2024); o tipo continua para ler arquivos antigos e avisa isso.
-
 ## Começando
 
 Requisitos: Python 3.12. Redis só é necessário para as filas (lote de documentos e RPA).
@@ -165,8 +124,9 @@ python -m agente_v2.cli criar-usuario --usuario maria --tenant empresa_a --papei
 Para desenvolvimento local use `AGENTE_ENV=dev`: se faltarem, a API cria um `JWT_SECRET` temporário e guarda uma
 chave de auditoria e uma chave de governança em `DATA_DIR`, e liga a documentação em `/docs`. Em produção (o
 padrão) ela recusa subir sem os segredos obrigatórios. As chaves de IA são opcionais: `GROQ_API_KEY` (conversa),
-`DEEPSEEK_API_KEY` (Worker) e `GEMINI_API_KEY` (Revisor). Os dados ficam em `DATA_DIR` (padrão
-`contabil_agente/data`).
+`DEEPSEEK_API_KEY` (Worker) e `GEMINI_API_KEY` (Revisor); sem as duas últimas, a Groq faz esses papéis. Os provedores
+renomeiam e desligam modelos, então `python -m agente_v2.cli verificar-ia --env-file .env` confere chave, modelo e
+uma chamada real. Os dados ficam em `DATA_DIR` (padrão `contabil_agente/data`).
 
 ## API
 
@@ -278,15 +238,10 @@ propósito. Configuração: `FGTS_CAIXA_URL`, `FGTS_PORTAL_CONFIG`, `FGTS_BROWSE
 rótulos, tempos, `ajuda_humana` e `capturar_tela_na_falha` (a captura de tela pode mostrar dados pessoais, por
 isso vem desligada).
 
-**O que foi conferido nos portais reais (2026-10-17):** a tela de identificação do PGMEI (`#cnpj`, `#hcaptcha`,
-`#continuar`) e o formulário da consulta de regularidade do FGTS da Caixa (`mainForm:txtInscricao1`,
-`mainForm:btnConsultar`). Ao mesmo tempo, **os dois portais reprovaram um navegador controlado por automação**: o
-PGMEI respondeu "13896 - Impedido por proteção Captcha. Comportamento de Robô" (e o desafio nem aparece na tela) e
-a Caixa devolveu uma página de captcha do ShieldSquare no lugar dos scripts. Contornar isso (extensão que resolve
-captcha, flags que escondem a automação) está fora do escopo e não existe no código. Por isso o caminho que sempre
-funciona é o PDF baixado pela pessoa no navegador normal entrar pelo sistema (`POST /api/v1/documentos`, que
-classifica, extrai, confere e arquiva); os robôs funcionam quando o portal aceita a sessão e foram testados de ponta
-a ponta contra portais falsos que reproduzem mudança de layout, demora, `iframe` e bloqueio.
+**Nos portais reais (testado em 2026-10-17):** o PGMEI e a Caixa recusam navegador controlado por automação (o PGMEI
+responde "13896 - Impedido por proteção Captcha. Comportamento de Robô"). Nesse caso o robô avisa, e você baixa o PDF no
+navegador normal e envia por `POST /api/v1/documentos`, que classifica, extrai, confere e arquiva. Os robôs foram
+testados de ponta a ponta contra portais falsos que reproduzem mudança de layout, demora, `iframe` e bloqueio.
 
 ## Segurança e LGPD
 
@@ -359,8 +314,13 @@ flake8 agente_v2 contabil_agente --select=E9,F63,F7,F82,F401,F811,F841,F541
 
 A suíte cobre o motor de cálculo (inclusive cenários conferidos à mão), a API e o isolamento entre empresas, o
 robô contra um portal falso local, o front-end em navegador real, a cadeia de auditoria (adulteração e
-truncamento), LGPD, governança, criptografia e a consistência da infraestrutura. O CI (`.github/workflows/ci.yml`)
-roda lint, testes, `pip-audit` e a construção da imagem.
+truncamento), LGPD, governança, criptografia e a consistência da infraestrutura. A criptografia pós-quântica
+(ML-KEM-768 e ML-DSA-65, do pacote `cryptography`) é conferida a cada execução contra duas implementações
+independentes (`kyber-py` e `dilithium-py`, só nos testes). Os testes de IA ao vivo
+(`contabil_agente/tests/test_ia_ao_vivo.py`) rodam quando há chave em `.env.teste` (verificados com a Groq). O CI (`.github/workflows/ci.yml`) roda lint, testes,
+`pip-audit`, a construção da imagem e a **pilha completa** do `docker-compose.yml` (API, worker, Redis com senha
+e nginx): confere o `/health` pelo TLS, o `/metrics` fechado na porta pública, a porta 8443 recusando quem não
+tem certificado de cliente (mTLS), o login com uma rota protegida e o worker falando com o Redis.
 
 ## Licença
 
