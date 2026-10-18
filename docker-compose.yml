@@ -85,7 +85,9 @@ services:
     cap_add:
       - IPC_LOCK
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN:?defina VAULT_DEV_ROOT_TOKEN no .env para usar o perfil dev}
+      # O compose interpola o arquivo todo, até serviços de perfis desligados: por isso a variável não pode ser obrigatória
+      # aqui (senão nada sobe sem ela). Vazia, o Vault em modo dev gera um token aleatório e o mostra no log.
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN:-}
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
     ports:
       - "127.0.0.1:8200:8200"

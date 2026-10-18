@@ -84,14 +84,16 @@ jobs:
             echo "JWT_SECRET=$(S)"
             echo "AUDIT_HMAC_KEY=$(S)"
             echo "REDIS_PASSWORD=$(S)"
-            python -m agente_v2.cli gerar-chave-governanca | tail -1
+            echo "GOVERNANCA_DSA_KEY='$(python -m agente_v2.cli gerar-chave-governanca | tail -1 | cut -d= -f2-)'"
             echo "ADMIN_USERNAME=admin"
             echo "ADMIN_PASSWORD=Aa1-$(S)"
             echo "ADMIN_TENANT=ci"
           } > .env
           python -c "from agente_v2.mtls import emitir_certificados_dev as e; e('certs')"
       - name: Subir a pilha (API, worker, Redis, nginx)
-        run: docker compose --profile gateway up -d --build
+        run: |
+          set -o pipefail
+          docker compose --profile gateway up -d --build 2>&1 | tee compose.log
       - name: A API responde pelo gateway (TLS) e as métricas não ficam públicas
         run: |
           ok=0
@@ -110,6 +112,9 @@ jobs:
           curl -fsS --cacert certs/ca.pem -H "Authorization: Bearer ${TOKEN}" https://localhost/users/me
       - name: O worker de documentos fala com o Redis
         run: docker compose exec -T worker-documentos celery -A contabil_agente.tarefas inspect ping --timeout 15
-      - name: Logs (se algo falhou)
+      - name: Erro como anotação pública (se algo falhou)
         if: failure()
-        run: docker compose logs --no-color | tail -n 200
+        run: |
+          { tail -n 40 compose.log 2>/dev/null; echo '--- logs dos contêineres ---'; docker compose logs --no-color --tail 40 2>&1; } > falha.txt || true
+          corpo=$(tail -n 70 falha.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=pilha falhou::${corpo}"
