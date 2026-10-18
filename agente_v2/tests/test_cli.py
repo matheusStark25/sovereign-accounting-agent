@@ -16,3 +16,13 @@ def test_verificar_ia_sem_nenhuma_chave_avisa_e_sai_com_2(tmp_path, monkeypatch,
     vazio.write_text("", encoding="utf-8")
     assert cli.main(["verificar-ia", "--env-file", str(vazio)]) == 2
     assert "Nenhuma chave de IA" in capsys.readouterr().err
+
+
+def test_verificar_ia_avisa_quais_chaves_estao_em_branco_no_arquivo(tmp_path, monkeypatch, capsys):
+    for nome in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.delenv(nome, raising=False)
+    arq = tmp_path / ".env.teste"
+    arq.write_text("GROQ_API_KEY=\nDEEPSEEK_API_KEY=\n", encoding="utf-8")
+    assert cli.main(["verificar-ia", "--env-file", str(arq)]) == 2
+    err = capsys.readouterr().err
+    assert "estão em branco: GROQ_API_KEY, DEEPSEEK_API_KEY" in err and "GEMINI" not in err.split("em branco:")[1]

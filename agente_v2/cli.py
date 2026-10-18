@@ -127,6 +127,11 @@ def verificar_ia(args: argparse.Namespace) -> int:
         verificados.append(groq.verificar())
     if not verificados:
         print("Nenhuma chave de IA configurada (GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY).", file=sys.stderr)
+        if args.env_file:
+            em_branco = [n for n in ("GROQ_API_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY") if n in env and not env[n].strip()]
+            if em_branco:
+                print(f"No arquivo {args.env_file} estas chaves existem mas estão em branco: {', '.join(em_branco)}. "
+                      "Cole o valor depois do '=' e salve (Ctrl+S).", file=sys.stderr)
         return 2
     for v in verificados:
         print(json.dumps(v, ensure_ascii=False))
