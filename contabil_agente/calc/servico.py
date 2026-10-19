@@ -7,6 +7,7 @@ cobre a data devolve ``status = "erro"`` com a explicação.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Any, Dict, List, Optional
 
@@ -100,6 +101,12 @@ def pergunta_para(faltando: List[str]) -> str:
 
 def _competencia(dados: Dict[str, Any], hoje: Optional[date]) -> date:
     base = _pegar(dados, "competencia", "data_calculo")
+    mes_ano = re.fullmatch(r"\s*(\d{4})-(\d{1,2})\s*|\s*(\d{1,2})/(\d{4})\s*", str(base)) if base is not None else None
+    if mes_ano:  # competência é mês e ano: "2026-09" ou "09/2026" (a data completa DD/MM/AAAA também vale)
+        ano, mes = (mes_ano.group(1), mes_ano.group(2)) if mes_ano.group(1) else (mes_ano.group(4), mes_ano.group(3))
+        if not 1 <= int(mes) <= 12:
+            raise DadosInvalidos(f"competência: mês inválido em {base!r}")
+        return date(int(ano), int(mes), 1)
     if base is not None:
         data = ler_data(base, "competência")
     else:

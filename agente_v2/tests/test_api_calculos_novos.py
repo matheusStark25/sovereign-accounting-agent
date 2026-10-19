@@ -50,3 +50,15 @@ def test_pdf_dos_novos_tipos_e_auditado(client, tipo, corpo):
 def test_sem_tabela_da_competencia_a_api_recusa_em_vez_de_estimar(client):
     r = _post(client, "das_mei", {"atividade_mei": "servicos", "competencia": "2010-01-01"})
     assert r.status_code == 422 and r.json()["codigo"] == "competencia_sem_tabela"
+
+
+def test_competencia_por_mes_e_ano_e_a_metrica_que_o_prometheus_le(client):  # noqa: F811
+    # o mesmo pedido do job de observabilidade do CI: competência "2026-09" (antes só DD/MM/AAAA passava e a API devolvia 422)
+    h = entrar(client)
+    for competencia in ("2026-09", "09/2026", "01/09/2026"):
+        r = client.post("/api/v1/calculo/inss", json={"salario": 3000, "competencia": competencia}, headers=h)
+        assert r.status_code == 200, r.text
+        assert r.json()["resultado"]["competencia"] == "2026-09"
+    assert client.post("/api/v1/calculo/inss", json={"salario": 3000, "competencia": "2026-13"}, headers=h).status_code == 422
+    metricas = client.get("/metrics").text
+    assert 'agente_calculos_total{resultado="ok",tipo="inss"}' in metricas
