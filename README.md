@@ -74,7 +74,7 @@ graph LR
 
 | Área | O que está implementado |
 |---|---|
-| **Cálculo** | Rescisão (sem justa causa, justa causa, pedido de demissão, acordo), férias (com 1/3 e abono pecuniário), 13º, INSS progressivo, IRRF (com a redução da Lei 15.270/2025), FGTS (8%; multa de 40% sem justa causa e 20% em acordo; doméstico 8% + 3,2%), adicionais (horas extras, adicional noturno, insalubridade, periculosidade) e folha completa. `Decimal` em tudo; as tabelas ficam em um único arquivo, [`calc/data/tabelas.yaml`](contabil_agente/calc/data/tabelas.yaml). Competência sem tabela → erro explícito. |
+| **Cálculo** | Rescisão (sem justa causa, justa causa, pedido de demissão, acordo), férias (com 1/3 e abono pecuniário), 13º, INSS progressivo, IRRF (com a redução da Lei 15.270/2025), FGTS (8%; multa de 40% sem justa causa e 20% em acordo; doméstico 8% + 3,2%), adicionais (horas extras, adicional noturno, insalubridade, periculosidade), folha completa, pró-labore (INSS do sócio, IRRF e custo da empresa), GPS (20%, 11% e 5%), DAS do MEI (INSS + ICMS e/ou ISS) e DARF em atraso (multa e juros da Lei 9.430/1996, com a SELIC acumulada informada, nunca chutada). `Decimal` em tudo; as tabelas ficam em um único arquivo, [`calc/data/tabelas.yaml`](contabil_agente/calc/data/tabelas.yaml). Competência sem tabela → erro explícito. |
 | **PDF** | PDF do cálculo com campos AcroForm preenchidos (`/api/v1/calculo/{tipo}/pdf` e no chat). |
 | **Documentos** | 27 tipos classificados e extraídos; conferências automáticas em 16 deles (veja [Documentos](#documentos)); detector de anomalias (escore z robusto, duplicidade, competência repetida/futura/antiga); lote assíncrono de até 50 arquivos. |
 | **Autenticação** | Login com bcrypt, JWT, bloqueio da conta após 5 senhas erradas (15 min), papéis lidos do banco (cabeçalhos de identidade enviados pelo cliente são ignorados), isolamento por empresa (tenant). |
@@ -84,8 +84,10 @@ graph LR
 | **Segredos** | Variáveis de ambiente ou HashiCorp Vault (token ou AppRole). Vault configurado e fora do ar → a API se recusa a subir (sem fallback silencioso). Sem `JWT_SECRET`, `AUDIT_HMAC_KEY` ou `GOVERNANCA_DSA_KEY` ela também não sobe. |
 | **Criptografia** | CPF cifrado com ML-KEM-768 + X25519 + AES-GCM (pacote `cryptography`) antes de entrar na fila do Celery; mTLS no gateway (porta 8443) e utilitários mTLS/XML-DSig em `agente_v2/`. |
 | **Resiliência** | Circuit breaker, retentativas com backoff exponencial, timeouts, degradação controlada, `/health` e `/ready`. |
-| **Observabilidade** | Métricas Prometheus em `/metrics`, log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados. |
-| **Interface web** | Login, conversa com atalhos, envio de documento, painel (extrato do FGTS, aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
+| **Agentes** | `TaxAgent` (cálculos), `ValidationAgent` (CPF, CNPJ, PIS, chave de NF-e e documentos), `ReconciliationAgent` (concilia holerites com a guia do FGTS, a GPS e o DARF do IRRF e aponta a diferença em reais), `ComplianceAgent` (regras de conformidade e base legal da LGPD) e `RPAAgent` (extrato do FGTS e do PGMEI), orquestrados pela API em `/api/v1/agentes`: uma ação de um agente ou um plano de até 10 passos, com o resultado de um passo alimentando o seguinte. |
+| **Voz** | Microfone no navegador → WebSocket `/ws/voz` (áudio em pedaços) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → resposta frase por frase, lida em voz alta pela voz do navegador (Web Speech API). Exige o consentimento de IA externa (o áudio vai a um terceiro). O MARCOS adapta o tom (formal, informal ou neutro) ao jeito de quem escreve ou fala; a Maria Helena é a persona técnica de auditoria. |
+| **Observabilidade** | Métricas Prometheus em `/metrics`; log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados; e, no perfil `observabilidade` do compose, Prometheus, Alertmanager (7 alertas: API fora do ar, erros 5xx, latência, falha na trilha de auditoria, logins recusados, cálculos com erro, voz com falha) e Grafana com o painel "Sovereign Accounting Agent". |
+| **Interface web** | Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (extrato do FGTS, aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
 | **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI com a pessoa resolvendo só o captcha (`baixar-extrato`). |
 
 ## Começando
@@ -137,9 +139,11 @@ A documentação interativa (`/docs`) só fica ligada com `AGENTE_ENV=dev`. Rota
 |---|---|
 | `POST /token`, `POST /logout`, `GET /users/me`, `POST /users` | Login, logout, usuário atual, criar usuário (admin) |
 | `POST /api/chat`, `GET /api/chat/{sessao}`, `GET /api/chat/{sessao}/pdf` | Conversa, histórico e PDF do último cálculo |
-| `GET /api/v1/calculo/tipos`, `POST /api/v1/calculo/{tipo}`, `POST /api/v1/calculo/{tipo}/pdf` | Cálculo direto: `rescisao`, `ferias`, `decimo_terceiro`, `inss`, `irrf`, `fgts`, `folha` |
+| `GET /api/v1/calculo/tipos`, `POST /api/v1/calculo/{tipo}`, `POST /api/v1/calculo/{tipo}/pdf` | Cálculo direto: `rescisao`, `ferias`, `decimo_terceiro`, `inss`, `irrf`, `fgts`, `folha`, `prolabore`, `gps`, `das_mei`, `darf` |
 | `GET /api/v1/documentos/tipos`, `POST /api/v1/documentos`, `POST /api/v1/documentos/lote` | Tipos aceitos, processar um arquivo, processar até 50 em segundo plano (202) |
-| `POST /api/v1/rpa/fgts`, `GET /api/v1/rpa/jobs/{id}` | Pedir o extrato do FGTS (202) e acompanhar o trabalho |
+| `POST /api/v1/rpa/fgts`, `POST /api/v1/rpa/pgmei`, `GET /api/v1/rpa/jobs/{id}` | Pedir o extrato do FGTS (CPF) ou do PGMEI (CNPJ) (202) e acompanhar o trabalho |
+| `GET /api/v1/agentes`, `POST /api/v1/agentes/{agente}/{acao}`, `POST /api/v1/agentes/orquestrar` | Catálogo dos agentes, uma ação de um agente, ou um plano com vários passos |
+| `WS /ws/voz` | Canal de voz: o 1º quadro autentica (`{"tipo": "autenticar", "token": ...}`), depois `inicio`, áudio em pedaços e `fim` (ou `texto`); volta `transcricao`, `fala` frase por frase e `fim_resposta` |
 | `POST /api/v1/governanca/decisoes`, `GET …/pendentes`, `GET …/decisoes/{id}`, `POST …/aprovar`, `POST …/rejeitar` | Decisões críticas assinadas e aprovação por limite |
 | `GET /api/v1/lgpd/finalidades`, `POST/GET /api/v1/lgpd/consentimentos`, `DELETE /api/v1/lgpd/titular`, `GET /api/v1/lgpd/retencao`, `POST /api/v1/lgpd/retencao/executar` | Consentimento, exclusão de titular e retenção |
 | `GET /api/v1/auditoria/verificar` | Confere a cadeia HMAC da sua empresa e devolve a âncora para guardar fora do servidor |
@@ -264,7 +268,10 @@ cp .env.example .env                                  # preencha os segredos: o 
 docker compose up --build                             # API (8000), worker de documentos e Redis com senha
 docker compose --profile gateway up --build           # + nginx: https://localhost e mTLS em :8443 (certificados em ./certs)
 docker compose --profile dev up --build               # + Vault em modo dev (nunca em produção)
+docker compose --profile observabilidade up -d        # + Prometheus (9090), Alertmanager (9093) e Grafana (3000), só em 127.0.0.1
 ```
+
+Para o perfil `observabilidade`, defina `GRAFANA_ADMIN_PASSWORD` no `.env` (o Grafana se recusa a subir sem ela) e, se quiser receber os alertas fora da tela do Alertmanager, `ALERTA_WEBHOOK_URL` (só HTTPS).
 
 Para gerar certificados de desenvolvimento (CA própria, servidor e cliente, válidos por 7 dias):
 `python -c "from agente_v2.mtls import emitir_certificados_dev as e; e('certs')"`. Em produção use certificados
@@ -279,6 +286,8 @@ agente_v2/                  API e infraestrutura de execução
 ├── auth.py, config.py      autenticação (reexport) e configuração por ambiente
 ├── vault_client.py         Vault (token/AppRole) e carga de segredos
 ├── mtls.py, signing.py     certificados mTLS e assinatura XML-DSig
+├── rotas_agentes.py        API dos agentes e do orquestrador
+├── rotas_voz.py            canal de voz (WebSocket)
 ├── cli.py, logging_setup.py
 ├── web/                    interface (index.html, app.css, app.js)
 └── tests/                  API, Vault, mTLS, assinatura e front-end (navegador real)
@@ -289,7 +298,9 @@ contabil_agente/            domínio e serviços
 ├── intelligence/           diálogo de cálculo, extração, auditoria forense, FSM
 ├── documentos/             leitura, 27 tipos, validadores, PDF
 ├── pipeline/               dispatcher, agentes, anomalias, evidência, destinos
-├── rpa/                    robô do FGTS, pausa humana, estado das tarefas
+├── agentes/                TaxAgent, ValidationAgent, ReconciliationAgent, ComplianceAgent, RPAAgent e o orquestrador
+├── voz/                    Whisper (fala para texto)
+├── rpa/                    robôs do FGTS e do PGMEI, pausa humana, calibragem, estado das tarefas
 ├── tarefas/                Celery (filas documentos e rpa)
 ├── security/               auth, RBAC, auditoria WORM, PQC, Vault, criptografia
 ├── lgpd/                   base legal, consentimento, retenção, anonimização
@@ -300,6 +311,7 @@ contabil_agente/            domínio e serviços
 └── tests/                  testes de cálculo, pipeline, RPA, LGPD, infraestrutura…
 
 rules/compliance_rules.yaml regras de conformidade
+observabilidade/           Prometheus, alertas, Alertmanager e painel do Grafana
 Dockerfile, docker-compose.yml, nginx/, deploy/, .github/workflows/ci.yml
 ```
 
@@ -320,7 +332,7 @@ independentes (`kyber-py` e `dilithium-py`, só nos testes). Os testes de IA ao 
 (`contabil_agente/tests/test_ia_ao_vivo.py`) rodam quando há chave em `.env.teste` (verificados com a Groq). O CI (`.github/workflows/ci.yml`) roda lint, testes,
 `pip-audit`, a construção da imagem e a **pilha completa** do `docker-compose.yml` (API, worker, Redis com senha
 e nginx): confere o `/health` pelo TLS, o `/metrics` fechado na porta pública, a porta 8443 recusando quem não
-tem certificado de cliente (mTLS), o login com uma rota protegida e o worker falando com o Redis.
+tem certificado de cliente (mTLS), o login com uma rota protegida e o worker falando com o Redis. Outro job sobe a observabilidade: o Prometheus enxerga a API e carrega as 7 regras sem erro, uma métrica real aparece depois de usar a API, o Grafana abre com o painel e a fonte de dados (e exige login), e um alerta de verdade (derrubar a API) chega ao Alertmanager.
 
 ## Licença
 
