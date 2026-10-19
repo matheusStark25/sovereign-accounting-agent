@@ -1,4 +1,4 @@
-"""Tarefa do extrato do FGTS: decifra o CPF, roda o robô (com pausa para a pessoa), processa o PDF no pipeline."""
+"""Tarefas do robô: decifra o CPF/CNPJ/chave, roda o robô (com pausa para a pessoa) e processa o PDF no pipeline (a consulta de NF-e devolve o resumo)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,10 @@ from typing import Any, Dict, Optional
 from contabil_agente.lgpd import TratamentoSemBaseLegal
 from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 from contabil_agente.resilience import CircuitoAberto
-from contabil_agente.rpa import ErroDoRobo, HumanoNaoRespondeu, PortalBloqueouAutomacao, RoboExtratoFGTS, RoboExtratoPGMEI
+from contabil_agente.rpa import (
+    MODELOS, ErroDoRobo, HumanoNaoRespondeu, PortalBloqueouAutomacao, RoboConsultaNFe, RoboExtratoFGTS, RoboExtratoPGMEI, config_para_chave,
+    modelo_da_chave,
+)
 from contabil_agente.rpa import estado as st
 from contabil_agente.security import pqc
 
@@ -60,7 +63,13 @@ def _executar_extrato(job_id: str, tenant: str, ator: str, envelope: Dict[str, s
         if ctx.ao_pausar is not None:
             ctx.ao_pausar(motivo, seletor, page)
 
-    if portal == "pgmei":
+    if portal == "nfe":  # NF-e, CT-e ou NFC-e: o modelo gravado na chave escolhe o portal
+        try:
+            config_doc = config_para_chave(documento, ctx.config_nfe, ctx.config_cte, ctx.config_nfce)
+        except ErroDoRobo as exc:
+            return falhar(f"Robô: {exc}")
+        robo = RoboConsultaNFe(config_doc, ctx.pasta_de_trabalho / job_id, ctx.audit, tenant=tenant, ator=ator, notificar_humano=notificar, chave_hash=ctx.chave_hash)
+    elif portal == "pgmei":
         robo = RoboExtratoPGMEI(ctx.config_pgmei, ctx.pasta_de_trabalho / job_id, ctx.audit, tenant=tenant, ator=ator, notificar_humano=notificar, chave_hash=ctx.chave_hash)
     else:
         robo = RoboExtratoFGTS(ctx.config_fgts, ctx.pasta_de_trabalho / job_id, ctx.audit, tenant=tenant, ator=ator, notificar_humano=notificar, chave_hash=ctx.chave_hash)
@@ -71,10 +80,19 @@ def _executar_extrato(job_id: str, tenant: str, ator: str, envelope: Dict[str, s
     except CircuitoAberto as exc:
         return falhar(f"Portal temporariamente suspenso após falhas seguidas: {exc}")
     except PortalBloqueouAutomacao:
-        return falhar("O portal bloqueou o navegador automatizado. Baixe o extrato no seu navegador normal e envie o PDF pelo sistema (POST /api/v1/documentos).")
+        return falhar("O portal bloqueou o navegador automatizado. Baixe o extrato no seu navegador normal: com o observar-pasta ligado ele entra "
+                      "sozinho; sem ele, envie o PDF pelo sistema (POST /api/v1/documentos)."
+                      if portal != "nfe" else "O portal bloqueou o navegador automatizado. Consulte a nota no seu navegador normal.")
     except ErroDoRobo as exc:
         return falhar(f"Robô: {exc.motivo}")
 
+    if portal == "nfe":  # a consulta devolve o resumo da nota (JSON), não um PDF para o pipeline
+        tipo = "CONSULTA_" + MODELOS.get(modelo_da_chave(documento), "DOC").replace("-", "").upper()
+        resumo = {"sha256": extrato.sha256, "tipo": tipo, "modelo": extrato.dados.get("modelo"), "resumo": extrato.dados.get("resumo", {}),
+                  "titular": PIIAnonymizer.hash_pii(documento, ctx.chave_hash)}
+        ctx.audit.append("rpa.nfe.job_concluido", {"job": job_id, "sha256": extrato.sha256}, tenant=tenant, ator=ator)
+        status.atualizar(job_id, st.CONCLUIDO, "Consulta concluída.", resumo)
+        return {"status": "concluido", **resumo}
     usar_ia = ctx.lgpd.pode_tratar("envio_a_provedor_de_ia", tenant)
     doc = ctx.dispatcher.process(document_path=extrato.caminho, document_type=tipo_documento, tenant=tenant, ator=ator, usar_ia=usar_ia)
     resultado = {
@@ -100,3 +118,8 @@ def extrato_fgts(self, job_id: str, tenant: str, ator: str, envelope: Dict[str, 
 @celery_app.task(name="rpa.extrato_pgmei", bind=True, max_retries=0)
 def extrato_pgmei(self, job_id: str, tenant: str, ator: str, envelope: Dict[str, str], ano: Optional[int] = None) -> Dict[str, Any]:
     return _executar_extrato(job_id, tenant, ator, envelope, portal="pgmei", nome="do PGMEI", finalidade="consulta_extrato_pgmei", tipo_documento="DAS", ano=ano)
+
+
+@celery_app.task(name="rpa.consulta_nfe", bind=True, max_retries=0)
+def consulta_nfe(self, job_id: str, tenant: str, ator: str, envelope: Dict[str, str]) -> Dict[str, Any]:
+    return _executar_extrato(job_id, tenant, ator, envelope, portal="nfe", nome="da NF-e", finalidade="consulta_nfe", tipo_documento="NFE")

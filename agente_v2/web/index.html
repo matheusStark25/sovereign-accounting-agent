@@ -73,13 +73,28 @@
   <section id="aba-painel" class="aba-conteudo painel" role="tabpanel" hidden>
     <div class="grade">
       <article class="cartao">
-        <h2>Extrato do FGTS</h2>
+        <h2>Robôs dos portais</h2>
         <p class="nota">O robô abre o portal e <strong>pausa</strong> se aparecer captcha ou login: a pessoa que está na máquina do worker resolve na janela do navegador.</p>
-        <form id="form-fgts" class="linha">
+        <h3 class="subtitulo">Extrato do FGTS</h3>
+        <form id="form-fgts" class="linha" data-robo="fgts">
           <input id="cpf-fgts" inputmode="numeric" placeholder="CPF do trabalhador" maxlength="14" aria-label="CPF do trabalhador" required>
           <button class="botao primario" type="submit">Consultar</button>
         </form>
         <p id="status-fgts" class="status" role="status"></p>
+        <h3 class="subtitulo">Extrato/DAS do MEI (PGMEI)</h3>
+        <form id="form-pgmei" class="linha quebra" data-robo="pgmei">
+          <input id="cnpj-pgmei" inputmode="numeric" placeholder="CNPJ do MEI" maxlength="18" aria-label="CNPJ do MEI" required>
+          <input id="ano-pgmei" class="curto" type="number" min="2000" max="2100" placeholder="Ano" aria-label="Ano do extrato (opcional)">
+          <button class="botao primario" type="submit">Consultar</button>
+        </form>
+        <p id="status-pgmei" class="status" role="status"></p>
+        <h3 class="subtitulo">Nota fiscal (NF-e, CT-e ou NFC-e)</h3>
+        <form id="form-nfe" class="linha" data-robo="nfe">
+          <textarea id="chave-nfe" inputmode="numeric" rows="2" placeholder="Chave de acesso (44 dígitos); várias: uma por linha, até 20" aria-label="Chaves de acesso" required></textarea>
+          <button class="botao primario" type="submit">Consultar</button>
+        </form>
+        <p id="status-nfe" class="status" role="status"></p>
+        <div id="resumo-nfe" class="lista-nfe" hidden></div>
       </article>
 
       <article class="cartao">

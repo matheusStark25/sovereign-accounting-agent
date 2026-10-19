@@ -2,7 +2,8 @@
 
 import json
 
-from contabil_agente.rpa import ConfigPortalPGMEI
+from contabil_agente.rpa import ConfigPortalNFe, ConfigPortalPGMEI
+from contabil_agente.tests.portal_nfe_falso import NfeFalsa
 from contabil_agente.tests.portal_pgmei_falso import PgmeiFalso
 
 from .test_api import client, entrar, llm  # noqa: F401
@@ -131,3 +132,71 @@ def test_cnpj_nunca_aparece_na_trilha_nem_no_status_do_pgmei(rpa, canal, tmp_pat
     bruto = open(tmp_path / "audit" / "empresa_a.worm.jsonl", "rb").read() + open(rpa.app.state.rpa_status.db_path, "rb").read()
     assert b"11222333000181" not in bruto and CNPJ.encode() not in bruto
     assert rpa.get(f"/api/v1/rpa/jobs/{job_id}", headers=h).json()["estado"] == "CONCLUIDO"
+
+
+# --------------------------------------------------------------------------- consulta de NF-e pela fila
+CHAVE_NFE = "35260911222333000181550010000012341000001234"
+
+
+def _com_nfe(rpa, canal, **kw):
+    nfe = NfeFalsa(**kw)
+    rpa.ctx.config_nfe = ConfigPortalNFe(url=nfe.url, headless=True, canal=canal, timeout_humano_s=20, timeout_navegacao_s=20, espera_resultado_s=8, espera_elemento_s=3)
+    return nfe
+
+
+def test_consulta_de_nfe_de_ponta_a_ponta_pela_rota_e_pelo_agente(rpa, canal):
+    nfe = _com_nfe(rpa, canal)
+    try:
+        h = entrar(rpa, "maria")
+        r = rpa.post("/api/v1/rpa/nfe", json={"chave": CHAVE_NFE}, headers=h)
+        assert r.status_code == 202, r.text
+        job = rpa.get(f"/api/v1/rpa/jobs/{r.json()['job_id']}", headers=h).json()
+        assert job["estado"] == "CONCLUIDO", job
+        assert job["resultado"]["tipo"] == "CONSULTA_NFE" and job["resultado"]["resumo"]["numero"] == "1234"
+        assert job["resultado"]["resumo"]["emitente"]["nome"] == "COMERCIO DE TESTE LTDA" and rpa.cliques  # a "pessoa" resolveu o hCaptcha
+
+        via_agente = chamar(rpa, "RPAAgent", "solicitar_extrato", {"portal": "nfe", "documento": CHAVE_NFE}).json()
+        assert via_agente["status"] == "ok"
+        estado = chamar(rpa, "RPAAgent", "estado", {"job_id": via_agente["job_id"]}).json()
+        assert estado["trabalho"]["estado"] == "CONCLUIDO" and len(nfe.envios) == 2
+    finally:
+        nfe.parar()
+
+
+def test_nfe_com_chave_invalida_nao_enfileira_e_a_chave_nao_fica_na_trilha_nem_no_status(rpa, canal, tmp_path):
+    assert rpa.post("/api/v1/rpa/nfe", json={"chave": CHAVE_NFE[:-1] + "0"}, headers=entrar(rpa, "maria")).status_code == 422
+    assert rpa.cliques == []
+    nfe = _com_nfe(rpa, canal)
+    try:
+        h = entrar(rpa, "maria")
+        job_id = rpa.post("/api/v1/rpa/nfe", json={"chave": CHAVE_NFE}, headers=h).json()["job_id"]
+    finally:
+        nfe.parar()
+    bruto = open(tmp_path / "audit" / "empresa_a.worm.jsonl", "rb").read() + open(rpa.app.state.rpa_status.db_path, "rb").read()
+    assert CHAVE_NFE.encode() not in bruto
+    assert rpa.get(f"/api/v1/rpa/jobs/{job_id}", headers=h).json()["estado"] == "CONCLUIDO"
+
+
+def test_lote_de_chaves_um_trabalho_por_chave_e_ct_e_vai_para_o_portal_do_ct_e(rpa, canal):
+    from contabil_agente.rpa import ConfigPortalCTe
+    from contabil_agente.tests.portal_nfe_falso import chave_com_dv
+
+    chave_cte = chave_com_dv("3526091122233300018157001000004321100000123")
+    nfe, cte = _com_nfe(rpa, canal), NfeFalsa(estrutura="cte")
+    rpa.ctx.config_cte = ConfigPortalCTe(url=cte.url, headless=True, canal=canal, timeout_humano_s=20, timeout_navegacao_s=20, espera_resultado_s=8)
+    try:
+        h = entrar(rpa, "maria")
+        ruim = rpa.post("/api/v1/rpa/nfe/lote", json={"chaves": [CHAVE_NFE, CHAVE_NFE[:-1] + "0"]}, headers=h)
+        assert ruim.status_code == 422 and "Chave 2" in ruim.json()["detail"] and nfe.envios == []  # nenhuma entrou na fila
+        r = rpa.post("/api/v1/rpa/nfe/lote", json={"chaves": [CHAVE_NFE, chave_cte]}, headers=h)
+        assert r.status_code == 202, r.text
+        trabalhos = r.json()["trabalhos"]
+        assert [t["posicao"] for t in trabalhos] == [1, 2] and trabalhos[1]["final_da_chave"] == chave_cte[-4:]
+        jobs = [rpa.get(f"/api/v1/rpa/jobs/{t['job_id']}", headers=h).json() for t in trabalhos]
+        assert [j["resultado"]["tipo"] for j in jobs] == ["CONSULTA_NFE", "CONSULTA_CTE"]
+        assert jobs[1]["resultado"]["resumo"]["numero"] == "4321" and len(nfe.envios) == 1 and len(cte.envios) == 1
+        mdfe = chave_com_dv("3526091122233300018158001000000001100000001")
+        assert rpa.post("/api/v1/rpa/nfe", json={"chave": mdfe}, headers=h).status_code == 422  # modelo 58: o robô não consulta
+    finally:
+        nfe.parar()
+        cte.parar()

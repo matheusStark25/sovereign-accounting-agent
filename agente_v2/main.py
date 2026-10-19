@@ -9,8 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -26,7 +27,8 @@ import hashlib
 import hmac as _hmac
 
 from contabil_agente.documentos import gerar_pdf_calculo, hash_do_resultado
-from contabil_agente.documentos.validadores import validar_cnpj, validar_cpf
+from contabil_agente.documentos.validadores import validar_chave_acesso, validar_cnpj, validar_cpf
+from contabil_agente.rpa.robo_nfe import MODELOS as MODELOS_FISCAIS, modelo_da_chave
 from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 from contabil_agente.rpa import estado as rpa_estado
 from contabil_agente.rpa.estado import StatusStore
@@ -101,6 +103,14 @@ class PedidoFGTS(BaseModel):
 class PedidoPGMEI(BaseModel):
     cnpj: str = Field(max_length=20)
     ano: Optional[int] = Field(default=None, ge=2000, le=2100)
+
+
+class PedidoNFe(BaseModel):
+    chave: str = Field(max_length=60)
+
+
+class PedidoNFeLote(BaseModel):
+    chaves: List[str] = Field(min_length=1, max_length=20)
 
 
 class PedidoDecisao(BaseModel):
@@ -498,12 +508,15 @@ def create_app(
 
     # -------------------------------------------------------------------- RPA
     def enfileirar_extrato(request: Request, usuario: Principal, portal: str, documento: str, ano: Optional[int] = None) -> Dict[str, Any]:
-        """Enfileira o extrato do FGTS (CPF) ou do PGMEI (CNPJ). O documento vai cifrado (pós-quântico) pelo broker; o robô
-        pausa para uma pessoa resolver captcha/login na janela do navegador do worker."""
-        pgmei = portal == "pgmei"
-        if not (validar_cnpj(documento) if pgmei else validar_cpf(documento)):
-            raise HTTPException(status_code=422, detail="CNPJ inválido." if pgmei else "CPF inválido.")
-        finalidade = "consulta_extrato_pgmei" if pgmei else "consulta_extrato_fgts"
+        """Enfileira o extrato do FGTS (CPF), do PGMEI (CNPJ) ou a consulta de NF-e (chave de 44 dígitos). O documento vai cifrado
+        (pós-quântico) pelo broker; o robô pausa para uma pessoa resolver captcha/login na janela do navegador do worker."""
+        pgmei, nfe = portal == "pgmei", portal == "nfe"
+        validador, erro = (validar_chave_acesso, "Chave de acesso inválida.") if nfe else (validar_cnpj, "CNPJ inválido.") if pgmei else (validar_cpf, "CPF inválido.")
+        if not validador(documento):
+            raise HTTPException(status_code=422, detail=erro)
+        if nfe and modelo_da_chave(documento) not in MODELOS_FISCAIS:
+            raise HTTPException(status_code=422, detail="O robô consulta NF-e (modelo 55), CT-e (57) e NFC-e (65); esta chave é de outro modelo.")
+        finalidade = "consulta_nfe" if nfe else "consulta_extrato_pgmei" if pgmei else "consulta_extrato_fgts"
         try:
             request.app.state.lgpd.exigir_base_legal(finalidade, usuario.tenant_id, documento)
         except TratamentoSemBaseLegal as exc:
@@ -511,15 +524,18 @@ def create_app(
         chave = request.app.state.rpa_chave_publica
         if chave is None:
             raise HTTPException(status_code=503, detail="RPA não configurado: falta RPA_PQC_PUBLIC_KEY (gere com: python -m agente_v2.cli gerar-chaves-rpa).")
-        from contabil_agente.tarefas.rpa import envelope_do_cpf, extrato_fgts, extrato_pgmei
+        from contabil_agente.tarefas.rpa import consulta_nfe, envelope_do_cpf, extrato_fgts, extrato_pgmei
 
         titular = PIIAnonymizer.hash_pii(documento, request.app.state.lgpd._chave_hash)
         status_store = request.app.state.rpa_status
-        job_id = status_store.criar(usuario.tenant_id, usuario.user_id, "extrato_pgmei" if pgmei else "extrato_fgts", titular)
+        tarefa = "consulta_nfe" if nfe else "extrato_pgmei" if pgmei else "extrato_fgts"
+        job_id = status_store.criar(usuario.tenant_id, usuario.user_id, tarefa, titular)
         envelope = envelope_do_cpf(chave, documento, usuario.tenant_id, job_id, portal)
-        _auditar(request, "process_document", usuario, "Extrato do PGMEI solicitado" if pgmei else "Extrato do FGTS solicitado", job=job_id, titular=titular)
+        _auditar(request, "process_document", usuario, "Consulta de NF-e solicitada" if nfe else "Extrato do PGMEI solicitado" if pgmei else "Extrato do FGTS solicitado", job=job_id, titular=titular)
         try:
-            if pgmei:
+            if nfe:
+                consulta_nfe.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope])
+            elif pgmei:
                 extrato_pgmei.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope, ano])
             else:
                 extrato_fgts.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope])
@@ -538,6 +554,21 @@ def create_app(
     def enfileirar_extrato_pgmei(pedido: PedidoPGMEI, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
         """Extrato/DAS do MEI no PGMEI (CNPJ), com a pessoa resolvendo só o captcha."""
         return enfileirar_extrato(request, usuario, "pgmei", pedido.cnpj, pedido.ano)
+
+    @app.post("/api/v1/rpa/nfe", status_code=202)
+    def enfileirar_consulta_nfe(pedido: PedidoNFe, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        """Resumo de uma NF-e, CT-e ou NFC-e pela chave de 44 dígitos (o modelo na chave escolhe o portal), com a pessoa resolvendo só o captcha."""
+        return enfileirar_extrato(request, usuario, "nfe", re.sub(r"\D", "", pedido.chave))
+
+    @app.post("/api/v1/rpa/nfe/lote", status_code=202)
+    def enfileirar_consulta_nfe_lote(pedido: PedidoNFeLote, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        """Várias chaves de uma vez (até 20): um trabalho por chave, na ordem enviada. Se uma for inválida, nenhuma entra na fila."""
+        chaves = [re.sub(r"\D", "", c) for c in pedido.chaves]
+        for n, chave in enumerate(chaves, 1):
+            if not validar_chave_acesso(chave) or modelo_da_chave(chave) not in MODELOS_FISCAIS:
+                raise HTTPException(status_code=422, detail=f"Chave {n} inválida (ou de um modelo que o robô não consulta).")
+        return {"trabalhos": [{"posicao": n, "final_da_chave": chave[-4:], **enfileirar_extrato(request, usuario, "nfe", chave)}
+                              for n, chave in enumerate(chaves, 1)]}
 
     instalar_agentes(app, _auditar, enfileirar_extrato)
     instalar_voz(app, _auditar, _base_legal)

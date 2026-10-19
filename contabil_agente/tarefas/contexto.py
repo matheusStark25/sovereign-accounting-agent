@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Mapping, Optional
 
 from contabil_agente.lgpd import ConsentimentoStore, PoliticaDeRetencao, ServicoLGPD
 from contabil_agente.pipeline import DocumentDispatcher, HistoricoDocumentos, destinos_do_ambiente, provedores_do_ambiente
-from contabil_agente.rpa import ConfigPortalFGTS, ConfigPortalPGMEI
+from contabil_agente.rpa import ConfigPortalCTe, ConfigPortalFGTS, ConfigPortalNFCe, ConfigPortalNFe, ConfigPortalPGMEI
 from contabil_agente.rpa.estado import StatusStore
 from contabil_agente.security.worm_audit import WormAudit
 
@@ -27,6 +27,9 @@ class Contexto:
     # só para testes: age sobre a página quando o robô pausa (faz o papel da pessoa)
     ao_pausar: Optional[Callable[[str, str, Any], None]] = None
     config_pgmei: ConfigPortalPGMEI = field(default_factory=ConfigPortalPGMEI)
+    config_nfe: ConfigPortalNFe = field(default_factory=ConfigPortalNFe)
+    config_cte: ConfigPortalCTe = field(default_factory=ConfigPortalCTe)
+    config_nfce: ConfigPortalNFCe = field(default_factory=ConfigPortalNFCe)
 
 
 _CONTEXTO: Optional[Contexto] = None
@@ -57,7 +60,9 @@ def contexto_do_ambiente(env: Optional[Mapping[str, str]] = None) -> Contexto:
     lgpd = ServicoLGPD(audit, ConsentimentoStore(base / "lgpd.db", chave_hash), PoliticaDeRetencao.carregar(), raiz_arquivo=base / "arquivo", historico=historico)
     return Contexto(
         audit=audit, dispatcher=dispatcher, lgpd=lgpd, status=StatusStore(base / "rpa.db"),
-        config_fgts=ConfigPortalFGTS.carregar(env=segredos), config_pgmei=ConfigPortalPGMEI.carregar(env=segredos), pasta_de_trabalho=base / "rpa",
+        config_fgts=ConfigPortalFGTS.carregar(env=segredos), config_pgmei=ConfigPortalPGMEI.carregar(env=segredos),
+        config_nfe=ConfigPortalNFe.carregar(env=segredos), config_cte=ConfigPortalCTe.carregar(env=segredos),
+        config_nfce=ConfigPortalNFCe.carregar(env=segredos), pasta_de_trabalho=base / "rpa",
         chave_privada_rpa=_json_do_ambiente(segredos, "RPA_PQC_PRIVATE_KEY"), chave_hash=chave_hash,
     )
 

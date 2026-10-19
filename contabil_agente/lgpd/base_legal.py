@@ -45,6 +45,7 @@ FINALIDADES: Dict[str, Finalidade] = {f.codigo: f for f in [
     Finalidade("envio_a_provedor_de_ia", "Enviar texto de documentos a provedores externos de IA (transferência a terceiros)", BaseLegal.CONSENTIMENTO),
     Finalidade("consulta_extrato_fgts", "Consultar o extrato do FGTS do trabalhador no portal da Caixa", BaseLegal.CONSENTIMENTO),
     Finalidade("consulta_extrato_pgmei", "Consultar o extrato/DAS do MEI do cliente no portal da Receita Federal", BaseLegal.CONTRATO),
+    Finalidade("consulta_nfe", "Consultar o resumo de uma NF-e do cliente no portal nacional da NF-e (SEFAZ)", BaseLegal.CONTRATO),
     Finalidade("exame_ocupacional", "Registrar ASO e dados de saúde ocupacional", BaseLegal.OBRIGACAO_LEGAL, dados_sensiveis=True),
 ]}
 

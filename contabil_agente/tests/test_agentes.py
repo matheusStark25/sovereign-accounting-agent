@@ -130,10 +130,11 @@ def test_rpaagent_valida_portal_e_ano_e_repassa_o_pedido():
     ag = RPAAgent(lambda portal, doc, ano: (pedidos.append((portal, doc, ano)), {"job_id": "j1", "estado": "RECEBIDO"})[1], lambda job: {"id": job} if job == "j1" else None)
     assert ag.executar("solicitar_extrato", {"portal": "pgmei", "documento": CNPJ, "ano": 2026})["job_id"] == "j1"
     assert pedidos == [("pgmei", CNPJ, 2026)]
-    assert ag.executar("solicitar_extrato", {"portal": "sefaz", "documento": CNPJ})["status"] == "erro"
+    assert ag.executar("solicitar_extrato", {"portal": "esocial", "documento": CNPJ})["status"] == "erro"
+    assert ag.executar("solicitar_extrato", {"portal": "nfe", "documento": "3526 0911"})["job_id"] == "j1" and pedidos[-1][0] == "nfe"
     assert ag.executar("solicitar_extrato", {"portal": "fgts", "documento": CPF, "ano": "2026"})["status"] == "erro"
     assert ag.executar("estado", {"job_id": "j1"})["trabalho"] == {"id": "j1"} and ag.executar("estado", {"job_id": "zz"})["status"] == "erro"
-    assert [p["portal"] for p in ag.executar("portais", {})["portais"]] == ["fgts", "pgmei"]
+    assert [p["portal"] for p in ag.executar("portais", {})["portais"]] == ["fgts", "pgmei", "nfe"]
 
 
 # ------------------------------------------------------------------------------ orquestrador

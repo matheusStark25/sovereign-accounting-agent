@@ -8,7 +8,10 @@
     python -m agente_v2.cli verificar-ia --env-file .env
     python -m agente_v2.cli calibrar-fgts --canal msedge --saida ./calibragem
     python -m agente_v2.cli baixar-extrato --portal pgmei --documento 11.222.333/0001-81 --ano 2026 --canal msedge
+    python -m agente_v2.cli baixar-extrato --portal nfe --documento <chave 1> --documento <chave 2> --canal msedge   # NF-e, CT-e ou NFC-e
     python -m agente_v2.cli baixar-extrato --portal fgts --documento 529.982.247-25 --canal msedge
+    python -m agente_v2.cli observar-pasta --usuario maria            # o PDF baixado no navegador normal entra sozinho
+    python -m agente_v2.cli baixar-xml-nfe --pfx empresa.pfx --uf SP --chave <chave> --usuario maria   # XML pelo web service oficial
 """
 
 from __future__ import annotations
@@ -101,34 +104,52 @@ def carregar_env(caminho: str) -> dict:
 
 
 def baixar_extrato(args: argparse.Namespace) -> int:
-    """Baixa o extrato (FGTS por CPF ou PGMEI por CNPJ) com uma janela de navegador; a pessoa resolve só o captcha/login."""
+    """Baixa o extrato (FGTS por CPF, PGMEI por CNPJ) ou consulta o resumo de NF-e, CT-e ou NFC-e (uma ou várias chaves) com uma
+    janela de navegador; a pessoa resolve só o captcha/login."""
     from contabil_agente.rpa import (
-        ConfigPortalFGTS, ConfigPortalPGMEI, ErroDoRobo, HumanoNaoRespondeu, PortalBloqueouAutomacao, RoboExtratoFGTS, RoboExtratoPGMEI,
+        ConfigPortalCTe, ConfigPortalFGTS, ConfigPortalNFCe, ConfigPortalNFe, ConfigPortalPGMEI, ErroDoRobo, HumanoNaoRespondeu,
+        PortalBloqueouAutomacao, RoboConsultaNFe, RoboExtratoFGTS, RoboExtratoPGMEI, config_para_chave,
     )
 
-    pgmei = args.portal == "pgmei"
-    config_cls, robo_cls = (ConfigPortalPGMEI, RoboExtratoPGMEI) if pgmei else (ConfigPortalFGTS, RoboExtratoFGTS)
-    cfg = config_cls.carregar(args.config) if args.config else config_cls.carregar()
-    cfg = cfg.com(headless=bool(args.headless), **({"canal": args.canal} if args.canal else {}), **({"url": args.url} if args.url else {}))
+    pgmei, nfe = args.portal == "pgmei", args.portal == "nfe"
+    documentos = args.documento
+    if not nfe and len(documentos) > 1:
+        print(json.dumps({"status": "erro", "motivo": "um_documento_por_vez", "mensagem": "várias de uma vez só para --portal nfe"}, ensure_ascii=False))
+        return 1
+
+    def ajustar(cfg):
+        return cfg.com(headless=bool(args.headless), **({"canal": args.canal} if args.canal else {}), **({"url": args.url} if args.url else {}))
+
+    def carregar(cls):
+        return ajustar(cls.carregar(args.config) if args.config else cls.carregar())
 
     def avisar(motivo: str, seletor: str, page) -> None:
         print(f"\n>>> Sua vez na janela do navegador: {motivo}", file=sys.stderr)
 
-    robo = robo_cls(cfg, args.saida, notificar_humano=avisar)
-
     def saida(status: str, codigo: int, **extra) -> int:
-        print(json.dumps({"status": status, **extra}, ensure_ascii=False))
+        print(json.dumps({"status": status, **extra}, ensure_ascii=False), flush=True)
         return codigo
 
-    try:
-        r = robo.executar(args.documento, ano=args.ano) if pgmei else robo.executar(args.documento)
-    except PortalBloqueouAutomacao as exc:
-        return saida("bloqueado", 3, mensagem=str(exc))
-    except HumanoNaoRespondeu as exc:
-        return saida("sem_resposta_da_pessoa", 4, mensagem=str(exc))
-    except ErroDoRobo as exc:
-        return saida("erro", 1, motivo=exc.motivo, mensagem=str(exc), diagnostico=str(Path(args.saida)))
-    return saida("ok", 0, caminho=r.caminho, sha256=r.sha256, tamanho=r.tamanho, segundos_com_humano=round(r.segundos_com_humano, 1))
+    def um(documento: str) -> int:
+        try:
+            if nfe:  # o modelo gravado na chave (NF-e, CT-e ou NFC-e) escolhe o portal
+                cfg = config_para_chave(documento, carregar(ConfigPortalNFe), carregar(ConfigPortalCTe), carregar(ConfigPortalNFCe))
+                r = RoboConsultaNFe(cfg, args.saida, notificar_humano=avisar).executar(documento)
+            elif pgmei:
+                r = RoboExtratoPGMEI(carregar(ConfigPortalPGMEI), args.saida, notificar_humano=avisar).executar(documento, ano=args.ano)
+            else:
+                r = RoboExtratoFGTS(carregar(ConfigPortalFGTS), args.saida, notificar_humano=avisar).executar(documento)
+        except PortalBloqueouAutomacao as exc:
+            return saida("bloqueado", 3, mensagem=str(exc))
+        except HumanoNaoRespondeu as exc:
+            return saida("sem_resposta_da_pessoa", 4, mensagem=str(exc))
+        except ErroDoRobo as exc:
+            return saida("erro", 1, motivo=exc.motivo, mensagem=str(exc), diagnostico=str(Path(args.saida)))
+        extra = {"modelo": r.dados.get("modelo"), "resumo": r.dados["resumo"]} if nfe else {}
+        return saida("ok", 0, caminho=r.caminho, sha256=r.sha256, tamanho=r.tamanho, segundos_com_humano=round(r.segundos_com_humano, 1), **extra)
+
+    codigos = [um(d) for d in documentos]  # várias chaves: uma linha de resultado por chave, na ordem
+    return next((c for c in codigos if c), 0)
 
 
 def calibrar_fgts(args: argparse.Namespace) -> int:
@@ -178,6 +199,68 @@ def verificar_ia(args: argparse.Namespace) -> int:
     return 0 if all(v["chamada_ok"] for v in verificados) else 1
 
 
+def baixar_xml_nfe(args: argparse.Namespace) -> int:
+    """XML completo da NF-e pelo web service oficial (NFeDistribuicaoDFe), com o certificado A1 da empresa. Opcional: já envia ao sistema."""
+    from contabil_agente.sefaz import CertificadoA1, ClienteDistribuicao, ErroDistribuicao
+
+    from .observador import ClienteAPI, ErroDeEnvio
+
+    def saida(status: str, **extra) -> None:
+        print(json.dumps({"status": status, **extra}, ensure_ascii=False), flush=True)
+
+    senha = os.environ.get("CERTIFICADO_SENHA") or getpass.getpass("Senha do certificado (.pfx): ")
+    try:
+        cert = CertificadoA1(args.pfx, senha)
+        sefaz = ClienteDistribuicao(cert, args.uf, "homologacao" if args.homologacao else "producao", documento=args.cnpj,
+                                    url=args.url, verificar=args.ca or True)
+    except ErroDistribuicao as exc:
+        saida("erro", motivo=exc.motivo, mensagem=str(exc))
+        return 1
+    api = None
+    if args.usuario:
+        api = ClienteAPI(args.api, args.usuario, os.environ.get("AGENTE_SENHA") or getpass.getpass(f"Senha de {args.usuario} no sistema: "))
+    codigo = 0
+    for chave in args.chave:
+        try:
+            xml, resp = sefaz.baixar_xml(chave, args.saida)
+        except ErroDistribuicao as exc:
+            saida("erro", final_da_chave=chave[-4:], motivo=exc.motivo, cstat=exc.cstat, mensagem=str(exc))
+            codigo = 1
+            continue
+        extra = {}
+        if api is not None:
+            try:
+                doc = api(Path(xml.caminho))
+                extra = {"enviado": True, "tipo": doc.get("tipo"), "estado": doc.get("estado"), "requer_revisao": doc.get("requer_revisao")}
+            except ErroDeEnvio as exc:
+                extra, codigo = {"enviado": False, "erro_envio": str(exc)}, 1
+        saida("ok", caminho=xml.caminho, sha256=xml.sha256, tamanho=xml.tamanho, cstat=resp.cstat, **extra)
+    return codigo
+
+
+def observar_pasta(args: argparse.Namespace) -> int:
+    """Envia ao sistema cada PDF novo que aparecer na pasta (o extrato que você baixou no seu navegador normal)."""
+    import time
+
+    from .observador import ClienteAPI, ObservadorDePasta
+
+    senha = os.environ.get("AGENTE_SENHA") or getpass.getpass(f"Senha de {args.usuario}: ")
+    observador = ObservadorDePasta(Path(args.pasta).expanduser(), ClienteAPI(args.api, args.usuario, senha),
+                                   desde=0.0 if args.incluir_existentes else None)
+    print(f"Olhando {observador.pasta} (Ctrl+C para parar). Baixe o PDF no seu navegador e ele entra sozinho.", file=sys.stderr)
+    try:
+        voltas = 0
+        while True:
+            for item in observador.varrer():
+                print(json.dumps(item, ensure_ascii=False), flush=True)
+            voltas += 1
+            if args.uma_vez and voltas >= 2:  # duas voltas: a primeira vê o arquivo, a segunda confirma que parou de crescer
+                return 0
+            time.sleep(args.intervalo)
+    except KeyboardInterrupt:
+        return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agente_v2.cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -199,9 +282,10 @@ def main(argv=None) -> int:
     v = sub.add_parser("verificar-ia", help="testa de verdade as chaves e os modelos de IA configurados")
     v.add_argument("--env-file", help="arquivo CHAVE=valor com as chaves (ex.: .env)")
     v.set_defaults(func=verificar_ia)
-    e = sub.add_parser("baixar-extrato", help="baixa o extrato do FGTS (CPF) ou do PGMEI (CNPJ); a pessoa resolve só o captcha/login")
-    e.add_argument("--portal", choices=("fgts", "pgmei"), required=True)
-    e.add_argument("--documento", required=True, help="CPF (fgts) ou CNPJ (pgmei)")
+    e = sub.add_parser("baixar-extrato", help="baixa o extrato do FGTS (CPF) ou do PGMEI (CNPJ) ou consulta NF-e, CT-e e NFC-e (chave); a pessoa resolve só o captcha/login")
+    e.add_argument("--portal", choices=("fgts", "pgmei", "nfe"), required=True)
+    e.add_argument("--documento", required=True, action="append",
+                   help="CPF (fgts), CNPJ (pgmei) ou chave de acesso de 44 dígitos de NF-e, CT-e ou NFC-e (nfe; repita para várias)")
     e.add_argument("--ano", type=int, help="ano do extrato (só pgmei; padrão: o ano atual)")
     e.add_argument("--saida", default="./extratos", help="pasta de trabalho: PDFs, perfil do navegador e diagnósticos")
     e.add_argument("--canal", help="msedge ou chrome (navegador já instalado)")
@@ -215,6 +299,26 @@ def main(argv=None) -> int:
     f.add_argument("--canal", help="msedge ou chrome (navegador já instalado); padrão: Chromium do Playwright")
     f.add_argument("--perfil", help="pasta do perfil do navegador (a sessão logada fica guardada nela)")
     f.set_defaults(func=calibrar_fgts)
+    x = sub.add_parser("baixar-xml-nfe", help="XML completo da NF-e pelo web service oficial da SEFAZ, com o certificado A1 da empresa")
+    x.add_argument("--pfx", required=True, help="certificado A1 (.pfx/.p12); a senha vem de CERTIFICADO_SENHA ou é perguntada")
+    x.add_argument("--uf", required=True, help="UF da empresa (sigla, como SP)")
+    x.add_argument("--chave", required=True, action="append", help="chave de acesso de 44 dígitos (repita para várias)")
+    x.add_argument("--cnpj", help="CNPJ da empresa (padrão: o que está no certificado)")
+    x.add_argument("--saida", default="./xmls", help="pasta onde o XML é gravado")
+    x.add_argument("--homologacao", action="store_true", help="usa o ambiente de homologação da SEFAZ")
+    x.add_argument("--usuario", help="se informado, já envia o XML ao sistema (pipeline de documentos) com este usuário")
+    x.add_argument("--api", default="http://127.0.0.1:8000", help="endereço da API do sistema (com --usuario)")
+    x.add_argument("--url", help=argparse.SUPPRESS)  # endereço do web service: só para testes
+    x.add_argument("--ca", help=argparse.SUPPRESS)  # CA para conferir o servidor: só para testes
+    x.set_defaults(func=baixar_xml_nfe)
+    o = sub.add_parser("observar-pasta", help="envia ao sistema cada PDF novo da pasta (o extrato baixado no seu navegador normal)")
+    o.add_argument("--pasta", default=str(Path.home() / "Downloads"))
+    o.add_argument("--api", default="http://127.0.0.1:8000", help="endereço da API do sistema")
+    o.add_argument("--usuario", required=True, help="usuário do sistema (a senha vem de AGENTE_SENHA ou é perguntada)")
+    o.add_argument("--intervalo", type=float, default=2.0, help="segundos entre uma olhada e outra")
+    o.add_argument("--incluir-existentes", action="store_true", help="envia também os PDFs que já estavam na pasta")
+    o.add_argument("--uma-vez", action="store_true", help="olha a pasta, envia o que estiver pronto e sai")
+    o.set_defaults(func=observar_pasta)
     args = p.parse_args(argv)
     return args.func(args)
 

@@ -344,25 +344,81 @@
     } catch (e) { caixa.checked = !caixa.checked; st.className = "status falha"; st.textContent = e.message; }
   }
 
-  async function acompanharJob(id) {
-    const st = $("status-fgts");
-    for (let i = 0; i < 400; i++) {
-      const j = await api(`/api/v1/rpa/jobs/${id}`);
-      const rotulos = { ENFILEIRADO: "Na fila…", EXECUTANDO: "Executando…", AGUARDANDO_HUMANO: j.mensagem || "Aguardando uma pessoa resolver o desafio na janela do navegador.", CONCLUIDO: "Concluído: extrato baixado e arquivado.", FALHOU: `Falhou: ${j.mensagem}` };
-      st.className = `status ${j.estado === "CONCLUIDO" ? "ok" : j.estado === "FALHOU" ? "falha" : "espera"}`;
-      st.textContent = rotulos[j.estado] || j.estado;
-      if (j.estado === "CONCLUIDO" || j.estado === "FALHOU") return;
-      await new Promise((r) => setTimeout(r, 2000));
-    }
+  // Cada robô: rota da API, corpo do pedido, campo a limpar e a mensagem de pronto.
+  const ROBOS = {
+    fgts: { rota: "/api/v1/rpa/fgts", corpo: () => ({ cpf: $("cpf-fgts").value }), campo: "cpf-fgts", pronto: "Concluído: extrato baixado e arquivado." },
+    pgmei: {
+      rota: "/api/v1/rpa/pgmei", campo: "cnpj-pgmei", pronto: "Concluído: extrato/DAS baixado e arquivado.",
+      corpo: () => { const ano = parseInt($("ano-pgmei").value, 10); return ano ? { cnpj: $("cnpj-pgmei").value, ano } : { cnpj: $("cnpj-pgmei").value }; },
+    },
+    nfe: { rota: "/api/v1/rpa/nfe", corpo: () => ({ chave: $("chave-nfe").value }), campo: "chave-nfe", pronto: "Concluído: nota consultada." },
+  };
+
+  function mostrarResumoNFe(resumo, titulo) {
+    // um bloco por nota consultada; null limpa a lista
+    const lista = $("resumo-nfe");
+    if (resumo === null) { lista.replaceChildren(); lista.hidden = true; return; }
+    const r = resumo || {}, dl = el("dl", { class: "resumo-nfe" });
+    const linhas = [["Número", r.numero], ["Série", r.serie], ["Emissão", r.data_emissao], ["Valor total", r.valor_total], ["Situação", r.situacao],
+      ["Emitente", (r.emitente || {}).nome], ["CNPJ do emitente", (r.emitente || {}).documento], ["Destinatário", (r.destinatario || {}).nome],
+      ["Tomador", (r.tomador || {}).nome || (r.tomador || {}).documento]];
+    for (const [rotulo, valor] of linhas) if (valor) dl.append(el("dt", { texto: rotulo }), el("dd", { texto: valor }));
+    if (!dl.children.length) return;
+    lista.append(el("div", { class: "nota-nfe" }, titulo ? el("p", { class: "nota", texto: titulo }) : null, dl));
+    lista.hidden = false;
   }
 
-  async function pedirExtrato(ev) {
+  function chavesDigitadas() {
+    return $("chave-nfe").value.split(/[\n,;]+/).map((c) => c.trim()).filter(Boolean);
+  }
+
+  function botaoEnviarPdf() {
+    // o portal recusou o robô: o PDF baixado no navegador normal entra pelo mesmo envio de documentos da conversa
+    return el("button", { class: "botao", type: "button", texto: "Enviar o PDF que baixei", onclick: () => { trocarAba("chat"); $("arquivo").click(); } });
+  }
+
+  async function acompanharJob(id, robo, prefixo = "") {
+    const st = $(`status-${robo}`);
+    for (let i = 0; i < 400; i++) {
+      const j = await api(`/api/v1/rpa/jobs/${id}`);
+      const rotulos = { ENFILEIRADO: "Na fila…", EXECUTANDO: "Executando…", AGUARDANDO_HUMANO: j.mensagem || "Aguardando uma pessoa resolver o desafio na janela do navegador.", CONCLUIDO: ROBOS[robo].pronto, FALHOU: `Falhou: ${j.mensagem}` };
+      st.className = `status ${j.estado === "CONCLUIDO" ? "ok" : j.estado === "FALHOU" ? "falha" : "espera"}`;
+      st.textContent = prefixo + (rotulos[j.estado] || j.estado);
+      if (j.estado === "FALHOU" && robo !== "nfe" && /navegador normal/.test(j.mensagem || "")) st.append(" ", botaoEnviarPdf());
+      if (j.estado === "CONCLUIDO" || j.estado === "FALHOU") return j;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    return null;
+  }
+
+  async function consultarNotas(st) {
+    // uma chave vai para /nfe; várias, para /nfe/lote (um trabalho por chave, acompanhados um depois do outro)
+    const chaves = chavesDigitadas();
+    mostrarResumoNFe(null);
+    const r = chaves.length === 1 ? { trabalhos: [{ posicao: 1, ...(await api("/api/v1/rpa/nfe", { metodo: "POST", corpo: { chave: chaves[0] } })) }] }
+      : await api("/api/v1/rpa/nfe/lote", { metodo: "POST", corpo: { chaves } });
+    $("chave-nfe").value = "";
+    let ok = 0;
+    for (const t of r.trabalhos) {
+      const prefixo = r.trabalhos.length > 1 ? `Nota ${t.posicao} de ${r.trabalhos.length}: ` : "";
+      const j = await acompanharJob(t.job_id, "nfe", prefixo);
+      if (j && j.estado === "CONCLUIDO") {
+        ok += 1;
+        mostrarResumoNFe(j.resultado && j.resultado.resumo, r.trabalhos.length > 1 ? `Nota ${t.posicao} (chave …${t.final_da_chave}) · ${j.resultado.modelo || ""}` : "");
+      }
+    }
+    if (r.trabalhos.length > 1) { st.className = `status ${ok === r.trabalhos.length ? "ok" : "falha"}`; st.textContent = `${ok} de ${r.trabalhos.length} nota(s) consultada(s).`; }
+  }
+
+  async function pedirRobo(ev) {
     ev.preventDefault();
-    const st = $("status-fgts"); st.className = "status"; st.textContent = "Enviando…";
+    const robo = ev.currentTarget.dataset.robo, cfg = ROBOS[robo];
+    const st = $(`status-${robo}`); st.className = "status"; st.textContent = "Enviando…";
     try {
-      const r = await api("/api/v1/rpa/fgts", { metodo: "POST", corpo: { cpf: $("cpf-fgts").value } });
-      $("cpf-fgts").value = "";
-      await acompanharJob(r.job_id);
+      if (robo === "nfe") return await consultarNotas(st);
+      const r = await api(cfg.rota, { metodo: "POST", corpo: cfg.corpo() });
+      $(cfg.campo).value = "";
+      await acompanharJob(r.job_id, robo);
     } catch (e) { st.className = "status falha"; st.textContent = e.message; }
   }
 
@@ -404,7 +460,7 @@
     $("arquivo").addEventListener("change", (ev) => enviarDocumento(ev.target.files[0]));
     $("atalhos").addEventListener("click", (ev) => { const c = ev.target.closest(".chip[data-texto]"); if (c) enviar(c.dataset.texto); });
     for (const b of document.querySelectorAll(".aba")) b.addEventListener("click", () => trocarAba(b.dataset.aba));
-    $("form-fgts").addEventListener("submit", pedirExtrato);
+    for (const robo of Object.keys(ROBOS)) $(`form-${robo}`).addEventListener("submit", pedirRobo);
     $("consentimento-ia").addEventListener("change", alterarConsentimento);
     $("botao-auditoria").addEventListener("click", verificarAuditoria);
 

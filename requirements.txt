@@ -17,6 +17,7 @@ bcrypt>=4.1
 cryptography>=50.0      # inclui ML-KEM-768 e ML-DSA-65 (FIPS 203/204)
 hvac>=2.1
 signxml>=4.0
+certifi>=2024.2         # cadeia de confiança para o TLS dos web services da SEFAZ (mTLS com o certificado A1)
 lxml>=5.0
 defusedxml>=0.7
 portalocker>=2.8

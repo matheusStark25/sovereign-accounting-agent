@@ -60,6 +60,14 @@ def servidor(tmp_path_factory):
     t.join(5)
 
 
+@pytest.fixture(autouse=True)
+def limite_de_login_novo(servidor):
+    """Cada teste entra de novo; o limite de 10 logins por minuto (por IP) vale por teste, não para o módulo inteiro."""
+    from contabil_agente.middleware.limite_de_uso import LimiteDeUso
+
+    APP["app"].state.limite_login = LimiteDeUso(maximo=10, janela_segundos=60)
+
+
 @pytest.fixture(scope="module")
 def browser():
     p, b = navegador()
@@ -130,6 +138,85 @@ def test_upload_de_documento_mostra_cartao_com_alertas(pagina):
     assert pagina.locator(".doc .selo.aviso").count() == 1
     # o alerta é parte do fluxo normal da página (não flutua sobre ela como um toast)
     assert pagina.eval_on_selector(".doc .alerta", "e => getComputedStyle(e).position") != "fixed"
+
+
+def _abrir_painel(pagina):
+    entrar(pagina)
+    pagina.wait_for_selector("#app:not([hidden])")
+    pagina.click("button[data-aba='painel']")
+
+
+def _responder(rota, corpo, status=200):
+    import json
+
+    rota.fulfill(status=status, content_type="application/json", body=json.dumps(corpo))
+
+
+def test_painel_nfe_chave_invalida_vem_da_api_de_verdade(pagina):
+    _abrir_painel(pagina)
+    pagina.fill("#chave-nfe", "1234")
+    pagina.click("#form-nfe button[type='submit']")
+    pagina.wait_for_selector("#status-nfe.falha")
+    assert "Chave de acesso inválida" in pagina.inner_text("#status-nfe")
+
+
+def test_painel_nfe_mostra_o_resumo_da_nota_quando_o_trabalho_conclui(pagina):
+    # a fila e o robô são testados pela API (test_api_agentes); aqui o navegador recebe as respostas que a API daria
+    resumo = {"numero": "1234", "serie": "1", "data_emissao": "15/09/2026", "valor_total": "R$ 1.234,56", "situacao": "AUTORIZADA",
+              "emitente": {"nome": "COMERCIO DE TESTE LTDA", "documento": "11.222.333/0001-81"}, "destinatario": {"nome": "FULANO DE TAL"}}
+    estados = iter([{"estado": "AGUARDANDO_HUMANO", "mensagem": "Resolva na janela do navegador: hCaptcha da consulta de NF-e."},
+                    {"estado": "CONCLUIDO", "mensagem": "Consulta da NF-e concluída.", "resultado": {"tipo": "CONSULTA_NFE", "resumo": resumo}}])
+    pagina.route("**/api/v1/rpa/nfe", lambda r: _responder(r, {"job_id": "j1", "estado": "ENFILEIRADO"}, 202))
+    pagina.route("**/api/v1/rpa/jobs/j1", lambda r: _responder(r, next(estados)))
+    _abrir_painel(pagina)
+    pagina.fill("#chave-nfe", "35260911222333000181550010000012341000001234")
+    pagina.click("#form-nfe button[type='submit']")
+    pagina.wait_for_selector("#status-nfe.espera")
+    assert "hCaptcha" in pagina.inner_text("#status-nfe")
+    pagina.wait_for_selector("#resumo-nfe:not([hidden])", timeout=10000)
+    texto = pagina.inner_text("#resumo-nfe")
+    assert "AUTORIZADA" in texto and "COMERCIO DE TESTE LTDA" in texto and "R$ 1.234,56" in texto
+    assert pagina.input_value("#chave-nfe") == "" and "Concluído" in pagina.inner_text("#status-nfe")
+
+
+def test_painel_varias_chaves_vao_em_lote_e_cada_nota_aparece(pagina):
+    pedidos = []
+    trabalhos = [{"posicao": 1, "final_da_chave": "1234", "job_id": "a1"}, {"posicao": 2, "final_da_chave": "0123", "job_id": "a2"}]
+
+    def lote(r):
+        pedidos.append(r.request.post_data_json)
+        _responder(r, {"trabalhos": trabalhos}, 202)
+
+    pagina.route("**/api/v1/rpa/nfe/lote", lote)
+    pagina.route("**/api/v1/rpa/jobs/a1", lambda r: _responder(r, {"estado": "CONCLUIDO", "resultado": {"modelo": "NF-e", "resumo": {"numero": "1234", "situacao": "AUTORIZADA"}}}))
+    pagina.route("**/api/v1/rpa/jobs/a2", lambda r: _responder(r, {"estado": "CONCLUIDO", "resultado": {"modelo": "CT-e", "resumo": {"numero": "4321", "situacao": "AUTORIZADO"}}}))
+    _abrir_painel(pagina)
+    pagina.fill("#chave-nfe", "3526 0911 2223 3300 0181 5500 1000 0012 3410 0000 1234\n35260911222333000181570010000043211000001230")
+    pagina.click("#form-nfe button[type='submit']")
+    pagina.wait_for_selector("text=2 de 2 nota(s) consultada(s).", timeout=10000)
+    assert pedidos == [{"chaves": ["3526 0911 2223 3300 0181 5500 1000 0012 3410 0000 1234", "35260911222333000181570010000043211000001230"]}]
+    texto = pagina.inner_text("#resumo-nfe")
+    assert "4321" in texto and "CT-e" in texto and "1234" in texto and pagina.locator("#resumo-nfe .nota-nfe").count() == 2
+
+
+def test_painel_pgmei_bloqueado_oferece_enviar_o_pdf_baixado(pagina):
+    pedidos = []
+
+    def pedir(r):
+        pedidos.append(r.request.post_data_json)
+        _responder(r, {"job_id": "j2", "estado": "ENFILEIRADO"}, 202)
+
+    pagina.route("**/api/v1/rpa/pgmei", pedir)
+    pagina.route("**/api/v1/rpa/jobs/j2", lambda r: _responder(r, {"estado": "FALHOU", "mensagem": "O portal bloqueou o navegador automatizado. Baixe o extrato no seu navegador normal."}))
+    _abrir_painel(pagina)
+    pagina.fill("#cnpj-pgmei", "11.222.333/0001-81")
+    pagina.fill("#ano-pgmei", "2025")
+    pagina.click("#form-pgmei button[type='submit']")
+    pagina.wait_for_selector("#status-pgmei.falha button")
+    assert pedidos == [{"cnpj": "11.222.333/0001-81", "ano": 2025}]
+    with pagina.expect_file_chooser() as escolha:
+        pagina.click("#status-pgmei button")
+    assert escolha.value is not None and pagina.is_visible("#form-chat")  # voltou para a conversa, com a escolha de arquivo aberta
 
 
 def test_painel_e_sair(pagina):

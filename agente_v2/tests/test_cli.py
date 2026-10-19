@@ -61,6 +61,33 @@ def test_baixar_extrato_pgmei_pela_cli_com_ano(canal, tmp_path, capsys, monkeypa
     assert codigo == 0 and saida["status"] == "ok" and p.anos_pedidos == ["2025"]
 
 
+def test_consultar_nfe_pela_cli_devolve_o_resumo(canal, tmp_path, capsys):
+    from contabil_agente.tests.portal_nfe_falso import NfeFalsa
+
+    p = NfeFalsa(pre_resolvido=True)  # sem pessoa nesta execução sem janela, o token do captcha vem preenchido pelo portal falso
+    try:
+        codigo, saida = _rodar(["--portal", "nfe", "--documento", "35260911222333000181550010000012341000001234", "--url", p.url, "--saida", str(tmp_path), *(["--canal", canal] if canal else [])], capsys)
+    finally:
+        p.parar()
+    assert codigo == 0 and saida["status"] == "ok" and saida["resumo"]["numero"] == "1234" and saida["resumo"]["situacao"] == "AUTORIZADA"
+    assert json.load(open(saida["caminho"], encoding="utf-8"))["resumo"]["emitente"]["nome"] == "COMERCIO DE TESTE LTDA"
+
+
+def test_consultar_varias_chaves_pela_cli_uma_linha_por_chave(canal, tmp_path, capsys):
+    from contabil_agente.tests.portal_nfe_falso import NfeFalsa, chave_com_dv
+
+    p = NfeFalsa(pre_resolvido=True, estrutura="tabela")
+    outra = chave_com_dv("3526091122233300018155001000009999100000555")
+    try:
+        codigo = cli.main(["baixar-extrato", "--portal", "nfe", "--documento", "35260911222333000181550010000012341000001234", "--documento", outra,
+                           "--url", p.url, "--saida", str(tmp_path), "--headless", *(["--canal", canal] if canal else [])])
+    finally:
+        p.parar()
+    linhas = [json.loads(x) for x in capsys.readouterr().out.strip().splitlines()]
+    assert codigo == 0 and [x["resumo"]["numero"] for x in linhas] == ["1234", "9999"] and {x["modelo"] for x in linhas} == {"NF-e"}
+    assert cli.main(["baixar-extrato", "--portal", "fgts", "--documento", "529.982.247-25", "--documento", "529.982.247-25", "--saida", str(tmp_path)]) == 1
+
+
 def test_baixar_extrato_portal_que_bloqueia_sai_com_codigo_3_e_mensagem_clara(canal, tmp_path, capsys):
     p = PortalFalso(com_captcha=False, variante="bloqueado")
     try:
@@ -73,3 +100,35 @@ def test_baixar_extrato_portal_que_bloqueia_sai_com_codigo_3_e_mensagem_clara(ca
 def test_baixar_extrato_documento_invalido_sai_com_erro_e_nao_abre_navegador(tmp_path, capsys):
     codigo, saida = _rodar(["--portal", "pgmei", "--documento", "123", "--saida", str(tmp_path)], capsys)
     assert codigo == 1 and saida["motivo"] == "cnpj_invalido"
+    codigo, saida = _rodar(["--portal", "nfe", "--documento", "123", "--saida", str(tmp_path)], capsys)
+    assert codigo == 1 and saida["motivo"] == "chave_invalida"
+
+
+# ---------------------------------------------------------------- baixar-xml-nfe (web service oficial, mTLS contra a SEFAZ falsa)
+def test_baixar_xml_nfe_pela_cli_e_enviar_ao_sistema(tmp_path, capsys, monkeypatch):
+    import agente_v2.observador as obs
+    from contabil_agente.tests.sefaz_falsa import SENHA_PFX, IcpDeTeste, SefazFalsa
+
+    icp = IcpDeTeste(tmp_path / "icp")
+    sefaz = SefazFalsa(icp)
+    chave = "35260911222333000181550010000012341000001234"
+    monkeypatch.setenv("CERTIFICADO_SENHA", SENHA_PFX)
+    base = ["baixar-xml-nfe", "--pfx", str(icp.pfx), "--uf", "SP", "--chave", chave, "--saida", str(tmp_path / "xmls"), "--url", sefaz.url, "--ca", str(icp.ca_pem)]
+    try:
+        assert cli.main(base) == 0
+        saida = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+        assert saida["status"] == "ok" and saida["cstat"] == "138" and saida["caminho"].endswith(f"nfe_{chave}.xml")
+        enviados = []
+        monkeypatch.setattr(obs, "ClienteAPI", lambda api, usuario, senha: lambda caminho: enviados.append(caminho.name) or {"tipo": "NFE_XML", "estado": "ARCHIVED"})
+        monkeypatch.setenv("AGENTE_SENHA", "x")
+        assert cli.main(base + ["--usuario", "maria"]) == 0
+        saida = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+        assert saida["enviado"] is True and saida["tipo"] == "NFE_XML" and enviados == [f"nfe_{chave}.xml"]
+        sefaz.modo = "resumo"
+        assert cli.main(base) == 1
+        saida = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+        assert saida["motivo"] == "so_resumo" and saida["final_da_chave"] == chave[-4:]
+    finally:
+        sefaz.parar()
+    monkeypatch.setenv("CERTIFICADO_SENHA", "senha errada")
+    assert cli.main(base) == 1 and json.loads(capsys.readouterr().out.strip().splitlines()[-1])["motivo"] == "certificado_invalido"

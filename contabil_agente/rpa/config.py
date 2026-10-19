@@ -124,3 +124,84 @@ class ConfigPortalPGMEI(ConfigPortalFGTS):
                                            "a:has-text('Download')", "a[href$='.pdf']")
     navegacao: Tuple[Tuple[str, ...], ...] = (("text=Pagamentos", "a:has-text('Pagamentos')", "text=Extratos"),)  # cada item: alternativas de UM clique
     seletores_ano: Tuple[str, ...] = ("select", "[role='combobox']")
+
+
+@dataclass(frozen=True)
+class ConfigPortalNFe(ConfigPortalFGTS):
+    """Consulta pública de NF-e (resumo), portal nacional da NF-e (SEFAZ): chave de acesso, hCaptcha resolvido por uma pessoa.
+
+    Conferido ao vivo em 2026-10-19 (antes do captcha): campo ``#ctl00_ContentPlaceHolder1_txtChaveAcessoResumo``, botão
+    ``#ctl00_ContentPlaceHolder1_btnConsultarHCaptcha`` (postback ASP.NET) e o hCaptcha como caixa de seleção visível assim
+    que a página abre, com o ``textarea[name='h-captcha-response']``. A tela da nota que aparece depois do captcha só se
+    confirma com uma pessoa resolvendo-o numa consulta real: o robô a lê por rótulos (``<label>``, ``<th>``, ``<dt>`` ou
+    linhas ``Rótulo: valor``) e, se o portal mudou, para dizendo o que não achou e salva a estrutura mascarada da tela
+    (``diagnostico_*.json``) para ajustar ``NFE_PORTAL_CONFIG``.
+    """
+
+    ENV_PORTAL = "NFE_PORTAL_CONFIG"
+    ENV_URL = ""
+    ENV_PERFIL = "NFE_BROWSER_USER_DATA_DIR"
+    ENV_CANAL = "NFE_BROWSER_CHANNEL"
+
+    url: str = "https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=resumo&tipoConteudo=7PhJ+gAVw2g="
+    seletores_cpf: Tuple[str, ...] = ("#ctl00_ContentPlaceHolder1_txtChaveAcessoResumo", "input[id$='txtChaveAcessoResumo']", "input[id*='ChaveAcesso']")
+    seletores_envio: Tuple[str, ...] = ("#ctl00_ContentPlaceHolder1_btnConsultarHCaptcha", "input[id$='btnConsultarHCaptcha']", "input[value='Continuar']")
+    seletores_desafio: Tuple[str, ...] = ("iframe[src*='hcaptcha']", "iframe[title*='hCaptcha' i]", "[data-sitekey]")
+    rotulo_campo: str = r"chave|acesso"
+    # a tela da nota: o robô a reconhece pela chave na tela ou por estes títulos
+    padrao_resultado: str = r"dados da nf-?e|situa[cç][aã]o atual"
+    padrao_nota_inexistente: str = r"nf-?e (n[aã]o encontrada|inexistente)|chave de acesso (inv[aá]lida|n[aã]o encontrada)|n[aã]o existe nf-?e"
+    espera_resultado_s: int = 25  # quanto esperar a tela da nota depois de clicar em "Continuar"
+    tentativas_captcha: int = 3  # o token do hCaptcha vence: se o portal devolver o formulário, a pessoa resolve de novo
+    modelos: Tuple[str, ...] = ("55",)  # modelo do documento na chave (posições 21-22): 55 NF-e, 57 CT-e, 65 NFC-e
+    nome_portal: str = "portal nacional da NF-e (consulta pública, resumo)"
+    # captcha de imagem (a pessoa digita o código): o robô mostra o aviso na janela e espera "Terminei esta etapa"
+    seletores_captcha_imagem: Tuple[str, ...] = ()
+    uf: str = ""  # código IBGE da UF atendida (portais estaduais, como o da NFC-e); vazio = nacional
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.espera_resultado_s < 1 or self.tentativas_captcha < 1:
+            raise ConfigInvalida("espera_resultado_s e tentativas_captcha devem ser >= 1.")
+        for nome in ("padrao_resultado", "padrao_nota_inexistente"):
+            try:
+                re.compile(getattr(self, nome))
+            except re.error as exc:
+                raise ConfigInvalida(f"{nome} não é uma expressão regular válida: {exc}") from exc
+
+
+@dataclass(frozen=True)
+class ConfigPortalCTe(ConfigPortalNFe):
+    """Consulta pública de CT-e (resumo), portal nacional do CT-e. Conferido ao vivo em 2026-10-19: a mesma tela da NF-e
+    (``#ctl00_ContentPlaceHolder1_txtChaveAcessoResumo``, ``#ctl00_ContentPlaceHolder1_btnConsultarHCaptcha`` e hCaptcha visível)."""
+
+    ENV_PORTAL = "CTE_PORTAL_CONFIG"
+    ENV_PERFIL = "CTE_BROWSER_USER_DATA_DIR"
+    ENV_CANAL = "CTE_BROWSER_CHANNEL"
+
+    url: str = "https://www.cte.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=resumo&tipoConteudo=cktLvUUKqh0="
+    padrao_resultado: str = r"dados do ct-?e|situa[cç][aã]o atual"
+    padrao_nota_inexistente: str = r"ct-?e (n[aã]o encontrado|inexistente)|chave de acesso (inv[aá]lida|n[aã]o encontrada)|n[aã]o existe ct-?e"
+    modelos: Tuple[str, ...] = ("57",)
+    nome_portal: str = "portal nacional do CT-e (consulta pública, resumo)"
+
+
+@dataclass(frozen=True)
+class ConfigPortalNFCe(ConfigPortalNFe):
+    """Consulta pública de NFC-e, que é estadual. O padrão é a SEFAZ-SP, conferida ao vivo em 2026-10-19: campo
+    ``#Conteudo_txtChaveAcesso``, código de imagem ``#txCodigo`` (a pessoa digita) e botão ``#Conteudo_btnConsultaResumida``.
+    Para outra UF, ``NFCE_PORTAL_CONFIG`` com a ``url`` da consulta da sua SEFAZ, a ``uf`` (código IBGE) e os seletores."""
+
+    ENV_PORTAL = "NFCE_PORTAL_CONFIG"
+    ENV_PERFIL = "NFCE_BROWSER_USER_DATA_DIR"
+    ENV_CANAL = "NFCE_BROWSER_CHANNEL"
+
+    url: str = "https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx"
+    seletores_cpf: Tuple[str, ...] = ("#Conteudo_txtChaveAcesso", "input[id$='txtChaveAcesso']")
+    seletores_envio: Tuple[str, ...] = ("#Conteudo_btnConsultaResumida", "input[id$='btnConsultaResumida']")
+    seletores_captcha_imagem: Tuple[str, ...] = ("#txCodigo",)
+    padrao_resultado: str = r"dados da nfc-?e|situa[cç][aã]o atual|dados do emitente"
+    padrao_nota_inexistente: str = r"nfc-?e (n[aã]o encontrada|inexistente)|chave de acesso (inv[aá]lida|n[aã]o encontrada)|n[aã]o existe nfc-?e"
+    modelos: Tuple[str, ...] = ("65",)
+    nome_portal: str = "SEFAZ-SP (consulta pública de NFC-e)"
+    uf: str = "35"

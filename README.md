@@ -7,8 +7,9 @@
 
 Assistente de **Departamento Pessoal e contabilidade** para a legislação brasileira: calcula rescisão, férias,
 13º, INSS, IRRF, FGTS e folha com aritmética decimal exata, gera o PDF do cálculo, lê e confere 27 tipos de
-documento (holerite, TRCT, guias, SPED, XMLs) e busca o extrato do FGTS com um robô que **pausa para uma
-pessoa** resolver login e captcha. Tudo passa por autenticação, isolamento entre empresas e uma trilha de
+documento (holerite, TRCT, guias, SPED, XMLs), busca o extrato do FGTS, o extrato do PGMEI e o resumo de NF-e, CT-e e
+NFC-e com robôs que **pausam para uma pessoa** resolver login e captcha, e baixa o XML completo da NF-e pelo web service
+oficial da SEFAZ com o certificado digital da empresa. Tudo passa por autenticação, isolamento entre empresas e uma trilha de
 auditoria à prova de adulteração.
 
 > Os valores calculados vêm do código, nunca de um modelo de linguagem. O LLM só conversa sobre o que não é
@@ -28,7 +29,7 @@ auditoria à prova de adulteração.
 - [Começando](#começando)
 - [API](#api)
 - [Documentos](#documentos)
-- [RPA: extrato do FGTS e do PGMEI](#rpa-extrato-do-fgts-e-do-pgmei)
+- [RPA: FGTS, PGMEI e notas fiscais](#rpa-fgts-pgmei-e-notas-fiscais)
 - [Segurança e LGPD](#segurança-e-lgpd)
 - [Docker, gateway e Vault](#docker-gateway-e-vault)
 - [Estrutura do projeto](#estrutura-do-projeto)
@@ -84,11 +85,11 @@ graph LR
 | **Segredos** | Variáveis de ambiente ou HashiCorp Vault (token ou AppRole). Vault configurado e fora do ar → a API se recusa a subir (sem fallback silencioso). Sem `JWT_SECRET`, `AUDIT_HMAC_KEY` ou `GOVERNANCA_DSA_KEY` ela também não sobe. |
 | **Criptografia** | CPF cifrado com ML-KEM-768 + X25519 + AES-GCM (pacote `cryptography`) antes de entrar na fila do Celery; mTLS no gateway (porta 8443) e utilitários mTLS/XML-DSig em `agente_v2/`. |
 | **Resiliência** | Circuit breaker, retentativas com backoff exponencial, timeouts, degradação controlada, `/health` e `/ready`. |
-| **Agentes** | `TaxAgent` (cálculos), `ValidationAgent` (CPF, CNPJ, PIS, chave de NF-e e documentos), `ReconciliationAgent` (concilia holerites com a guia do FGTS, a GPS e o DARF do IRRF e aponta a diferença em reais), `ComplianceAgent` (regras de conformidade e base legal da LGPD) e `RPAAgent` (extrato do FGTS e do PGMEI), orquestrados pela API em `/api/v1/agentes`: uma ação de um agente ou um plano de até 10 passos, com o resultado de um passo alimentando o seguinte. |
+| **Agentes** | `TaxAgent` (cálculos), `ValidationAgent` (CPF, CNPJ, PIS, chave de NF-e e documentos), `ReconciliationAgent` (concilia holerites com a guia do FGTS, a GPS e o DARF do IRRF e aponta a diferença em reais), `ComplianceAgent` (regras de conformidade e base legal da LGPD) e `RPAAgent` (extrato do FGTS e do PGMEI, resumo de NF-e, CT-e e NFC-e), orquestrados pela API em `/api/v1/agentes`: uma ação de um agente ou um plano de até 10 passos, com o resultado de um passo alimentando o seguinte. |
 | **Voz** | Microfone no navegador → WebSocket `/ws/voz` (áudio em pedaços) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → resposta frase por frase, lida em voz alta pela voz do navegador (Web Speech API). Exige o consentimento de IA externa (o áudio vai a um terceiro). O MARCOS adapta o tom (formal, informal ou neutro) ao jeito de quem escreve ou fala; a Maria Helena é a persona técnica de auditoria. |
 | **Observabilidade** | Métricas Prometheus em `/metrics`; log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados; e, no perfil `observabilidade` do compose, Prometheus, Alertmanager (7 alertas: API fora do ar, erros 5xx, latência, falha na trilha de auditoria, logins recusados, cálculos com erro, voz com falha) e Grafana com o painel "Sovereign Accounting Agent". |
-| **Interface web** | Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (extrato do FGTS, aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
-| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI com a pessoa resolvendo só o captcha (`baixar-extrato`). |
+| **Interface web** | Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (robôs do FGTS, do PGMEI e das notas fiscais, com uma ou várias chaves e o resumo de cada nota na tela; aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
+| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI e consulta NF-e, CT-e e NFC-e, com a pessoa resolvendo só o captcha (`baixar-extrato`), envia sozinho ao sistema o PDF que você baixou no navegador normal (`observar-pasta`) e baixa o XML da NF-e com o certificado A1 (`baixar-xml-nfe`). |
 
 ## Começando
 
@@ -141,7 +142,8 @@ A documentação interativa (`/docs`) só fica ligada com `AGENTE_ENV=dev`. Rota
 | `POST /api/chat`, `GET /api/chat/{sessao}`, `GET /api/chat/{sessao}/pdf` | Conversa, histórico e PDF do último cálculo |
 | `GET /api/v1/calculo/tipos`, `POST /api/v1/calculo/{tipo}`, `POST /api/v1/calculo/{tipo}/pdf` | Cálculo direto: `rescisao`, `ferias`, `decimo_terceiro`, `inss`, `irrf`, `fgts`, `folha`, `prolabore`, `gps`, `das_mei`, `darf` |
 | `GET /api/v1/documentos/tipos`, `POST /api/v1/documentos`, `POST /api/v1/documentos/lote` | Tipos aceitos, processar um arquivo, processar até 50 em segundo plano (202) |
-| `POST /api/v1/rpa/fgts`, `POST /api/v1/rpa/pgmei`, `GET /api/v1/rpa/jobs/{id}` | Pedir o extrato do FGTS (CPF) ou do PGMEI (CNPJ) (202) e acompanhar o trabalho |
+| `POST /api/v1/rpa/fgts`, `POST /api/v1/rpa/pgmei`, `POST /api/v1/rpa/nfe`, `GET /api/v1/rpa/jobs/{id}` | Pedir o extrato do FGTS (CPF), do PGMEI (CNPJ) ou o resumo de uma NF-e, CT-e ou NFC-e (chave de 44 dígitos) (202) e acompanhar o trabalho |
+| `POST /api/v1/rpa/nfe/lote` | Até 20 chaves de uma vez: um trabalho por chave (se uma for inválida, nenhuma entra na fila) |
 | `GET /api/v1/agentes`, `POST /api/v1/agentes/{agente}/{acao}`, `POST /api/v1/agentes/orquestrar` | Catálogo dos agentes, uma ação de um agente, ou um plano com vários passos |
 | `WS /ws/voz` | Canal de voz: o 1º quadro autentica (`{"tipo": "autenticar", "token": ...}`), depois `inicio`, áudio em pedaços e `fim` (ou `texto`); volta `transcricao`, `fala` frase por frase e `fim_resposta` |
 | `POST /api/v1/governanca/decisoes`, `GET …/pendentes`, `GET …/decisoes/{id}`, `POST …/aprovar`, `POST …/rejeitar` | Decisões críticas assinadas e aprovação por limite |
@@ -192,14 +194,21 @@ resultado de **todas** as empresas da instalação, então aponte só para um se
 vira alerta e não impede o arquivamento. Também existe `CallbackDestino` (uma função Python), disponível só
 pela API Python ao montar o `DocumentDispatcher`.
 
-## RPA: extrato do FGTS e do PGMEI
+## RPA: FGTS, PGMEI e notas fiscais
 
-Dois robôs (Playwright) com o mesmo princípio: **a pessoa só resolve o captcha (ou o login); o resto é do robô**, e o
+Robôs (Playwright) com o mesmo princípio: **a pessoa só resolve o captcha (ou o login); o resto é do robô**, e o
 robô não trava por bobeira.
 
 - **FGTS** (extrato por CPF) e **PGMEI** (extrato/DAS do MEI por CNPJ, portal público da Receita). O PDF baixado
   entra no pipeline de documentos.
-- Só baixa PDF de verdade (confere a assinatura e o tamanho), calcula o SHA-256 e guarda `0600`.
+- **Notas fiscais** pela chave de 44 dígitos; o modelo gravado na chave escolhe o portal: **NF-e** (portal nacional),
+  **CT-e** (portal nacional do CT-e) e **NFC-e** (SEFAZ-SP por padrão; outra UF por `NFCE_PORTAL_CONFIG`). A pessoa clica
+  no hCaptcha (NF-e e CT-e) ou digita o código da imagem (NFC-e de SP); o robô lê a tela da nota (número, série, emissão,
+  valor, situação, emitente, destinatário, tomador) por rótulos e grava `consulta_<modelo>_<sha>.json`. CPF de pessoa
+  física sai mascarado. Várias chaves de uma vez: pela API (`/api/v1/rpa/nfe/lote`), pelo painel (uma por linha) ou
+  repetindo `--documento` na CLI.
+- Só baixa PDF de verdade (confere a assinatura e o tamanho), calcula o SHA-256 e guarda `0600`. Captcha que vence
+  (ou código digitado errado) volta para a pessoa resolver de novo (até `tentativas_captcha`).
 - Só navega nos hosts permitidos, conferidos de novo depois de cada redirecionamento.
 - O CPF/CNPJ nunca vai em claro para o broker (cifrado com ML-KEM + X25519 + AES-GCM) e na auditoria só entra o hash.
 - Sem captcha solver e sem flags para esconder a automação (um teste confere que não existem no código).
@@ -216,14 +225,16 @@ robô não trava por bobeira.
    (`ajuda_humana`, ligado por padrão). Em todos os casos ele salva um `diagnostico_<etapa>_<hora>.json` com a
    estrutura da página (botões, campos, links; números e e-mails mascarados), sem nada digitado.
 5. Se o portal **reprova o navegador automatizado** (ex.: "Comportamento de Robô"), ele falha na hora, com
-   mensagem clara e **sem nova tentativa** (insistir só piora): baixe o PDF no seu navegador normal e envie por
-   `POST /api/v1/documentos`.
+   mensagem clara e **sem nova tentativa** (insistir só piora): baixe o PDF no seu navegador normal. Com o
+   `observar-pasta` ligado ele entra sozinho no sistema (veja abaixo); no painel, o botão "Enviar o PDF que baixei" faz o
+   mesmo na hora.
 
 Como rodar, direto da linha de comando (abre a janela; você resolve o captcha e só):
 
 ```bash
 python -m agente_v2.cli baixar-extrato --portal pgmei --documento 11.222.333/0001-81 --ano 2026 --canal msedge
 python -m agente_v2.cli baixar-extrato --portal fgts  --documento 529.982.247-25 --canal msedge
+python -m agente_v2.cli baixar-extrato --portal nfe   --documento <chave 1> --documento <chave 2> --canal msedge
 ```
 
 Ou pela API (fila `rpa`, com a pessoa na máquina do worker):
@@ -238,14 +249,42 @@ O worker `rpa` precisa rodar **em uma máquina com tela** (a pessoa resolve o ca
 mesmo `DATA_DIR` e os mesmos segredos da API (status das tarefas, auditoria e LGPD ficam em arquivos ali). O
 caminho mais simples é rodar API e worker no mesmo computador. Ele **não** está no `docker-compose.yml`, de
 propósito. Configuração: `FGTS_CAIXA_URL`, `FGTS_PORTAL_CONFIG`, `FGTS_BROWSER_CHANNEL`, `FGTS_BROWSER_USER_DATA_DIR`
-(e `PGMEI_PORTAL_CONFIG`, `PGMEI_BROWSER_CHANNEL`, `PGMEI_BROWSER_USER_DATA_DIR`); o YAML aceita seletores,
+(e `PGMEI_PORTAL_CONFIG`, `PGMEI_BROWSER_CHANNEL`, `PGMEI_BROWSER_USER_DATA_DIR`; e os mesmos três com os prefixos `NFE_`, `CTE_` e `NFCE_`); o YAML aceita seletores,
 rótulos, tempos, `ajuda_humana` e `capturar_tela_na_falha` (a captura de tela pode mostrar dados pessoais, por
 isso vem desligada).
 
 **Nos portais reais (testado em 2026-10-17):** o PGMEI e a Caixa recusam navegador controlado por automação (o PGMEI
 responde "13896 - Impedido por proteção Captcha. Comportamento de Robô"). Nesse caso o robô avisa, e você baixa o PDF no
-navegador normal e envia por `POST /api/v1/documentos`, que classifica, extrai, confere e arquiva. Os robôs foram
-testados de ponta a ponta contra portais falsos que reproduzem mudança de layout, demora, `iframe` e bloqueio.
+navegador normal e envia por `POST /api/v1/documentos` (ou deixa o `observar-pasta` enviar), que classifica, extrai,
+confere e arquiva. Nas consultas de NF-e, CT-e e NFC-e de SP (conferidas em 2026-10-19), o robô acha nas telas reais o
+campo da chave, o botão e o captcha (caixa de seleção do hCaptcha na NF-e e no CT-e, código de imagem na NFC-e). Os robôs
+foram testados de ponta a ponta contra portais falsos com a mesma estrutura, que reproduzem mudança de layout, demora,
+`iframe`, captcha vencido, código errado e bloqueio.
+
+### PDF baixado no navegador normal entra sozinho (`observar-pasta`)
+
+```bash
+python -m agente_v2.cli observar-pasta --usuario maria        # olha a pasta Downloads; a senha vem de AGENTE_SENHA ou é perguntada
+```
+
+Você baixa o extrato do FGTS ou o DAS no seu navegador de sempre e o observador envia cada PDF novo a
+`POST /api/v1/documentos` assim que ele termina de ser gravado. Só PDF de verdade (até 25 MB); o mesmo conteúdo nunca
+vai duas vezes (SHA-256 guardado na pasta); falha de rede tenta de novo, recusa da API não. Ele não toca no navegador nem
+no portal.
+
+### XML completo da NF-e pelo certificado digital (`baixar-xml-nfe`)
+
+```bash
+python -m agente_v2.cli baixar-xml-nfe --pfx empresa.pfx --uf SP --chave <chave> --usuario maria   # senha do .pfx em CERTIFICADO_SENHA
+```
+
+Usa o web service oficial **NFeDistribuicaoDFe** do Ambiente Nacional (sem navegador e sem captcha), com o certificado
+A1 da empresa na conexão (mTLS). O CNPJ sai do próprio certificado (campo da ICP-Brasil). Grava `nfe_<chave>.xml` e, com
+`--usuario`, já envia ao pipeline, que o lê como `NFE_XML` e confere chave, CNPJ, número e total. A SEFAZ só entrega notas
+em que a empresa aparece; quando ela manda só o resumo, o comando diz para registrar a "Ciência da Operação" e consultar
+de novo; consumo indevido (656) e nota inexistente (137) também vêm com o motivo. A chave privada do certificado nunca vai
+em claro para o disco. Os endereços de produção e homologação foram conferidos em 2026-10-19 (TLS válido, 403 sem
+certificado); o fluxo completo foi testado com mTLS de verdade contra uma SEFAZ falsa com o formato do `retDistDFeInt`.
 
 ## Segurança e LGPD
 
@@ -288,6 +327,7 @@ agente_v2/                  API e infraestrutura de execução
 ├── mtls.py, signing.py     certificados mTLS e assinatura XML-DSig
 ├── rotas_agentes.py        API dos agentes e do orquestrador
 ├── rotas_voz.py            canal de voz (WebSocket)
+├── observador.py           pasta observada: PDF baixado no navegador normal entra no sistema
 ├── cli.py, logging_setup.py
 ├── web/                    interface (index.html, app.css, app.js)
 └── tests/                  API, Vault, mTLS, assinatura e front-end (navegador real)
@@ -300,7 +340,8 @@ contabil_agente/            domínio e serviços
 ├── pipeline/               dispatcher, agentes, anomalias, evidência, destinos
 ├── agentes/                TaxAgent, ValidationAgent, ReconciliationAgent, ComplianceAgent, RPAAgent e o orquestrador
 ├── voz/                    Whisper (fala para texto)
-├── rpa/                    robôs do FGTS e do PGMEI, pausa humana, calibragem, estado das tarefas
+├── rpa/                    robôs do FGTS, do PGMEI e das notas fiscais (NF-e, CT-e, NFC-e), pausa humana, calibragem
+├── sefaz/                  web service oficial NFeDistribuicaoDFe (XML da NF-e com certificado A1)
 ├── tarefas/                Celery (filas documentos e rpa)
 ├── security/               auth, RBAC, auditoria WORM, PQC, Vault, criptografia
 ├── lgpd/                   base legal, consentimento, retenção, anonimização
