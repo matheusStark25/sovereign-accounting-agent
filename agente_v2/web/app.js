@@ -74,6 +74,7 @@
 
   async function sair(chamarServidor = true) {
     if (chamarServidor && estado.token) { try { await api("/logout", { metodo: "POST" }); } catch (_) { /* já inválido */ } }
+    encerrarVoz();
     estado.token = null; estado.usuario = null; estado.sessao = null;
     sessionStorage.removeItem(CHAVE_TOKEN);
     $("mensagens").replaceChildren();
@@ -133,6 +134,120 @@
       $("mensagens").scrollTop = $("mensagens").scrollHeight;
       $("texto").focus();
     }
+  }
+
+  /* ----------------------------------------------------------------- voz */
+  /* Microfone -> /ws/voz (WebSocket, o token vai no 1º quadro, não na URL) -> Whisper -> chat. A fala das respostas sai pela voz do navegador. */
+  const voz = { ws: null, pronto: false, stt: false, gravador: null, fluxo: null, gravando: false, falar: false, envio: Promise.resolve(), eu: null, ela: null, resposta: [] };
+
+  function falarTexto(frase) {
+    if (!voz.falar || !("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(frase);
+    u.lang = "pt-BR";
+    const v = speechSynthesis.getVoices().find((x) => x.lang === "pt-BR") || speechSynthesis.getVoices().find((x) => x.lang.startsWith("pt"));
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  }
+
+  function formatoDoGravador(mime) { return /ogg/.test(mime) ? "ogg" : /mp4/.test(mime) ? "mp4" : "webm"; }
+
+  function falhaDeVoz(msg) {
+    if (voz.ela) { voz.ela.className = "msg erro-msg"; voz.ela.textContent = msg; } else avisar(msg);
+    voz.eu = voz.ela = null; voz.resposta = [];
+    estado.ocupado = false; $("botao-enviar").disabled = false;
+  }
+
+  function tratarQuadro(q, resolver, rejeitar) {
+    if (q.tipo === "pronto") { voz.pronto = true; voz.stt = !!q.stt; resolver && resolver(voz.ws); return; }
+    if (q.tipo === "transcricao") { if (voz.eu) voz.eu.textContent = `🎤 ${q.texto}`; return; }
+    if (q.tipo === "fala") {
+      voz.resposta.push(q.texto);
+      if (voz.ela) { voz.ela.textContent = voz.resposta.join("\n"); $("mensagens").scrollTop = $("mensagens").scrollHeight; }
+      falarTexto(q.texto);
+      return;
+    }
+    if (q.tipo === "fim_resposta") {
+      estado.sessao = q.sessao;
+      if (voz.ela) { voz.ela.textContent = q.texto; if (q.dados_calculados) voz.ela.append(el("div", { class: "acoes" }, botaoPdf())); }
+      voz.eu = voz.ela = null; voz.resposta = [];
+      estado.ocupado = false; $("botao-enviar").disabled = false;
+      $("mensagens").scrollTop = $("mensagens").scrollHeight;
+      return;
+    }
+    if (q.tipo === "erro") {
+      if (q.codigo === "nao_autenticado") { rejeitar && rejeitar(new Error(q.mensagem)); sair(false); return; }
+      if (rejeitar && !voz.pronto) { rejeitar(new Error(q.mensagem)); return; }
+      falhaDeVoz(q.mensagem);
+    }
+  }
+
+  function abrirCanalVoz() {
+    return new Promise((resolver, rejeitar) => {
+      if (voz.ws && voz.pronto && voz.ws.readyState === WebSocket.OPEN) { resolver(voz.ws); return; }
+      const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/voz`);
+      voz.ws = ws; voz.pronto = false;
+      ws.onopen = () => ws.send(JSON.stringify({ tipo: "autenticar", token: estado.token }));
+      ws.onmessage = (ev) => { try { tratarQuadro(JSON.parse(ev.data), resolver, rejeitar); } catch (_) { /* quadro que não é JSON: ignora */ } };
+      ws.onerror = () => rejeitar(new Error("Não consegui abrir o canal de voz."));
+      ws.onclose = () => { voz.pronto = false; if (voz.gravando) pararGravacao(true); };
+    });
+  }
+
+  async function iniciarGravacao() {
+    if (estado.ocupado) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      avisar("Este navegador não grava áudio aqui (é preciso HTTPS ou localhost)."); return;
+    }
+    try {
+      await abrirCanalVoz();
+      if (!voz.stt) { avisar("A voz não está configurada neste servidor (falta a chave do Whisper)."); return; }
+      voz.fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      avisar(e && e.name === "NotAllowedError" ? "Sem permissão para usar o microfone." : (e.message || "Não consegui abrir o microfone."));
+      return;
+    }
+    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"].find((m) => MediaRecorder.isTypeSupported(m)) || "";
+    voz.gravador = new MediaRecorder(voz.fluxo, mime ? { mimeType: mime } : {});
+    voz.envio = Promise.resolve();
+    voz.ws.send(JSON.stringify({ tipo: "inicio", formato: formatoDoGravador(voz.gravador.mimeType), idioma: "pt", sessao: estado.sessao }));
+    // os pedaços sobem na ordem: cada um espera o anterior terminar de virar ArrayBuffer
+    voz.gravador.ondataavailable = (ev) => { if (ev.data && ev.data.size) voz.envio = voz.envio.then(() => ev.data.arrayBuffer()).then((b) => { if (voz.ws.readyState === WebSocket.OPEN) voz.ws.send(b); }); };
+    voz.gravador.start(250);
+    voz.gravando = true;
+    $("botao-voz").classList.add("gravando"); $("botao-voz").setAttribute("aria-pressed", "true"); $("botao-voz").title = "Parar e enviar";
+  }
+
+  function pararGravacao(descartar = false) {
+    if (!voz.gravando) return;
+    voz.gravando = false;
+    $("botao-voz").classList.remove("gravando"); $("botao-voz").setAttribute("aria-pressed", "false"); $("botao-voz").title = "Falar";
+    const g = voz.gravador;
+    g.onstop = async () => {
+      voz.fluxo.getTracks().forEach((t) => t.stop());
+      await voz.envio;
+      if (descartar || voz.ws.readyState !== WebSocket.OPEN) return;
+      estado.ocupado = true; $("botao-enviar").disabled = true;
+      voz.eu = adicionar("eu", "🎤 …");
+      voz.ela = adicionar("ela", el("span", { class: "digitando", "aria-label": "Digitando" }, el("i"), el("i"), el("i")));
+      voz.resposta = [];
+      voz.ws.send(JSON.stringify({ tipo: "fim" }));
+    };
+    g.stop();
+  }
+
+  function alternarGravacao() { if (voz.gravando) pararGravacao(); else iniciarGravacao(); }
+
+  function alternarFala() {
+    voz.falar = !voz.falar;
+    $("alternar-fala").setAttribute("aria-pressed", String(voz.falar));
+    if (!voz.falar && "speechSynthesis" in window) speechSynthesis.cancel();
+  }
+
+  function encerrarVoz() {
+    if (voz.gravando) pararGravacao(true);
+    if (voz.ws) { try { voz.ws.close(); } catch (_) { /* já fechado */ } }
+    voz.ws = null; voz.pronto = false;
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
   }
 
   /* ----------------------------------------------------------- documentos */
@@ -284,8 +399,10 @@
     $("texto").addEventListener("input", ajustarAltura);
     $("texto").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $("form-chat").requestSubmit(); } });
     $("botao-anexo").addEventListener("click", () => $("arquivo").click());
+    $("botao-voz").addEventListener("click", alternarGravacao);
+    $("alternar-fala").addEventListener("click", alternarFala);
     $("arquivo").addEventListener("change", (ev) => enviarDocumento(ev.target.files[0]));
-    $("atalhos").addEventListener("click", (ev) => { const c = ev.target.closest(".chip"); if (c) enviar(c.dataset.texto); });
+    $("atalhos").addEventListener("click", (ev) => { const c = ev.target.closest(".chip[data-texto]"); if (c) enviar(c.dataset.texto); });
     for (const b of document.querySelectorAll(".aba")) b.addEventListener("click", () => trocarAba(b.dataset.aba));
     $("form-fgts").addEventListener("submit", pedirExtrato);
     $("consentimento-ia").addEventListener("change", alterarConsentimento);

@@ -4,3 +4,5 @@
 *.jpg binary
 *.db binary
 *.zip binary
+*.wav binary
+*.png binary

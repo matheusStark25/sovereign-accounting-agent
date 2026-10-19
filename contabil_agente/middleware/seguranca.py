@@ -15,7 +15,7 @@ CABECALHOS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
     "Content-Security-Policy": CSP,
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
     "Cross-Origin-Opener-Policy": "same-origin",
 }
 

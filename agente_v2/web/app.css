@@ -89,6 +89,10 @@ input:focus, textarea:focus { border-color: var(--azul); outline: none; box-shad
 .botao.fantasma { border-color: transparent; background: transparent; color: var(--suave); }
 .botao.icone { width: 44px; padding: 0; flex: none; }
 .botao:disabled { opacity: .55; cursor: not-allowed; }
+.botao.icone.gravando { background: var(--vermelho); border-color: var(--vermelho); color: #fff; animation: gravando 1.2s infinite; }
+@keyframes gravando { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--vermelho) 25%, transparent); } }
+.chip[aria-pressed="true"] { background: var(--azul); border-color: var(--azul); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .botao.icone.gravando { animation: none; } }
 
 /* ----- login ----- */
 .login { min-height: 100dvh; display: grid; place-items: center; padding: max(1rem, env(safe-area-inset-top)) 1rem; }

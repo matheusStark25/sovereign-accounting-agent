@@ -52,11 +52,15 @@
       <button type="button" class="chip" data-texto="Calcular GPS">GPS</button>
       <button type="button" class="chip" data-texto="Calcular DAS do MEI">DAS MEI</button>
       <button type="button" class="chip" data-texto="Calcular DARF">DARF</button>
+      <button type="button" class="chip" id="alternar-fala" aria-pressed="false" title="Lê as respostas em voz alta (voz do navegador)">Ler em voz alta</button>
     </div>
     <form id="form-chat" class="compositor" autocomplete="off">
       <input type="file" id="arquivo" accept=".pdf,.xml,.txt,.csv" hidden>
       <button type="button" class="botao icone" id="botao-anexo" aria-label="Enviar documento para análise" title="Enviar documento (PDF, XML, TXT)">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 01-7.8-7.8l9-9a3.7 3.7 0 015.2 5.2l-9 9a1.8 1.8 0 01-2.6-2.6l8.3-8.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="botao icone" id="botao-voz" aria-label="Falar (gravar com o microfone)" aria-pressed="false" title="Falar">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0M12 17v4m-3 0h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <textarea id="texto" rows="1" maxlength="4000" placeholder="Escreva sua dúvida ou peça um cálculo…" aria-label="Mensagem"></textarea>
       <button type="submit" class="botao primario" id="botao-enviar" aria-label="Enviar">

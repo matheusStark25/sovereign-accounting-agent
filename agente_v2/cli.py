@@ -160,6 +160,11 @@ def verificar_ia(args: argparse.Namespace) -> int:
     groq = llm_do_ambiente(env)
     if isinstance(groq, GroqLLM):
         verificados.append(groq.verificar())
+    from contabil_agente.voz import stt_do_ambiente
+
+    whisper = stt_do_ambiente(env)
+    if whisper is not None:
+        verificados.append(whisper.verificar())
     if not verificados:
         print("Nenhuma chave de IA configurada (GROQ_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY).", file=sys.stderr)
         if args.env_file:

@@ -20,6 +20,7 @@ from contabil_agente.intelligence.dialogo_calculo import DialogoCalculo
 from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 
 from .llm import LLM, LLMIndisponivel
+from .tom import escolher_variante
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,13 @@ class ChatError(ValueError):
 
 
 class ChatEngine:
-    def __init__(self, llm: Optional[LLM] = None, hoje: Optional[date] = None, persona: str = "MARCOS"):
+    def __init__(self, llm: Optional[LLM] = None, hoje: Optional[date] = None, persona: str = "MARCOS", adaptar_tom: bool = True):
         self._llm = llm
         self._dialogo = DialogoCalculo(hoje=hoje)
+        self._persona = persona.strip().upper().replace(" ", "_")
         self._prompt = obter_prompt(persona)
+        # só o MARCOS tem tons (base, formal, informal); a Maria Helena é sempre técnica e seca
+        self._adaptar_tom = adaptar_tom and self._persona == "MARCOS"
 
     def responder(self, estado: Dict[str, Any], mensagem: str, usar_llm: bool = True) -> Dict[str, Any]:
         """Atualiza ``estado`` e devolve ``{resposta, status, tipo, dados_calculados}``."""
@@ -75,11 +79,12 @@ class ChatEngine:
             return {"resposta": MENSAGEM_SEM_CONSENTIMENTO, "status": "ok", "origem": "padrao"}
         if self._llm is None:
             return {"resposta": MENSAGEM_SEM_LLM, "status": "ok", "origem": "padrao"}
-        mensagens = [{"role": "system", "content": self._prompt}]
+        tom = escolher_variante(m["content"] for m in historico if m["role"] == "user") if self._adaptar_tom else "base"
+        mensagens = [{"role": "system", "content": obter_prompt(self._persona, tom) if self._adaptar_tom else self._prompt}]
         for m in historico[-CONTEXTO_LLM:]:
             mensagens.append({"role": m["role"], "content": PIIAnonymizer.anonymize_text(m["content"])})
         try:
-            return {"resposta": self._llm(mensagens), "status": "ok", "origem": "llm"}
+            return {"resposta": self._llm(mensagens), "status": "ok", "origem": "llm", "persona": self._persona, "tom": tom}
         except LLMIndisponivel:
             return {"resposta": MENSAGEM_LLM_FORA, "status": "ok", "origem": "padrao"}
         except Exception:

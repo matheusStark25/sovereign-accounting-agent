@@ -51,6 +51,7 @@ from contabil_agente.governance_manager import (
     carregar_limites, carregar_par_de_assinatura,
 )
 from contabil_agente.middleware.limite_de_uso import LimiteDeUso
+from contabil_agente.voz import stt_do_ambiente
 from contabil_agente.middleware.observabilidade import instalar_observabilidade
 from contabil_agente.middleware.seguranca import aplicar_protecoes
 from contabil_agente.resilience.readiness import readiness_check
@@ -59,6 +60,7 @@ from .auth import exigir, get_auth, token_da_requisicao, usuario_atual
 from .config import settings
 from .logging_setup import setup_logging
 from .rotas_agentes import instalar_agentes
+from .rotas_voz import instalar_voz
 from .vault_client import VaultClient, carregar_segredos
 
 logger = logging.getLogger("agente_v2")
@@ -192,6 +194,7 @@ def create_app(
     dispatcher: Optional[DocumentDispatcher] = None,
     lgpd: Optional[ServicoLGPD] = None,
     governanca: Optional[GovernanceManager] = None,
+    stt: Any = None,
 ) -> FastAPI:
     app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs" if settings.ENV == "dev" else None, redoc_url=None)
     precisa_de_segredos = auth is None or audit is None or engine is None or dispatcher is None
@@ -202,6 +205,7 @@ def create_app(
     app.state.auth = auth or AuthService(AuthSettings.from_env(segredos))
     app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente(segredos))
     app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
+    app.state.stt = stt if stt is not None else stt_do_ambiente(segredos)  # voz: Whisper pela Groq quando há GROQ_API_KEY
     app.state.audit = audit or AuditTrailManager(worm=WormAudit.do_ambiente(settings.AUDIT_DIR, segredos))
     if dispatcher is None:
         provedores = provedores_do_ambiente(segredos)
@@ -536,6 +540,7 @@ def create_app(
         return enfileirar_extrato(request, usuario, "pgmei", pedido.cnpj, pedido.ano)
 
     instalar_agentes(app, _auditar, enfileirar_extrato)
+    instalar_voz(app, _auditar, _base_legal)
 
     @app.get("/api/v1/rpa/jobs/{job_id}")
     def estado_do_job(job_id: str, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
