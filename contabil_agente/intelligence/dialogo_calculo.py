@@ -69,6 +69,8 @@ class DialogoCalculo:
 
         extraido = ex.extrair_dados(mensagem)
         tipo_novo = ex.detectar_tipo_calculo(mensagem)
+        if ativo is not None and tipo_novo is None and not extraido and ex.pergunta_fora_do_calculo(mensagem):
+            return None  # no meio de um cálculo, uma pergunta sobre documento ou regra vai para a assistente; o cálculo espera
 
         if ativo is None:
             if tipo_novo is None:

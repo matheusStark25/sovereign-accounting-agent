@@ -16,9 +16,15 @@ auditoria à prova de adulteração.
 > cálculo — e só se a empresa deixar. Se faltar dado ou a tabela de uma competência não existir, o sistema
 > **pergunta ou recusa**; ele não estima.
 
-![Interface do sistema: cálculo de rescisão feito pelo próprio motor](docs/interface-chat.png)
+![Maria Helena: demonstrativo de rescisão calculado pelo motor](docs/interface-chat.png)
 
-*Captura da interface real, com um cálculo de rescisão (valores de exemplo): cada número vem do motor de cálculo, com as premissas e as tabelas usadas e o botão do PDF.*
+*Captura da interface real: o demonstrativo da rescisão (valores de exemplo), com cada número vindo do motor de cálculo, o total
+com sublinhado duplo, as premissas e as tabelas usadas.*
+
+![Maria Helena conferindo o holerite que a empresa enviou](docs/interface-conferencia.png)
+
+*Também real, com a Groq: a pessoa manda um holerite, a ficha sai com o carimbo da conferência e, perguntada, a Maria Helena
+consulta os documentos da empresa e explica a divergência do INSS em reais, com a lei certa. O rodapé diz que ferramenta ela usou.*
 
 ---
 
@@ -60,10 +66,15 @@ graph LR
     Q --> T
 ```
 
-- **Chat:** primeiro o `DialogoCalculo` tenta entender o pedido ("calcular rescisão…") e conduz as perguntas
-  que faltam; se tudo estiver completo, calcula pelo motor. Só o que sobra vai ao LLM, com CPF/CNPJ/e-mail
-  mascarados e apenas se a empresa registrou o consentimento `envio_a_provedor_de_ia`. Sem chave de LLM o
-  sistema continua funcionando para cálculos e regras.
+- **Chat (Maria Helena):** primeiro o `DialogoCalculo` tenta entender o pedido ("calcular rescisão…") e conduz as
+  perguntas que faltam; se tudo estiver completo, calcula pelo motor. Pergunta sobre um documento enviado ou sobre a regra
+  (prazo, direito, tabela) não vira formulário de cálculo: vai para a Maria Helena, que responde com **ferramentas do
+  sistema** em vez de memória: `calcular` (o motor), `tabela_vigente` (faixas, teto e a norma de INSS e IRRF),
+  `documentos_recentes` (o que a empresa enviou, com os alertas da conferência), `conciliar_fechamento`,
+  `validar_identificadores` e `verificar_conformidade`. Ela nunca soma encargo por conta própria e só cita leis de uma
+  lista conferida. CPF, CNPJ, PIS e chave de acesso viram marcadores (`[CPF_1]`) antes de ir ao provedor; a ferramenta
+  recebe o valor real só dentro da requisição. Tudo isso só com o consentimento `envio_a_provedor_de_ia`; sem chave de
+  LLM o sistema continua funcionando para cálculos e regras.
 - **Pipeline de documentos:** `RECEIVED → CLASSIFYING → PROCESSING → REVIEWING → CORRECTING → DISPATCHING →
   ARCHIVED`. Worker e Revisor têm modo determinístico (sempre disponível) e usam DeepSeek/Gemini (ou a Groq) quando há
   chave **e** consentimento. O Corretor só aceita um valor sugerido se ele aparecer no texto do documento
@@ -86,9 +97,9 @@ graph LR
 | **Criptografia** | CPF cifrado com ML-KEM-768 + X25519 + AES-GCM (pacote `cryptography`) antes de entrar na fila do Celery; mTLS no gateway (porta 8443) e utilitários mTLS/XML-DSig em `agente_v2/`. |
 | **Resiliência** | Circuit breaker, retentativas com backoff exponencial, timeouts, degradação controlada, `/health` e `/ready`. |
 | **Agentes** | `TaxAgent` (cálculos), `ValidationAgent` (CPF, CNPJ, PIS, chave de NF-e e documentos), `ReconciliationAgent` (concilia holerites com a guia do FGTS, a GPS e o DARF do IRRF e aponta a diferença em reais), `ComplianceAgent` (regras de conformidade e base legal da LGPD) e `RPAAgent` (extrato do FGTS e do PGMEI, resumo de NF-e, CT-e e NFC-e), orquestrados pela API em `/api/v1/agentes`: uma ação de um agente ou um plano de até 10 passos, com o resultado de um passo alimentando o seguinte. |
-| **Voz** | Microfone no navegador → WebSocket `/ws/voz` (áudio em pedaços) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → resposta frase por frase, lida em voz alta pela voz do navegador (Web Speech API). Exige o consentimento de IA externa (o áudio vai a um terceiro). O MARCOS adapta o tom (formal, informal ou neutro) ao jeito de quem escreve ou fala; a Maria Helena é a persona técnica de auditoria. |
+| **Voz** | Microfone no navegador → WebSocket `/ws/voz` (áudio em pedaços) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → resposta frase por frase, lida em voz alta pela voz do navegador (Web Speech API). Exige o consentimento de IA externa (o áudio vai a um terceiro). A Maria Helena adapta o tom (formal, informal ou neutro) ao jeito de quem escreve ou fala e usa as mesmas ferramentas do chat escrito (o MARCOS segue disponível por `AGENTE_PERSONA=MARCOS`). |
 | **Observabilidade** | Métricas Prometheus em `/metrics`; log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados; e, no perfil `observabilidade` do compose, Prometheus, Alertmanager (7 alertas: API fora do ar, erros 5xx, latência, falha na trilha de auditoria, logins recusados, cálculos com erro, voz com falha) e Grafana com o painel "Sovereign Accounting Agent". |
-| **Interface web** | Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (robôs do FGTS, do PGMEI e das notas fiscais, com uma ou várias chaves e o resumo de cada nota na tela; aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
+| **Interface web** | Identidade de escritório contábil (papel de livro-razão, selo "MH", demonstrativo com pontilhado e total com sublinhado duplo, carimbo de conferência nos documentos, tema escuro). Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (robôs do FGTS, do PGMEI e das notas fiscais, com uma ou várias chaves e o resumo de cada nota na tela; aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
 | **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI e consulta NF-e, CT-e e NFC-e, com a pessoa resolvendo só o captcha (`baixar-extrato`), envia sozinho ao sistema o PDF que você baixou no navegador normal (`observar-pasta`) e baixa o XML da NF-e com o certificado A1 (`baixar-xml-nfe`). |
 
 ## Começando
@@ -334,7 +345,7 @@ agente_v2/                  API e infraestrutura de execução
 
 contabil_agente/            domínio e serviços
 ├── calc/                   motor de cálculo (Decimal) e tabelas YAML
-├── chat/                   motor da conversa, LLM, armazenamento
+├── chat/                   motor da conversa, LLM com ferramentas, marcadores de dados pessoais, armazenamento
 ├── intelligence/           diálogo de cálculo, extração, auditoria forense, FSM
 ├── documentos/             leitura, 27 tipos, validadores, PDF
 ├── pipeline/               dispatcher, agentes, anomalias, evidência, destinos

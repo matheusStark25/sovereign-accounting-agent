@@ -7,6 +7,7 @@ que não se deixa enganar por um outlier antigo, e só dispara com pelo menos 5 
 from __future__ import annotations
 
 import sqlite3
+import json
 import statistics
 import time
 from contextlib import contextmanager
@@ -52,6 +53,9 @@ class HistoricoDocumentos:
             )
             con.execute("CREATE INDEX IF NOT EXISTS ix_proc_hash ON processados(tenant, sha256)")
             con.execute("CREATE INDEX IF NOT EXISTS ix_proc_chave ON processados(tenant, tipo, cnpj)")
+            colunas = {linha["name"] for linha in con.execute("PRAGMA table_info(processados)")}
+            if "resumo" not in colunas:  # bancos criados antes da memória da assistente
+                con.execute("ALTER TABLE processados ADD COLUMN resumo TEXT")
 
     @contextmanager
     def _db(self) -> Iterator[sqlite3.Connection]:
@@ -67,14 +71,36 @@ class HistoricoDocumentos:
         finally:
             con.close()
 
-    def registrar(self, tenant: str, sha256: str, tipo: str, dados: Dict[str, Any], audit_id: Optional[str]) -> None:
+    def registrar(self, tenant: str, sha256: str, tipo: str, dados: Dict[str, Any], audit_id: Optional[str],
+                  resumo: Optional[Dict[str, Any]] = None) -> None:
+        """``resumo``: o que a assistente pode consultar depois (já com dados pessoais mascarados por quem chama)."""
         campo = METRICA.get(tipo)
         with self._db() as con:
             con.execute(
-                "INSERT INTO processados (tenant, sha256, tipo, cnpj, competencia, valor, audit_id, criado_em) VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO processados (tenant, sha256, tipo, cnpj, competencia, valor, audit_id, criado_em, resumo) VALUES (?,?,?,?,?,?,?,?,?)",
                 (tenant, sha256, tipo, _cnpj_do(dados), str(dados.get("competencia") or dados.get("periodo_apuracao") or ""),
-                 str(dados[campo]) if campo and campo in dados else None, audit_id, time.time()),
+                 str(dados[campo]) if campo and campo in dados else None, audit_id, time.time(),
+                 json.dumps(resumo, ensure_ascii=False, default=str) if resumo else None),
             )
+
+    def recentes(self, tenant: str, limite: int = 10) -> List[Dict[str, Any]]:
+        """Os últimos documentos processados da empresa, do mais novo para o mais antigo (só desta empresa)."""
+        with self._db() as con:
+            linhas = con.execute(
+                "SELECT id, sha256, tipo, cnpj, competencia, valor, criado_em, resumo FROM processados WHERE tenant=? ORDER BY id DESC LIMIT ?",
+                (tenant, max(1, min(int(limite), 50))),
+            ).fetchall()
+        saida = []
+        for r in linhas:
+            item = {"id": r["id"], "tipo": r["tipo"], "cnpj": r["cnpj"] or None, "competencia": r["competencia"] or None, "valor": r["valor"],
+                    "processado_em": time.strftime("%d/%m/%Y %H:%M", time.localtime(r["criado_em"])), "sha256": r["sha256"][:12]}
+            if r["resumo"]:
+                try:
+                    item.update(json.loads(r["resumo"]))
+                except ValueError:
+                    pass
+            saida.append(item)
+        return saida
 
     def por_hash(self, tenant: str, sha256: str) -> Optional[sqlite3.Row]:
         with self._db() as con:

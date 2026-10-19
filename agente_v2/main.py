@@ -23,6 +23,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 from contabil_agente.calc import servico
 from contabil_agente.chat import ChatEngine, ChatError, ChatStore, llm_do_ambiente
+from contabil_agente.chat.ferramentas import Ferramentas
 import hashlib
 import hmac as _hmac
 
@@ -196,6 +197,11 @@ def _bootstrap_admin(auth: AuthService) -> None:
 
 
 # ------------------------------------------------------------------------- app
+def ferramentas_da_assistente(app: FastAPI, tenant: str) -> Ferramentas:
+    """As ferramentas da Maria Helena para esta empresa: cálculo, tabelas, documentos da empresa, conciliação, validação."""
+    return Ferramentas(tenant, historico=getattr(app.state.dispatcher, "historico", None), lgpd=app.state.lgpd)
+
+
 def create_app(
     auth: Optional[AuthService] = None,
     engine: Optional[ChatEngine] = None,
@@ -213,7 +219,8 @@ def create_app(
     segredos = carregar_segredos(vault)
     app.state.vault = vault
     app.state.auth = auth or AuthService(AuthSettings.from_env(segredos))
-    app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente(segredos))
+    app.state.chat_engine = engine or ChatEngine(llm=llm_do_ambiente(segredos), persona=segredos.get("AGENTE_PERSONA") or "MARIA_HELENA")
+    app.state.ferramentas_da_assistente = lambda tenant: ferramentas_da_assistente(app, tenant)
     app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
     app.state.stt = stt if stt is not None else stt_do_ambiente(segredos)  # voz: Whisper pela Groq quando há GROQ_API_KEY
     app.state.audit = audit or AuditTrailManager(worm=WormAudit.do_ambiente(settings.AUDIT_DIR, segredos))
@@ -352,7 +359,8 @@ def create_app(
         else:
             sid, estado = loja.nova_sessao(usuario.user_id, usuario.tenant_id), {}
         try:
-            resultado = request.app.state.chat_engine.responder(estado, dados.message, usar_llm=usar_ia)
+            resultado = request.app.state.chat_engine.responder(estado, dados.message, usar_llm=usar_ia,
+                                                                ferramentas=request.app.state.ferramentas_da_assistente(usuario.tenant_id))
         except ChatError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         loja.salvar(sid, usuario.user_id, usuario.tenant_id, estado)
@@ -364,6 +372,7 @@ def create_app(
             "status": resultado.get("status", "ok"),
             "tipo": resultado.get("tipo"),
             "dados_calculados": resultado.get("dados_calculados"),
+            "ferramentas": resultado.get("ferramentas") or [],
         }
 
     @app.get("/api/chat/{session_id}")

@@ -106,3 +106,58 @@ def test_pipeline_de_documentos_com_a_groq_como_worker_e_revisor(tmp_path):
     assert r.estado == "ARCHIVED" and r.tipo == "HOLERITE", r.to_dict()
     assert r.extracted_data["liquido"] == "4973.39"  # o valor vem do texto, nunca do LLM
     assert r.agentes["worker"] == "llm" and r.agentes["revisor"] == "llm", r.agentes  # as duas respostas reais passaram no nosso parser
+
+
+# ------------------------------------------------------------------ Maria Helena com ferramentas, de verdade
+class _GroqEspiao(GroqLLM):
+    """A Groq de verdade, guardando tudo o que foi enviado a ela (para conferir que nenhum CPF saiu em claro)."""
+
+    enviado: list = []
+
+    def _criar(self, mensagens, ferramentas=None):
+        self.enviado.append(list(mensagens))
+        return super()._criar(mensagens, ferramentas)
+
+
+def _espiao():
+    from contabil_agente.chat.llm import MODELO_PADRAO
+
+    return _GroqEspiao(ENV["GROQ_API_KEY"], ENV.get("GROQ_MODEL") or MODELO_PADRAO)
+
+
+@_chave("GROQ_API_KEY")
+def test_maria_helena_consulta_a_tabela_vigente_e_cita_a_norma():
+    from contabil_agente.chat.ferramentas import Ferramentas
+
+    r = ChatEngine(llm=_groq()).responder({}, "Quais são as faixas do INSS em setembro de 2026 e qual a norma?", ferramentas=Ferramentas("t"))
+    assert any(c["ferramenta"] == "tabela_vigente" and c["status"] == "ok" for c in r["ferramentas"]), r
+    assert "8.475,55" in r["resposta"] and "Portaria" in r["resposta"], r["resposta"]
+
+
+@_chave("GROQ_API_KEY")
+def test_maria_helena_valida_o_cpf_sem_mandar_o_cpf_ao_provedor():
+    import json
+
+    from contabil_agente.chat.ferramentas import Ferramentas
+
+    llm = _espiao()
+    llm.enviado = []
+    r = ChatEngine(llm=llm).responder({}, "vc sabe se o cpf 529.982.247-25 ta certo?", ferramentas=Ferramentas("t"))
+    assert any(c["ferramenta"] == "validar_identificadores" and c["status"] == "ok" for c in r["ferramentas"]), r
+    enviado = json.dumps(llm.enviado, ensure_ascii=False)
+    assert "52998224725" not in enviado and "529.982.247-25" not in enviado and "[CPF_1]" in enviado
+    assert "válido" in r["resposta"].lower() and "529.982.247-25" in r["resposta"]  # na tela, o CPF volta como a pessoa escreveu
+
+
+@_chave("GROQ_API_KEY")
+def test_maria_helena_le_os_documentos_da_empresa_e_explica_o_alerta(tmp_path):
+    from contabil_agente.chat.ferramentas import Ferramentas
+
+    hist = HistoricoDocumentos(tmp_path / "hist.db")
+    disp = DocumentDispatcher(WormAudit(tmp_path / "audit", "a" * 40, fsync=False), hist, destinos=[ArquivoDestino(tmp_path / "arq")])
+    holerite = ("HOLERITE - Competência: 09/2026\nSalário base 6.000,00\nTotal de proventos 6.000,00\nINSS 700,00\nIRRF 385,10\n"
+                "Total de descontos 1.085,10\nFGTS 480,00\nLíquido a receber 4.914,90\nCNPJ 11.222.333/0001-81\n")
+    assert disp.process(conteudo=holerite.encode(), nome="holerite.txt", tenant="t", ator="u", usar_ia=False).estado == "ARCHIVED"
+    r = ChatEngine(llm=_groq()).responder({}, "Tem algum problema no último holerite que eu mandei?", ferramentas=Ferramentas("t", historico=hist))
+    assert any(c["ferramenta"] == "documentos_recentes" for c in r["ferramentas"]), r
+    assert "INSS" in r["resposta"] and "11.222.333/0001-81" not in r["resposta"], r["resposta"]

@@ -29,11 +29,17 @@ def test_persona_ou_variante_desconhecida():
         obter_prompt("MARCOS", "debochado")
 
 
+def test_maria_helena_tem_tres_variantes_e_e_a_persona_padrao():
+    base, formal, informal = (obter_prompt("MARIA_HELENA", v) for v in ("base", "formal", "informal"))
+    assert len({base, formal, informal}) == 3 and obter_prompt() == base
+    for ferramenta in ("calcular", "tabela_vigente", "documentos_recentes", "conciliar_fechamento", "validar_identificadores"):
+        assert ferramenta in base  # o prompt diz quando usar cada ferramenta do sistema
+
+
 def test_engine_manda_o_prompt_da_persona_ao_llm():
     recebido = []
-    engine = ChatEngine(llm=lambda m: recebido.append(m) or "ok", persona="MARIA_HELENA")
-    engine.responder({}, "explique o que é o DARF")
-    assert recebido[0][0]["role"] == "system" and "Auditoria Sênior" in recebido[0][0]["content"]
+    ChatEngine(llm=lambda m: recebido.append(m) or "ok").responder({}, "explique o que é o DARF")
+    assert recebido[0][0]["role"] == "system" and "Você é a Maria Helena" in recebido[0][0]["content"]
     marcos = []
-    ChatEngine(llm=lambda m: marcos.append(m) or "ok").responder({}, "explique o que é o DARF")
+    ChatEngine(llm=lambda m: marcos.append(m) or "ok", persona="MARCOS").responder({}, "explique o que é o DARF")
     assert "MARCOS" in marcos[0][0]["content"]

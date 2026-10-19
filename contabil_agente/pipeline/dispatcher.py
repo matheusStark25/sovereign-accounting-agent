@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 from contabil_agente.documentos.leitura import ArquivoInvalido, Conteudo, ler_documento
 from contabil_agente.documentos.processador import ResultadoDocumento, classificar, processar_conteudo, resolver_tipo_informado
 from contabil_agente.documentos.tipos import TIPOS, Alerta, corpus
+from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 from contabil_agente.security.worm_audit import AuditoriaError, WormAudit
 
 from .agentes import AgenteCorretor, AgenteRevisor, AgenteWorker, Divergencia
@@ -198,7 +199,11 @@ class DocumentDispatcher:
         except AuditoriaError as exc:
             return falhar(f"Trilha de auditoria indisponível: {exc}", resultado)
         if self.historico is not None:
-            self.historico.registrar(tenant, conteudo_lido.sha256, tipo_codigo, resultado.extracted_data, resultado.audit_trail_id)
+            # o que a assistente pode consultar depois: tipo, alertas e dados extraídos, com dados pessoais mascarados
+            resumo = {"nome_tipo": getattr(resultado, "nome_tipo", None), "requer_revisao": resultado.requer_revisao,
+                      "alertas": [a.to_dict() for a in resultado.alertas][:20],
+                      "dados": PIIAnonymizer.anonymize_value({k: v for k, v in list(resultado.extracted_data.items())[:40]})}
+            self.historico.registrar(tenant, conteudo_lido.sha256, tipo_codigo, resultado.extracted_data, resultado.audit_trail_id, resumo)
         return resultado
 
     # ----------------------------------------------------------------- interno

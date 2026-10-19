@@ -52,7 +52,7 @@ def instalar_voz(app, auditar: Callable[..., Optional[str]], base_legal: Callabl
         if principal is None:
             return
         estado: Dict[str, Any] = {"buffer": bytearray(), "gravando": False, "formato": "webm", "idioma": "pt", "sessao": None}
-        await ws.send_json({"tipo": "pronto", "stt": ws.app.state.stt is not None, "persona": ws.app.state.chat_engine._persona})
+        await ws.send_json({"tipo": "pronto", "stt": ws.app.state.stt is not None, "persona": ws.app.state.chat_engine.persona})
         while True:
             try:
                 msg = await asyncio.wait_for(ws.receive(), TEMPO_OCIOSO_S)
@@ -156,7 +156,9 @@ def instalar_voz(app, auditar: Callable[..., Optional[str]], base_legal: Callabl
             sid, conversa = loja.nova_sessao(principal.user_id, principal.tenant_id), {}
         estado["sessao"] = sid
         try:
-            resultado = await asyncio.to_thread(app_.state.chat_engine.responder, conversa, texto, usar_ia)
+            fabrica = getattr(app_.state, "ferramentas_da_assistente", None)  # as mesmas ferramentas do chat escrito
+            resultado = await asyncio.to_thread(app_.state.chat_engine.responder, conversa, texto, usar_ia,
+                                                fabrica(principal.tenant_id) if fabrica else None)
         except ChatError as exc:
             await _erro(ws, "mensagem_invalida", str(exc))
             return
@@ -173,6 +175,6 @@ def instalar_voz(app, auditar: Callable[..., Optional[str]], base_legal: Callabl
         await ws.send_json({
             "tipo": "fim_resposta", "sessao": sid, "texto": resposta, "status": resultado.get("status", "ok"), "origem": resultado.get("origem"),
             "persona": resultado.get("persona"), "tom": resultado.get("tom"), "tipo_calculo": resultado.get("tipo"),
-            "dados_calculados": resultado.get("dados_calculados"),
+            "dados_calculados": resultado.get("dados_calculados"), "ferramentas": resultado.get("ferramentas") or [],
         })
         VOZ.labels("ok" if bytes_de_audio else "ok_texto").inc()

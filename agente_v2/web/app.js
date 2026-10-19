@@ -91,7 +91,84 @@
   }
 
   function boasVindas() {
-    adicionar("ela", `Oi, ${estado.usuario.username}! Eu calculo rescisão, férias, 13º, INSS, IRRF, FGTS e folha, e confiro documentos (holerite, TRCT, guias, SPED, NF-e e outros). Escolha um atalho ou escreva o que precisa. Sou uma assistente virtual (IA): em decisões importantes, confira com o contador responsável.`);
+    const hora = new Date().getHours();
+    const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+    adicionar("ela", el("div", { class: "boas-vindas" },
+      el("h2", { texto: `${saudacao}, ${estado.usuario.username}.` }),
+      el("p", { texto: "Sou a Maria Helena, a assistente de Departamento Pessoal e contabilidade do escritório. O que eu faço por você:" }),
+      el("ul", { class: "lista-feitos" },
+        el("li", { texto: "calculo rescisão, férias, 13º, INSS, IRRF, FGTS, folha, pró-labore, GPS, DAS do MEI e DARF em atraso, com a tabela oficial da competência;" }),
+        el("li", { texto: "confiro os documentos que você manda (holerite, TRCT, guias, SPED, NF-e) e explico cada divergência em reais;" }),
+        el("li", { texto: "concilio a folha com as guias do FGTS, da GPS e do IRRF, e digo a lei que vale para cada caso." })),
+      el("p", { class: "nota", texto: "Sou uma assistente virtual (IA). Em decisões importantes, confira com o contador responsável." })));
+  }
+
+  /* Texto da assistente: parágrafos, listas com "- " e **negrito**. Montado nó a nó (nada vira HTML). */
+  function trechos(s) {
+    return s.split(/\*\*(.+?)\*\*/g).map((p, i) => (i % 2 ? el("strong", { texto: p }) : document.createTextNode(p)));
+  }
+
+  function textoRico(texto) {
+    const raiz = el("div", { class: "texto-rico" });
+    for (const bloco of String(texto).replace(/\r/g, "").split(/\n{2,}/)) {
+      let lista = null;
+      for (const linha of bloco.split("\n")) {
+        if (!linha.trim()) continue;
+        const item = linha.match(/^(\s*)(?:[-•*]|\d+[.)])\s+(.*)$/);
+        if (item) {
+          if (!lista) { lista = el("ul"); raiz.append(lista); }
+          lista.append(el("li", item[1].length >= 2 ? { class: "sub" } : {}, ...trechos(item[2])));
+        } else {
+          lista = null;
+          raiz.append(el("p", {}, ...trechos(linha.trim())));
+        }
+      }
+    }
+    return raiz;
+  }
+
+  /* Resultado do motor de cálculo como demonstrativo: rubrica, pontilhado, valor; total com sublinhado duplo. */
+  function demonstrativo(texto) {
+    const linhas = String(texto).replace(/\r/g, "").split("\n");
+    const raiz = el("div", { class: "demo" }, el("h3", { class: "demo-titulo", texto: (linhas.shift() || "").trim() }));
+    let notas = null, secao = "";
+    for (const bruta of linhas) {
+      const linha = bruta.trim();
+      if (!linha) { notas = null; continue; }
+      if (/^tabelas?:/i.test(linha)) { raiz.append(el("p", { class: "fonte", texto: linha })); continue; }
+      const cabeca = linha.match(/^([^•:]{2,70}):$/);
+      if (cabeca) { secao = cabeca[1]; notas = null; raiz.append(el("h4", { texto: secao })); continue; }
+      const m = linha.match(/^(•\s*)?(.{2,110}?):\s*(.{1,40})$/);
+      if (m && /(R\$|%|\d)/.test(m[3]) && !/^premissa/i.test(secao)) {
+        const total = !m[1] && /^(total|l[ií]quido|custo|valor a pagar)/i.test(m[2]);
+        const destaque = !m[1] && /^(l[ií]quido|custo total|total a pagar|valor a pagar)/i.test(m[2]);
+        raiz.append(el("div", { class: `row${destaque ? " destaque" : total ? " total" : ""}` },
+          el("span", { class: "rotulo", texto: m[2] }), el("span", { class: "lider", "aria-hidden": "true" }), el("span", { class: "valor", texto: m[3] })));
+        notas = null;
+        continue;
+      }
+      if (linha.startsWith("•")) {
+        if (!notas) { notas = el("ul", { class: "demo-notas" }); raiz.append(notas); }
+        notas.append(el("li", { texto: linha.replace(/^•\s*/, "") }));
+        continue;
+      }
+      raiz.append(el("p", { class: "demo-meta", texto: linha }));
+    }
+    raiz.append(el("span", { class: "autoria", texto: "Calculado pelo motor do sistema" }));
+    return raiz;
+  }
+
+  const NOMES_FERRAMENTAS = {
+    calcular: "motor de cálculo", tabela_vigente: "tabela oficial", documentos_recentes: "documentos da empresa",
+    conciliar_fechamento: "conciliação", validar_identificadores: "validação", verificar_conformidade: "regras de conformidade",
+  };
+
+  /* Monta a resposta da assistente dentro da mensagem ``m``. */
+  function preencherResposta(m, texto, r) {
+    m.replaceChildren(r && r.dados_calculados && !(r.ferramentas || []).length ? demonstrativo(texto) : textoRico(texto));
+    const usadas = [...new Set((r && r.ferramentas || []).filter((f) => f.status === "ok").map((f) => NOMES_FERRAMENTAS[f.ferramenta] || f.ferramenta))];
+    if (usadas.length) m.append(el("div", { class: "consultas" }, "Consultou: ", ...usadas.flatMap((u, i) => [i ? " · " : "", el("b", { texto: u })])));
+    if (r && r.dados_calculados) m.append(el("div", { class: "acoes" }, botaoPdf()));
   }
 
   function baixar(blob, nome) {
@@ -122,11 +199,7 @@
     try {
       const r = await api("/api/chat", { metodo: "POST", corpo: { message: texto, session_id: estado.sessao } });
       estado.sessao = r.session_id;
-      pensando.textContent = r.response;
-      if (r.dados_calculados) {
-        const acoes = el("div", { class: "acoes" }, botaoPdf());
-        pensando.append(acoes);
-      }
+      preencherResposta(pensando, r.response, r);
     } catch (e) {
       pensando.className = "msg erro-msg"; pensando.textContent = e.message;
     } finally {
@@ -142,7 +215,7 @@
 
   function falarTexto(frase) {
     if (!voz.falar || !("speechSynthesis" in window)) return;
-    const u = new SpeechSynthesisUtterance(frase);
+    const u = new SpeechSynthesisUtterance(frase.replace(/\*\*/g, "").replace(/^\s*[-•]\s+/gm, ""));  // a voz não lê marcação
     u.lang = "pt-BR";
     const v = speechSynthesis.getVoices().find((x) => x.lang === "pt-BR") || speechSynthesis.getVoices().find((x) => x.lang.startsWith("pt"));
     if (v) u.voice = v;
@@ -168,7 +241,7 @@
     }
     if (q.tipo === "fim_resposta") {
       estado.sessao = q.sessao;
-      if (voz.ela) { voz.ela.textContent = q.texto; if (q.dados_calculados) voz.ela.append(el("div", { class: "acoes" }, botaoPdf())); }
+      if (voz.ela) preencherResposta(voz.ela, q.texto, q);
       voz.eu = voz.ela = null; voz.resposta = [];
       estado.ocupado = false; $("botao-enviar").disabled = false;
       $("mensagens").scrollTop = $("mensagens").scrollHeight;
@@ -251,6 +324,19 @@
   }
 
   /* ----------------------------------------------------------- documentos */
+  const SIGLAS = new Set(["inss", "irrf", "fgts", "cnpj", "cpf", "pis", "das", "darf", "gps", "nfe", "ie", "uf", "cbo", "ctps", "dsr", "cnae", "ncm", "cfop", "icms", "ipi", "iss", "mei", "trct"]);
+  const ACENTOS = {
+    liquido: "líquido", salario: "salário", competencia: "competência", emissao: "emissão", numero: "número", serie: "série",
+    contribuicao: "contribuição", inscricao: "inscrição", razao: "razão", periodo: "período", codigo: "código", referencia: "referência",
+    previdencia: "previdência", rescisao: "rescisão", ferias: "férias", admissao: "admissão", demissao: "demissão", funcao: "função",
+    deducao: "dedução", apuracao: "apuração", calendario: "calendário", tributaveis: "tributáveis", servicos: "serviços", destinatario: "destinatário",
+  };
+  function rotuloCampo(chave) {
+    const palavras = chave.split("_").map((p) => (SIGLAS.has(p) ? p.toUpperCase() : ACENTOS[p] || p));
+    if (palavras.length && palavras[0] === palavras[0].toLowerCase()) palavras[0] = palavras[0].charAt(0).toUpperCase() + palavras[0].slice(1);
+    return palavras.join(" ");
+  }
+
   function cartaoDocumento(d) {
     const raiz = el("div", { class: "doc" });
     const rotulo = d.nome_tipo || "Documento não identificado";
@@ -267,7 +353,7 @@
       const tb = el("table");
       for (const [k, v] of linhas) {
         const valor = /^\d+\.\d{2}$/.test(String(v)) ? brl(v) : dataBr(String(v));
-        tb.append(el("tr", {}, el("td", { texto: k.replaceAll("_", " ") }), el("td", { texto: valor })));
+        tb.append(el("tr", {}, el("td", { texto: rotuloCampo(k) }), el("td", { texto: valor })));
       }
       raiz.append(tb);
     }

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _NUM = r"\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:,\d{1,2})?"
 _DATA = r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4}|\d{2})"
+_MILHAR = r"\d+(?:[.,]\d+)? ?(?:mil|k)\b"  # "3 mil", "4,5 mil", "9k"
 
 
 def _sem_acento(texto: str) -> str:
@@ -107,12 +108,13 @@ def extrair_aviso(norm: str) -> Optional[str]:
 
 
 def _valor_apos(norm: str, padrao: str) -> Optional[Decimal]:
-    m = re.search(padrao + r"[^\d]{0,25}(?:r\$ ?)?(" + _NUM + r"|\d+(?:[.,]\d+)? ?(?:mil|k))", norm)
+    # "3 mil" e "3k" primeiro: se o número viesse antes, "3 mil" virava R$ 3
+    m = re.search(padrao + r"[^\d]{0,25}(?:r\$ ?)?(" + _MILHAR + r"|" + _NUM + r")", norm)
     return parse_valor_br(m.group(m.lastindex)) if m else None
 
 
-_MODO_DARF = re.compile(r"\bdarf\b|vencimento|venceu|\bvence\b|paguei|pagou|pago em|pagamento em")
-_CTX_VENCIMENTO = re.compile(r"(vencimento|venceu|vence)")
+_MODO_DARF = re.compile(r"\bdarf\b|vencimento|venceu|vencid|\bvence\b|paguei|pagou|pago em|pagamento em")
+_CTX_VENCIMENTO = re.compile(r"(vencimento|venceu|vencid|vence)")
 _CTX_PAGAMENTO = re.compile(r"(pag|quit|recolh)")
 
 
@@ -171,6 +173,20 @@ def extrair_regime(norm: str) -> Optional[str]:
     return None
 
 
+_MESES = ("janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro")
+_MES_ANO = r"\b(?:(" + "|".join(_MESES) + r")(?: de| do)? (\d{4})|(?<![/\d])(\d{1,2})/(\d{4}))\b"
+
+
+def extrair_competencia(norm: str) -> Optional[str]:
+    """Mês e ano ditos na frase ("setembro de 2026" ou "09/2026") como competência DD/MM/AAAA (dia 1)."""
+    for m in re.finditer(_MES_ANO, norm):
+        mes = _MESES.index(m.group(1)) + 1 if m.group(1) else int(m.group(3))
+        ano = int(m.group(2) or m.group(4))
+        if 1 <= mes <= 12 and 2000 <= ano <= 2100:
+            return f"01/{mes:02d}/{ano}"
+    return None
+
+
 def extrair_dados(mensagem: str) -> Dict[str, Any]:
     """Devolve apenas o que foi dito na mensagem. Chaves compatíveis com ``calc.servico``."""
     norm = normalizar(mensagem)
@@ -200,9 +216,17 @@ def extrair_dados(mensagem: str) -> Dict[str, Any]:
     elif re.search(r"(sem|nao sei o|nao tenho o|nao tenho) (o )?saldo|saldo (nao sei|desconhecido)", norm):
         dados["recusou_saldo_fgts"] = True
 
-    # remove datas para não virarem valores
-    texto_valores = re.sub(_DATA, " ", texto_sem_fgts)
+    # competência dita por mês e ano ("setembro de 2026", "09/2026"): vale para a tabela certa e não pode virar valor
+    competencia = extrair_competencia(re.sub(_DATA, " ", norm))  # sem as datas completas: "10/03/2023" não é a competência 03/2023
+    if competencia:
+        dados["competencia"] = competencia
 
+    # remove datas (e mês/ano) para não virarem valores: "INSS em setembro de 2026" não é salário de R$ 2.026
+    texto_valores = re.sub(_MES_ANO, " ", re.sub(_DATA, " ", texto_sem_fgts))
+
+    prolabore = _valor_apos(texto_valores, r"pro.?labore(?: mensal)?(?: (?:de|e|eh|:))?")  # "pró-labore de 8 mil"
+    if prolabore is not None and prolabore > 0:
+        dados["prolabore"] = prolabore
     salario = _valor_apos(texto_valores, r"(?:salario(?: base| bruto| mensal)?|ganha(?:va)?|recebe(?:u|ndo)?|remuneracao)(?: (?:de|e|eh|era|:))?")
     if salario is None:
         m = re.search(r"r\$ ?(" + _NUM + r")", texto_valores)
@@ -211,7 +235,7 @@ def extrair_dados(mensagem: str) -> Dict[str, Any]:
     if salario is None:
         # "INSS de 5000", "imposto de renda sobre 6.500" (sem R$ nem a palavra salário)
         m = re.search(
-            r"(?:inss|irrf|imposto(?: de renda)?|previdencia|contribuicao)[^\d]{0,25}(" + _NUM + r"|\d+(?:[.,]\d+)? ?(?:mil|k))\b",
+            r"(?:inss|irrf|imposto(?: de renda)?|previdencia|contribuicao)[^\d]{0,25}(" + _MILHAR + r"|" + _NUM + r")\b",
             texto_valores,
         )
         if m:
@@ -264,9 +288,32 @@ _PEDE_CALCULO = re.compile(r"\b(calcul|quanto|quero|preciso|faz|fazer|simul|gera
 _PEDE_EXPLICACAO = re.compile(r"\b(explic|o que e|oque e|como funciona|para que serve|significa|me ensin)")
 
 
+# Perguntas sobre um documento já enviado ou sobre a regra (prazo, direito, lei) não são pedido de cálculo: vão para a
+# assistente, que consulta os documentos e explica. Sem isso, "tem problema no holerite que eu mandei?" abria um cálculo de folha.
+_ENVIADO = re.compile(r"\bque (?:eu )?(?:mandei|enviei|anexei|subi|carreguei)\b|\b(?:documento|arquivo|anexo|upload)s?\b")
+_SOBRE_DOCUMENTO = re.compile(r"\b(?:esse|este|nesse|neste|desse|deste|no|do|o|ultimo|meu) (?:holerite|contracheque|extrato|recibo|guia|darf|das)\b(?! de \d)")
+_PERGUNTA_DE_REGRA = re.compile(
+    r"\b(?:prazo|ate quando|quanto tempo|quando (?:devo|tenho|preciso|posso|e|vence)|pode|posso|devo|obrigatori|lei|artigo|direito|regra"
+    r"|diferenca entre|faixas?|aliquotas?|tabela|teto|norma|portaria)\b"
+)
+_PEDE_CONTA = re.compile(r"\b(?:calcul|recalcul|simul|gera|gerar|emit|monta|montar|prepara)|\bquanto\b(?! tempo)|\bqual (?:o|a) valor\b")
+
+
+def pergunta_fora_do_calculo(mensagem: str) -> bool:
+    """A mensagem fala de um documento enviado, da regra ou de conceito, e não pede conta."""
+    norm = normalizar(mensagem)
+    if _ENVIADO.search(norm):  # "o holerite que eu mandei": é sobre o documento, mesmo com verbo de conta
+        return True
+    if _PEDE_CONTA.search(norm):
+        return False
+    return bool(_SOBRE_DOCUMENTO.search(norm) or _PERGUNTA_DE_REGRA.search(norm) or _PEDE_EXPLICACAO.search(norm))
+
+
 def detectar_tipo_calculo(mensagem: str) -> Optional[str]:
     """Qual cálculo o usuário pediu, ou None se a mensagem não pede cálculo."""
     norm = normalizar(mensagem)
+    if pergunta_fora_do_calculo(mensagem):
+        return None
     # os tipos de encargos só disparam quando a mensagem PEDE cálculo; "me explique o DARF" é conversa e vai para o LLM
     pede_calculo = bool(_PEDE_CALCULO.search(norm) or re.search(r"r\$ ?\d", norm)) and not _PEDE_EXPLICACAO.search(norm)
     if pede_calculo:

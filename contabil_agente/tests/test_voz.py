@@ -1,4 +1,4 @@
-"""Whisper (formato do pedido e limites, sem rede) e o tom adaptativo do MARCOS."""
+"""Whisper (formato do pedido e limites, sem rede) e o tom adaptativo da assistente."""
 
 import httpx
 import pytest

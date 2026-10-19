@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -62,25 +63,56 @@ class GroqLLM:
             res["erro"] = f"{type(exc).__name__}: {str(exc)[:200]}"
         return res
 
-    def __call__(self, mensagens: Mensagens) -> str:
+    def _criar(self, mensagens: List[Dict[str, Any]], ferramentas: Optional[List[Dict[str, Any]]] = None):
+        """Uma resposta do modelo (com novas tentativas). Sem ferramentas, só aceita resposta com texto."""
         ultimo_erro: Optional[Exception] = None
+        extra = {"tools": ferramentas, "tool_choice": "auto"} if ferramentas else {}
         for tentativa in range(self.tentativas):
             try:
                 resposta = self._cliente.chat.completions.create(
-                    model=self.modelo,
-                    messages=mensagens,
-                    temperature=self.temperatura,
-                    max_tokens=self.max_tokens,
+                    model=self.modelo, messages=mensagens, temperature=self.temperatura, max_tokens=self.max_tokens, **extra,
                 )
-                texto = (resposta.choices[0].message.content or "").strip()
-                if texto:
-                    return texto
+                msg = resposta.choices[0].message
+                if (msg.content or "").strip() or getattr(msg, "tool_calls", None):
+                    return msg
                 ultimo_erro = LLMIndisponivel("Resposta vazia do provedor.")
             except Exception as exc:  # erros de rede, limite e API compartilham o mesmo tratamento
                 ultimo_erro = exc
                 logger.warning("Groq falhou (tentativa %d/%d): %s", tentativa + 1, self.tentativas, type(exc).__name__)
             time.sleep(min(2 ** tentativa, 8) * 0.5)
         raise LLMIndisponivel("O provedor de IA não respondeu.") from ultimo_erro
+
+    def __call__(self, mensagens: Mensagens) -> str:
+        return (self._criar(mensagens).content or "").strip()
+
+    def com_ferramentas(
+        self, mensagens: Mensagens, ferramentas: List[Dict[str, Any]], executar: Callable[[str, Dict[str, Any]], Dict[str, Any]],
+        max_rodadas: int = 5,
+    ) -> Tuple[str, List[Dict[str, Any]]]:
+        """Conversa em que o modelo pode chamar ferramentas do sistema. Devolve o texto final e as chamadas feitas."""
+        conversa: List[Dict[str, Any]] = list(mensagens)
+        chamadas: List[Dict[str, Any]] = []
+        for _ in range(max_rodadas):
+            msg = self._criar(conversa, ferramentas)
+            pedidos = getattr(msg, "tool_calls", None) or []
+            if not pedidos:
+                return (msg.content or "").strip(), chamadas
+            conversa.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
+                {"id": p.id, "type": "function", "function": {"name": p.function.name, "arguments": p.function.arguments or "{}"}} for p in pedidos]})
+            for p in pedidos:
+                try:
+                    argumentos = json.loads(p.function.arguments or "{}")
+                except ValueError:
+                    argumentos = None
+                if isinstance(argumentos, dict):
+                    resultado = executar(p.function.name, argumentos)
+                else:
+                    resultado = {"status": "erro", "mensagem": "Os argumentos não são um objeto JSON válido."}
+                chamadas.append({"ferramenta": p.function.name, "status": resultado.get("status")})
+                conteudo = json.dumps(resultado, ensure_ascii=False, default=str, separators=(",", ":"))
+                conversa.append({"role": "tool", "tool_call_id": p.id, "content": conteudo[:12000]})
+        conversa.append({"role": "user", "content": "Responda agora com o que já tem, sem chamar mais ferramentas."})
+        return (self._criar(conversa).content or "").strip(), chamadas
 
 
 def llm_do_ambiente(env: Optional[dict] = None) -> Optional[LLM]:

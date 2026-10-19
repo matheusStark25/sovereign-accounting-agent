@@ -119,3 +119,54 @@ def test_nao_inventa_nada():
 )
 def test_detectar_tipo_calculo(texto, esperado):
     assert ex.detectar_tipo_calculo(texto) == esperado
+
+
+@pytest.mark.parametrize("frase,campo,valor", [
+    ("funcionário que ganha 3 mil", "salario", "3000"),
+    ("salário de 4,5 mil", "salario", "4500"),
+    ("INSS de 5 mil", "salario", "5000"),
+    ("salário 3k", "salario", "3000"),
+    ("quanto custa um pró-labore de 8 mil?", "prolabore", "8000"),
+    ("pró-labore de R$ 12.500,00", "prolabore", "12500"),
+])
+def test_valores_escritos_por_extenso_em_mil_ou_k(frase, campo, valor):
+    # antes, "3 mil" virava R$ 3: o número casava antes da palavra "mil"
+    assert ex.extrair_dados(frase)[campo] == Decimal(valor)
+
+
+@pytest.mark.parametrize("frase", [
+    "Tem algum problema no último holerite que eu mandei?",
+    "Qual o prazo para pagar a rescisão?",
+    "quanto tempo tenho para pagar a rescisão?",
+    "o que é férias vencidas?",
+    "confere o DAS que eu mandei",
+    "posso parcelar o DARF?",
+    "tem direito a férias quem tem 6 meses?",
+])
+def test_pergunta_sobre_documento_ou_regra_nao_vira_calculo(frase):
+    # vão para a assistente, que consulta os documentos e explica a regra; antes abriam um formulário de cálculo
+    assert ex.detectar_tipo_calculo(frase) is None
+
+
+@pytest.mark.parametrize("frase,tipo", [
+    ("calcular o holerite de quem ganha 3000", "folha"),
+    ("o holerite de 3000 com 2 dependentes", "folha"),
+    ("qual o desconto do INSS de quem ganha 3 mil?", "inss"),
+    ("calcular DARF de 1000 vencido em 10/08/2026", "darf"),
+])
+def test_pedido_de_conta_continua_indo_para_o_motor(frase, tipo):
+    assert ex.detectar_tipo_calculo(frase) == tipo
+
+
+def test_mes_e_ano_viram_competencia_e_nao_salario():
+    # antes, "INSS em setembro de 2026" virava salário de R$ 2.026
+    d = ex.extrair_dados("calcular INSS de 4500 em setembro de 2026")
+    assert d["competencia"] == "01/09/2026" and d["salario"] == Decimal("4500")
+    assert ex.extrair_dados("inss de 3 mil competência 09/2026")["competencia"] == "01/09/2026"
+    assert "competencia" not in ex.extrair_dados("admitido em 10/03/2023, demitido em 15/09/2026")  # data completa não é competência
+    assert ex.detectar_tipo_calculo("Quais são as faixas do INSS em setembro de 2026 e qual a norma?") is None  # vai para tabela_vigente
+
+
+def test_darf_vencido_em_conta_como_vencimento():
+    d = ex.extrair_dados("DARF vencido em 20/08/2026 pago em 10/10/2026")
+    assert d["vencimento"] == "2026-08-20" and d["pagamento"] == "2026-10-10"

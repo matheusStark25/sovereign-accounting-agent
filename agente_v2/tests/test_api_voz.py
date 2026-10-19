@@ -88,7 +88,7 @@ def test_o_token_nao_vai_na_url_e_logout_derruba_o_acesso(client):
 def test_fala_vira_transcricao_e_resposta_frase_por_frase_com_calculo_de_verdade(client):
     stt = STTFalso("calcular INSS")
     with voz(client, stt=stt) as ws:
-        assert ws.pronto["stt"] is True and ws.pronto["persona"] == "MARCOS"
+        assert ws.pronto["stt"] is True and ws.pronto["persona"] == "MARIA_HELENA"
         falar(ws)
         quadros = receber_ate_o_fim(ws)
         assert quadros[0] == {"tipo": "transcricao", "texto": "calcular INSS"}
@@ -225,9 +225,9 @@ def test_se_a_auditoria_falhar_a_voz_nao_responde(client, monkeypatch):
     ("Prezado, gostaria de saber o que é o aviso prévio.", "formal"),
     ("o que é aviso prévio", "base"),
 ])
-def test_o_marcos_ajusta_o_tom_ao_jeito_de_quem_fala(client, llm, texto, tom):  # noqa: F811
+def test_a_maria_helena_ajusta_o_tom_ao_jeito_de_quem_fala(client, llm, texto, tom):  # noqa: F811
     with voz(client, stt=None) as ws:
         ws.send_json({"tipo": "texto", "texto": texto})
         fim = receber_ate_o_fim(ws)[-1]
-    assert fim["origem"] == "llm" and fim["persona"] == "MARCOS" and fim["tom"] == tom
-    assert llm.recebido[-1][0]["content"] == obter_prompt("MARCOS", tom)  # e é o prompt daquele tom que foi para o modelo
+    assert fim["origem"] == "llm" and fim["persona"] == "MARIA_HELENA" and fim["tom"] == tom
+    assert llm.recebido[-1][0]["content"] == obter_prompt("MARIA_HELENA", tom)  # e é o prompt daquele tom que foi para o modelo
