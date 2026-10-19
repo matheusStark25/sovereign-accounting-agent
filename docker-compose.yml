@@ -4,6 +4,7 @@
 #   docker compose up --build   # API em http://localhost:8000
 #   docker compose --profile gateway up --build    # + nginx: https://localhost (usuários) e https://localhost:8443 (mTLS)
 #   docker compose --profile dev up --build        # + Vault em modo desenvolvimento
+#   docker compose --profile observabilidade up -d # + Prometheus, Alertmanager e Grafana (http://127.0.0.1:3000, só na própria máquina)
 #
 # O worker do RPA do FGTS (navegador com captcha/login feito por uma pessoa) NÃO está aqui: veja o README.
 
@@ -78,6 +79,60 @@ services:
       - api
     restart: unless-stopped
 
+  # Observabilidade: Prometheus lê /metrics da API, avalia os alertas de observabilidade/alertas.yml e os entrega ao Alertmanager;
+  # o Grafana já sobe com o painel "Sovereign Accounting Agent". Tudo escuta só em 127.0.0.1.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    profiles: ["observabilidade"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=15d"]
+    volumes:
+      - ./observabilidade/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observabilidade/alertas.yml:/etc/prometheus/alertas.yml:ro
+      - prometheus:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - api
+      - alertmanager
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    profiles: ["observabilidade"]
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrada.sh"]
+    environment:
+      ALERTA_WEBHOOK_URL: ${ALERTA_WEBHOOK_URL:-}
+    volumes:
+      - ./observabilidade/alertmanager.yml.modelo:/etc/alertmanager/alertmanager.yml.modelo:ro
+      - ./observabilidade/entrada.sh:/etc/alertmanager/entrada.sh:ro
+      - alertmanager:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    profiles: ["observabilidade"]
+    # Sem GRAFANA_ADMIN_PASSWORD o contêiner se recusa a subir (o padrão admin/admin do Grafana nunca é usado).
+    entrypoint: ["/bin/sh", "-c", "[ -n \"$$GF_SECURITY_ADMIN_PASSWORD\" ] || { echo 'defina GRAFANA_ADMIN_PASSWORD no .env' >&2; exit 1; }; exec /run.sh"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./observabilidade/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observabilidade/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observabilidade/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
   # Vault em modo desenvolvimento: dados em memória, token raiz fixo. NUNCA use assim em produção.
   vault:
     image: hashicorp/vault:1.17
@@ -95,3 +150,6 @@ services:
 volumes:
   dados:
   redis:
+  prometheus:
+  alertmanager:
+  grafana:

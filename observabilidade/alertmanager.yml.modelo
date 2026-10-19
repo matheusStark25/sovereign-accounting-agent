@@ -1,0 +1,11 @@
+# Modelo do Alertmanager. A entrada (entrada.sh) acrescenta o webhook se ALERTA_WEBHOOK_URL estiver definida; sem ela, os alertas
+# ficam visíveis na tela do Alertmanager (http://127.0.0.1:9093) e na API, mas não são enviados a lugar nenhum.
+route:
+  receiver: padrao
+  group_by: [alertname]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: padrao

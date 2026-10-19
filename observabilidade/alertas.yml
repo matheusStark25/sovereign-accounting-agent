@@ -1,0 +1,58 @@
+# Alertas do Sovereign Accounting Agent. Só usam métricas que o código realmente expõe (um teste confere isso).
+groups:
+  - name: agente
+    rules:
+      - alert: ApiForaDoAr
+        expr: up{job="api"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "A API não responde ao Prometheus há mais de 1 minuto."
+          description: "O alvo api:8000 está fora do ar. Veja `docker compose logs api`."
+
+      - alert: ErrosDoServidor
+        expr: sum(rate(agente_http_requisicoes_total{status=~"5.."}[5m])) / sum(rate(agente_http_requisicoes_total[5m])) > 0.05
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Mais de 5% das requisições estão terminando em erro 5xx."
+          description: "Taxa de erros 5xx nos últimos 5 minutos acima de 5%."
+
+      - alert: LatenciaAlta
+        expr: histogram_quantile(0.95, sum by (le) (rate(agente_http_latencia_segundos_bucket[5m]))) > 2
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "O p95 da latência passou de 2 segundos por mais de 10 minutos."
+          description: "Veja o painel 'Rotas mais lentas' para achar a rota."
+
+      - alert: FalhaNaTrilhaDeAuditoria
+        expr: increase(agente_audit_falhas_total[10m]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "A trilha de auditoria falhou ao gravar."
+          description: "Sem trilha a API recusa a operação (503). Confira disco e permissões em DATA_DIR."
+
+      - alert: LoginsRecusadosEmExcesso
+        expr: sum(rate(agente_logins_total{resultado=~"falha|bloqueado"}[5m])) > 0.2
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Muitas tentativas de login recusadas (possível ataque de força bruta)."
+          description: "Mais de 12 logins recusados por minuto, em média, nos últimos 5 minutos."
+
+      - alert: CalculosComErro
+        expr: sum(rate(agente_calculos_total{resultado="erro"}[15m])) / sum(rate(agente_calculos_total[15m])) > 0.2
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Mais de 20% dos cálculos estão voltando com erro."
+          description: "Costuma ser competência sem tabela fiscal carregada: confira calc/data/tabelas.yaml."
+
+      - alert: VozComFalha
+        expr: sum(rate(agente_voz_mensagens_total{resultado=~"stt_falhou|stt_indisponivel|auditoria_indisponivel"}[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "O canal de voz está falhando (transcrição ou auditoria)."
+          description: "Rode `python -m agente_v2.cli verificar-ia` para conferir a chave e o modelo do Whisper."

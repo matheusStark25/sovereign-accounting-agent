@@ -184,3 +184,84 @@ def test_lock_cobre_todas_as_dependencias_diretas():
     diretas = {re.split(r"[<>=\[ ]", l.strip())[0].lower().replace("_", "-") for l in ler("requirements.txt").splitlines()
                if l.strip() and not l.startswith("#")}
     assert diretas <= lock, sorted(diretas - lock)
+
+
+# ----------------------------------------------------------------------------- observabilidade (Prometheus, Alertmanager, Grafana)
+def _metricas_do_codigo():
+    """Nomes de métricas definidas em Counter/Histogram/Gauge no código da aplicação (os testes ficam de fora)."""
+    nomes = set()
+    for arq in list((RAIZ / "agente_v2").rglob("*.py")) + list((RAIZ / "contabil_agente").rglob("*.py")):
+        if "tests" in arq.parts:
+            continue
+        nomes |= set(re.findall(r'(?:Counter|Histogram|Gauge)\(\s*"([a-z_]+)"', arq.read_text(encoding="utf-8")))
+    return nomes
+
+
+def _metricas_usadas(texto):
+    return {re.sub(r"_(bucket|sum|count)$", "", m) for m in re.findall(r"\b(agente_[a-z_]+)", texto)}
+
+
+def test_observabilidade_so_em_perfil_so_na_propria_maquina_e_com_arquivos_que_existem():
+    servicos = yaml.safe_load(ler("docker-compose.yml"))["services"]
+    for nome in ("prometheus", "alertmanager", "grafana"):
+        s = servicos[nome]
+        assert s["profiles"] == ["observabilidade"], nome  # não sobe sem pedir
+        assert all(p.startswith("127.0.0.1:") for p in s["ports"]), f"{nome}: precisa escutar só em 127.0.0.1"
+        assert not s["image"].endswith(":latest") and ":" in s["image"], f"{nome}: imagem sem versão fixa"
+        for vol in s.get("volumes", []):
+            origem = vol.split(":")[0]
+            if origem.startswith("./"):
+                assert (RAIZ / origem).exists(), f"{nome}: volume {origem} não existe"
+    assert "GF_SECURITY_ADMIN_PASSWORD" in servicos["grafana"]["entrypoint"][2] and "exit 1" in servicos["grafana"]["entrypoint"][2]  # sem senha, não sobe
+    assert servicos["grafana"]["environment"]["GF_AUTH_ANONYMOUS_ENABLED"] == "false"
+
+
+def test_alertas_e_painel_so_usam_metricas_que_o_codigo_expoe():
+    expostas = _metricas_do_codigo()
+    assert {"agente_http_requisicoes_total", "agente_http_latencia_segundos", "agente_logins_total", "agente_audit_falhas_total"} <= expostas
+    import json
+
+    exprs_alertas = " ".join(r["expr"] for g in yaml.safe_load(ler("observabilidade/alertas.yml"))["groups"] for r in g["rules"])
+    exprs_painel = " ".join(tg["expr"] for pn in json.loads(ler("observabilidade/grafana/dashboards/sovereign.json"))["panels"] for tg in pn["targets"])
+    for origem, texto in (("alertas.yml", exprs_alertas), ("sovereign.json", exprs_painel)):  # só as consultas, não os textos de aviso
+        usadas = _metricas_usadas(texto)
+        assert usadas, origem
+        assert usadas <= expostas, f"{origem} usa métricas que o código não expõe: {sorted(usadas - expostas)}"
+
+
+def test_cada_alerta_tem_resumo_gravidade_e_nome_unico():
+    regras = [r for g in yaml.safe_load(ler("observabilidade/alertas.yml"))["groups"] for r in g["rules"]]
+    nomes = [r["alert"] for r in regras]
+    assert len(nomes) == len(set(nomes)) >= 6 and {"ApiForaDoAr", "FalhaNaTrilhaDeAuditoria"} <= set(nomes)
+    for r in regras:
+        assert r["expr"].strip() and r["labels"]["severity"] in ("warning", "critical") and len(r["annotations"]["summary"]) > 10, r["alert"]
+
+
+def test_prometheus_aponta_para_arquivos_e_servicos_que_existem():
+    prom = yaml.safe_load(ler("observabilidade/prometheus.yml"))
+    for caminho in prom["rule_files"]:
+        assert (RAIZ / "observabilidade" / Path(caminho).name).is_file(), caminho
+    servicos = yaml.safe_load(ler("docker-compose.yml"))["services"]
+    alvos = {t.split(":")[0] for j in prom["scrape_configs"] for c in j["static_configs"] for t in c["targets"]}
+    assert {"api", "alertmanager"} <= alvos and (alvos - {"localhost"}) <= set(servicos)  # todo alvo é um serviço do compose
+    assert any("alertmanager:9093" in t for a in prom["alerting"]["alertmanagers"] for c in a["static_configs"] for t in c["targets"])
+    assert 'CMD ["uvicorn", "agente_v2.main:app", "--host", "0.0.0.0", "--port", "8000"' in ler("Dockerfile")  # a porta do alvo "api:8000"
+
+
+def test_painel_do_grafana_e_valido_e_usa_a_fonte_de_dados_provisionada():
+    import json
+
+    painel = json.loads(ler("observabilidade/grafana/dashboards/sovereign.json"))
+    fonte = yaml.safe_load(ler("observabilidade/grafana/provisioning/datasources/prometheus.yml"))["datasources"][0]
+    assert painel["uid"] and painel["title"] and len(painel["panels"]) >= 8 and fonte["uid"] == "prometheus"
+    for p in painel["panels"]:
+        assert p["targets"] and all(t["expr"].strip() and t["datasource"]["uid"] == fonte["uid"] for t in p["targets"]), p["title"]
+    assert len({p["id"] for p in painel["panels"]}) == len(painel["panels"])  # ids únicos
+
+
+def test_entrada_do_alertmanager_e_sh_com_quebra_de_linha_unix_e_recusa_webhook_inseguro():
+    bruto = (RAIZ / "observabilidade" / "entrada.sh").read_bytes()
+    assert b"\r" not in bruto and bruto.startswith(b"#!/bin/sh")
+    texto = bruto.decode("utf-8")
+    assert "https://*" in texto and "exit 1" in texto and "exec /bin/alertmanager" in texto
+    assert "webhook_configs" not in ler("observabilidade/alertmanager.yml.modelo").replace("# ", "").split("receivers:")[1]  # só entra se a variável existir

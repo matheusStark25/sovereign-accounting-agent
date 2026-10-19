@@ -118,3 +118,88 @@ jobs:
           { tail -n 40 compose.log 2>/dev/null; echo '--- logs dos contêineres ---'; docker compose logs --no-color --tail 40 2>&1; } > falha.txt || true
           corpo=$(tail -n 70 falha.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::error title=pilha falhou::${corpo}"
+
+  observabilidade:
+    # Sobe API + Prometheus + Alertmanager + Grafana e confere de verdade: alvo no ar, métrica real depois de usar a API, painel e fonte
+    # de dados carregados no Grafana, regras sem erro e um alerta disparando de ponta a ponta (derruba a API e espera chegar ao Alertmanager).
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Validar a configuração do Prometheus com a ferramenta oficial (promtool)
+        run: |
+          docker run --rm \
+            -v "$PWD/observabilidade/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/observabilidade/alertas.yml:/etc/prometheus/alertas.yml:ro" \
+            --entrypoint promtool prom/prometheus:v2.54.1 check config /etc/prometheus/prometheus.yml
+      - name: Gerar segredos de teste
+        run: |
+          pip install -r requirements.txt
+          S() { python -m agente_v2.cli gerar-segredo; }
+          {
+            echo "JWT_SECRET=$(S)"
+            echo "AUDIT_HMAC_KEY=$(S)"
+            echo "REDIS_PASSWORD=$(S)"
+            echo "GOVERNANCA_DSA_KEY='$(python -m agente_v2.cli gerar-chave-governanca | tail -1 | cut -d= -f2-)'"
+            echo "ADMIN_USERNAME=admin"
+            echo "ADMIN_PASSWORD=Aa1-$(S)"
+            echo "ADMIN_TENANT=ci"
+            echo "GRAFANA_ADMIN_PASSWORD=$(S)"
+          } > .env
+      - name: O Grafana se recusa a subir sem senha e o Alertmanager recusa webhook sem HTTPS
+        run: |
+          if docker compose run --rm --no-deps -e GF_SECURITY_ADMIN_PASSWORD= grafana; then echo "ERRO: o Grafana subiu sem senha"; exit 1; fi
+          if docker compose run --rm --no-deps -e ALERTA_WEBHOOK_URL=http://exemplo.local/hook alertmanager; then echo "ERRO: o Alertmanager aceitou webhook sem HTTPS"; exit 1; fi
+      - name: Subir a API e a observabilidade
+        run: |
+          set -o pipefail
+          docker compose --profile observabilidade up -d --build 2>&1 | tee compose.log
+      - name: O Prometheus enxerga a API e carrega todas as regras sem erro
+        run: |
+          ok=0
+          for i in $(seq 1 40); do
+            v=$(curl -fsS --get 'http://127.0.0.1:9090/api/v1/query' --data-urlencode 'query=up{job="api"}' | python -c "import sys,json; r=json.load(sys.stdin)['data']['result']; print(r[0]['value'][1] if r else 0)" 2>/dev/null || echo 0)
+            [ "$v" = 1 ] && ok=1 && break; sleep 3
+          done
+          [ "$ok" = 1 ] || { docker compose logs prometheus api; exit 1; }
+          curl -fsS http://127.0.0.1:9090/api/v1/rules | python -c "import sys,json; regras=[x for g in json.load(sys.stdin)['data']['groups'] for x in g['rules']]; assert len(regras) >= 6 and all(x['health'] == 'ok' for x in regras), regras; print(len(regras), 'regras ok')"
+      - name: Métrica de verdade aparece depois de usar a API
+        run: |
+          set -a; . ./.env; set +a
+          TOKEN=$(curl -fsS -d "username=admin&password=${ADMIN_PASSWORD}" http://127.0.0.1:8000/token | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+          curl -fsS -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -d '{"salario":3000,"competencia":"2026-09"}' http://127.0.0.1:8000/api/v1/calculo/inss > /dev/null
+          v=0
+          for i in $(seq 1 30); do
+            v=$(curl -fsS --get 'http://127.0.0.1:9090/api/v1/query' --data-urlencode 'query=sum(agente_calculos_total{tipo="inss",resultado="ok"})' | python -c "import sys,json; r=json.load(sys.stdin)['data']['result']; print(int(float(r[0]['value'][1])) if r else 0)")
+            [ "$v" -ge 1 ] && break; sleep 3
+          done
+          [ "$v" -ge 1 ] || { echo "A métrica agente_calculos_total não chegou ao Prometheus"; exit 1; }
+      - name: O Grafana sobe com o painel e a fonte de dados, fala com o Prometheus e exige login
+        run: |
+          set -a; . ./.env; set +a
+          for i in $(seq 1 40); do curl -fsS http://127.0.0.1:3000/api/health > /dev/null 2>&1 && break; sleep 3; done
+          curl -fsS -u "admin:${GRAFANA_ADMIN_PASSWORD}" 'http://127.0.0.1:3000/api/search?query=Sovereign' | python -c "import sys,json; r=json.load(sys.stdin); assert any(d['uid'] == 'sovereign-agente' for d in r), r"
+          curl -fsS -u "admin:${GRAFANA_ADMIN_PASSWORD}" http://127.0.0.1:3000/api/datasources/uid/prometheus/health | python -c "import sys,json; r=json.load(sys.stdin); assert r['status'] == 'OK', r"
+          curl -fsS -u "admin:${GRAFANA_ADMIN_PASSWORD}" --get 'http://127.0.0.1:3000/api/datasources/proxy/uid/prometheus/api/v1/query' --data-urlencode 'query=up{job="api"}' | python -c "import sys,json; r=json.load(sys.stdin)['data']['result']; assert r and r[0]['value'][1] == '1', r"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/search)" = 401
+      - name: Um alerta de verdade chega ao Alertmanager (derruba a API)
+        run: |
+          curl -fsS http://127.0.0.1:9093/-/ready
+          docker compose stop api
+          ok=0
+          for i in $(seq 1 60); do
+            n=$(curl -fsS http://127.0.0.1:9093/api/v2/alerts | python -c "import sys,json; print(sum(1 for a in json.load(sys.stdin) if a['labels']['alertname'] == 'ApiForaDoAr' and a['status']['state'] == 'active'))")
+            [ "$n" -ge 1 ] && ok=1 && break; sleep 5
+          done
+          [ "$ok" = 1 ] || { curl -s http://127.0.0.1:9090/api/v1/alerts; docker compose logs prometheus alertmanager; exit 1; }
+      - name: Erro como anotação pública (se algo falhou)
+        if: failure()
+        run: |
+          { tail -n 40 compose.log 2>/dev/null; echo '--- logs dos contêineres ---'; docker compose logs --no-color --tail 40 2>&1; } > falha.txt || true
+          corpo=$(tail -n 70 falha.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::error title=observabilidade falhou::${corpo}"
