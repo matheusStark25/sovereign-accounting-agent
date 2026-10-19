@@ -144,3 +144,19 @@ def test_orquestrador_audita_cada_pedido(orq, tmp_path):
 def test_orquestrador_sem_trilha_nao_grava_e_nao_quebra(tmp_path):
     orq = IntelligenceOrchestrator(db_path=str(tmp_path / "c.sqlite"), hoje=HOJE)
     assert orq.audit.worm is None and rodar(orq.handle("s8", {"amount": 3000}))["request_id"]
+
+
+@pytest.mark.parametrize("competencia", ["2026-09", "09/2026", "15/09/2026", "2026-09-15"])
+def test_salario_abaixo_do_minimo_e_barrado_em_qualquer_formato_de_competencia(competencia):
+    from contabil_agente.intelligence.compliance import ComplianceChecker
+
+    r = ComplianceChecker().validate({"salario": 500, "competencia": competencia})
+    assert not r["ok"] and any(i["field"] == "salario" for i in r["issues"])
+    assert ComplianceChecker().validate({"salario": 3000, "competencia": competencia})["ok"]
+
+
+def test_competencia_irreconhecivel_gera_alerta_em_vez_de_pular_a_conferencia_em_silencio():
+    from contabil_agente.intelligence.compliance import ComplianceChecker
+
+    r = ComplianceChecker().validate({"salario": 500, "competencia": "setembro de 2026"})
+    assert any(a["field"] == "competencia" for a in r["alerts"])

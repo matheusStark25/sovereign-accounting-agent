@@ -7,6 +7,7 @@ As regras vêm de ``rules/compliance_rules.yaml``; o salário mínimo vem das ta
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -47,6 +48,8 @@ class ComplianceChecker:
             try:
                 valor = D(salario, "salário")
                 competencia = _competencia(data)
+                if competencia is None and integridade.get("minimum_wage_enforcement"):
+                    alerts.append({"field": "competencia", "issue": "competência não reconhecida (use AAAA-MM, MM/AAAA ou DD/MM/AAAA): salário mínimo não verificado"})
                 if integridade.get("minimum_wage_enforcement") and competencia:
                     minimo = tabela_inss(competencia).salario_minimo
                     if valor < minimo:
@@ -73,10 +76,25 @@ class ComplianceChecker:
 
 
 def _competencia(data: Dict[str, Any]) -> Optional[date]:
+    """Primeiro dia do mês da data/competência informada, ou ``None`` se o formato não for reconhecido (nunca chuta)."""
     bruto = data.get("data_demissao") or data.get("competencia") or data.get("date")
     if not bruto:
         return date.today().replace(day=1)
+    texto = str(bruto).strip()
+    for padrao, ordem in ((r"(\d{4})-(\d{2})", (1, 2)), (r"(\d{2})/(\d{4})", (2, 1))):
+        m = re.fullmatch(padrao, texto)
+        if m:
+            try:
+                return date(int(m.group(ordem[0])), int(m.group(ordem[1])), 1)
+            except ValueError:
+                return None
+    m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", texto)
+    if m:
+        try:
+            return date(int(m.group(3)), int(m.group(2)), 1)
+        except ValueError:
+            return None
     try:
-        return datetime.fromisoformat(str(bruto)).date().replace(day=1)
+        return datetime.fromisoformat(texto).date().replace(day=1)
     except ValueError:
         return None

@@ -26,7 +26,7 @@ import hashlib
 import hmac as _hmac
 
 from contabil_agente.documentos import gerar_pdf_calculo, hash_do_resultado
-from contabil_agente.documentos.validadores import validar_cpf
+from contabil_agente.documentos.validadores import validar_cnpj, validar_cpf
 from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
 from contabil_agente.rpa import estado as rpa_estado
 from contabil_agente.rpa.estado import StatusStore
@@ -58,6 +58,7 @@ from contabil_agente.resilience.readiness import readiness_check
 from .auth import exigir, get_auth, token_da_requisicao, usuario_atual
 from .config import settings
 from .logging_setup import setup_logging
+from .rotas_agentes import instalar_agentes
 from .vault_client import VaultClient, carregar_segredos
 
 logger = logging.getLogger("agente_v2")
@@ -93,6 +94,11 @@ class PedidoExclusao(BaseModel):
 
 class PedidoFGTS(BaseModel):
     cpf: str = Field(max_length=20)
+
+
+class PedidoPGMEI(BaseModel):
+    cnpj: str = Field(max_length=20)
+    ano: Optional[int] = Field(default=None, ge=2000, le=2100)
 
 
 class PedidoDecisao(BaseModel):
@@ -487,33 +493,49 @@ def create_app(
         return {"removidos": request.app.state.lgpd.executar_retencao(usuario.tenant_id, usuario.user_id)}
 
     # -------------------------------------------------------------------- RPA
-    @app.post("/api/v1/rpa/fgts", status_code=202)
-    def enfileirar_extrato_fgts(pedido: PedidoFGTS, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
-        """Enfileira a consulta do extrato do FGTS. O CPF vai cifrado (pós-quântico) pelo broker; o robô pausa
-        para uma pessoa resolver captcha/login na janela do navegador do worker."""
-        if not validar_cpf(pedido.cpf):
-            raise HTTPException(status_code=422, detail="CPF inválido.")
+    def enfileirar_extrato(request: Request, usuario: Principal, portal: str, documento: str, ano: Optional[int] = None) -> Dict[str, Any]:
+        """Enfileira o extrato do FGTS (CPF) ou do PGMEI (CNPJ). O documento vai cifrado (pós-quântico) pelo broker; o robô
+        pausa para uma pessoa resolver captcha/login na janela do navegador do worker."""
+        pgmei = portal == "pgmei"
+        if not (validar_cnpj(documento) if pgmei else validar_cpf(documento)):
+            raise HTTPException(status_code=422, detail="CNPJ inválido." if pgmei else "CPF inválido.")
+        finalidade = "consulta_extrato_pgmei" if pgmei else "consulta_extrato_fgts"
         try:
-            request.app.state.lgpd.exigir_base_legal("consulta_extrato_fgts", usuario.tenant_id, pedido.cpf)
+            request.app.state.lgpd.exigir_base_legal(finalidade, usuario.tenant_id, documento)
         except TratamentoSemBaseLegal as exc:
             raise HTTPException(status_code=403, detail=str(exc))
         chave = request.app.state.rpa_chave_publica
         if chave is None:
             raise HTTPException(status_code=503, detail="RPA não configurado: falta RPA_PQC_PUBLIC_KEY (gere com: python -m agente_v2.cli gerar-chaves-rpa).")
-        from contabil_agente.tarefas.rpa import envelope_do_cpf, extrato_fgts
+        from contabil_agente.tarefas.rpa import envelope_do_cpf, extrato_fgts, extrato_pgmei
 
-        titular = PIIAnonymizer.hash_pii(pedido.cpf, request.app.state.lgpd._chave_hash)
+        titular = PIIAnonymizer.hash_pii(documento, request.app.state.lgpd._chave_hash)
         status_store = request.app.state.rpa_status
-        job_id = status_store.criar(usuario.tenant_id, usuario.user_id, "extrato_fgts", titular)
-        envelope = envelope_do_cpf(chave, pedido.cpf, usuario.tenant_id, job_id)
-        _auditar(request, "process_document", usuario, "Extrato do FGTS solicitado", job=job_id, titular=titular)
+        job_id = status_store.criar(usuario.tenant_id, usuario.user_id, "extrato_pgmei" if pgmei else "extrato_fgts", titular)
+        envelope = envelope_do_cpf(chave, documento, usuario.tenant_id, job_id, portal)
+        _auditar(request, "process_document", usuario, "Extrato do PGMEI solicitado" if pgmei else "Extrato do FGTS solicitado", job=job_id, titular=titular)
         try:
-            extrato_fgts.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope])
+            if pgmei:
+                extrato_pgmei.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope, ano])
+            else:
+                extrato_fgts.apply_async(args=[job_id, usuario.tenant_id, usuario.user_id, envelope])
         except Exception as exc:  # noqa: BLE001 - broker (Redis) fora do ar
             status_store.atualizar(job_id, rpa_estado.FALHOU, "Fila indisponível.")
             logger.error("Fila indisponível: %s", type(exc).__name__)
             raise HTTPException(status_code=503, detail="Fila de tarefas indisponível (Redis).")
         return {"job_id": job_id, "estado": status_store.obter(job_id, usuario.tenant_id)["estado"]}
+
+    @app.post("/api/v1/rpa/fgts", status_code=202)
+    def enfileirar_extrato_fgts(pedido: PedidoFGTS, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        """Extrato do FGTS (CPF), com a pessoa resolvendo só o captcha/login."""
+        return enfileirar_extrato(request, usuario, "fgts", pedido.cpf)
+
+    @app.post("/api/v1/rpa/pgmei", status_code=202)
+    def enfileirar_extrato_pgmei(pedido: PedidoPGMEI, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
+        """Extrato/DAS do MEI no PGMEI (CNPJ), com a pessoa resolvendo só o captcha."""
+        return enfileirar_extrato(request, usuario, "pgmei", pedido.cnpj, pedido.ano)
+
+    instalar_agentes(app, _auditar, enfileirar_extrato)
 
     @app.get("/api/v1/rpa/jobs/{job_id}")
     def estado_do_job(job_id: str, request: Request, usuario: Principal = Depends(exigir(Permission.PROCESS_PAYROLL))):
