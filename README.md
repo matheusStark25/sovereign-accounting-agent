@@ -26,6 +26,27 @@ com sublinhado duplo, as premissas e as tabelas usadas.*
 *Também real, com a Groq: a pessoa manda um holerite, a ficha sai com o carimbo da conferência e, perguntada, a Maria Helena
 consulta os documentos da empresa e explica a divergência do INSS em reais, com a lei certa. O rodapé diz que ferramenta ela usou.*
 
+<table>
+  <tr>
+    <td width="50%"><img src="docs/interface-login.png" alt="Tela de entrada: capa de livro-razão e ficha de acesso"></td>
+    <td width="50%"><img src="docs/interface-escuro.png" alt="Tema escuro: demonstrativo de férias calculado pelo motor"></td>
+  </tr>
+  <tr>
+    <td><em>Entrada: a capa diz o que o sistema faz; a ficha pede usuário e senha.</em></td>
+    <td><em>Tema escuro (segue o do sistema operacional): demonstrativo de férias calculado pelo motor.</em></td>
+  </tr>
+  <tr>
+    <td><img src="docs/interface-painel.png" alt="Painel do escritório: robôs dos portais, aprovações, LGPD e auditoria"></td>
+    <td align="center"><img src="docs/interface-celular.png" alt="No celular: demonstrativo do pró-labore" width="62%"></td>
+  </tr>
+  <tr>
+    <td><em>Painel: robôs dos portais (FGTS, PGMEI e notas fiscais), aprovações pendentes, consentimento de IA e verificação da trilha.</em></td>
+    <td><em>No celular: "quanto custa um pró-labore de 8 mil?" vira o demonstrativo do motor, com as premissas e as tabelas.</em></td>
+  </tr>
+</table>
+
+*Todas as telas foram capturadas do sistema rodando de verdade (`uvicorn agente_v2.main:app`), com valores e nomes de exemplo.*
+
 ---
 
 ## Sumário
