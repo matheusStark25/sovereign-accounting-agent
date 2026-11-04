@@ -10,14 +10,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AGENTE_ENV=production
 
 WORKDIR /app
-# correções de segurança do sistema base, do pip e do setuptools (o CI passa o trivy na imagem pronta)
+# correções de segurança do sistema base (o CI passa o trivy na imagem pronta)
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --upgrade pip "setuptools>=78.1.1"
-# as versões exatas testadas (requirements.lock) como restrição: uma versão nova de dependência não entra na imagem sem teste
+    && rm -rf /var/lib/apt/lists/*
+# As versões exatas testadas (requirements.lock) entram como restrição: dependência nova não chega à imagem sem teste.
+# O pip só serve para montar a imagem e sai no fim: ele traz uma cópia antiga do setuptools (CVE-2025-47273, achada pelo
+# trivy) e não é usado em produção.
 COPY requirements.txt requirements.lock ./
-RUN pip install -r requirements.txt -c requirements.lock
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt -c requirements.lock \
+    && pip uninstall -y pip
 
 COPY agente_v2 ./agente_v2
 COPY contabil_agente ./contabil_agente
