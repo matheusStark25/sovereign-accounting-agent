@@ -21,6 +21,7 @@ certifi>=2024.2         # cadeia de confiança para o TLS dos web services da SE
 lxml>=5.0
 defusedxml>=0.7
 portalocker>=2.8
+segno>=1.6              # QR code da verificação em duas etapas (puro Python, sem dependências)
 
 # --- IA (opcional em tempo de execução: sem chave o sistema roda só com cálculo e regras) ---
 groq>=0.9

@@ -10,6 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AGENTE_ENV=production
 
 WORKDIR /app
+# correções de segurança do sistema base e do pip (o CI passa o trivy na imagem pronta)
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 

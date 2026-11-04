@@ -33,6 +33,13 @@ groups:
           summary: "A trilha de auditoria falhou ao gravar."
           description: "Sem trilha a API recusa a operação (503). Confira disco e permissões em DATA_DIR."
 
+      - alert: TentativaDePromptInjection
+        expr: sum(increase(agente_prompt_injection_total[10m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Alguém tentou dar ordens escondidas para a IA (prompt injection)."
+          description: "Veja os eventos security_alert na trilha de auditoria da empresa: a origem diz se veio da mensagem, de um documento ou da resposta."
+
       - alert: LoginsRecusadosEmExcesso
         expr: sum(rate(agente_logins_total{resultado=~"falha|bloqueado"}[5m])) > 0.2
         for: 5m

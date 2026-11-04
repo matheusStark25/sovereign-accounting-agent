@@ -169,6 +169,9 @@ def instalar_voz(app, auditar: Callable[..., Optional[str]], base_legal: Callabl
         except HTTPException as exc:
             await _erro(ws, "auditoria_indisponivel", str(exc.detail))
             return
+        if resultado.get("seguranca"):  # possível prompt injection: origem e motivos na trilha, sem o texto
+            auditar(ws, "security_alert", principal, "Possível prompt injection no canal de voz", sucesso=False, obrigatoria=False,
+                    sessao=sid, eventos=resultado["seguranca"])
         resposta = resultado["resposta"]
         for n, frase in enumerate(dividir_em_frases(resposta), 1):
             await ws.send_json({"tipo": "fala", "n": n, "texto": frase})

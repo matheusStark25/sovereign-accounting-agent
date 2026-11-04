@@ -159,7 +159,8 @@ def calibrar(
             elementos = pagina.evaluate("window.__instantaneo ? window.__instantaneo() : []") if _web(pagina.url) else []
         except PlaywrightError:
             return  # a página mudou ou fechou durante a leitura
-        assinatura = hashlib.sha1(json.dumps([_local(pagina.url), elementos], sort_keys=True).encode()).hexdigest()
+        # só identifica telas repetidas na gravação (não protege nada): SHA-1 aqui não é uso de segurança
+        assinatura = hashlib.sha1(json.dumps([_local(pagina.url), elementos], sort_keys=True).encode(), usedforsecurity=False).hexdigest()
         if elementos and assinatura not in vistos:
             vistos.add(assinatura)
             gravar({"evento": "elementos", **_local(pagina.url), "quantidade": len(elementos), "elementos": elementos})

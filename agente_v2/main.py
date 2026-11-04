@@ -37,12 +37,14 @@ from contabil_agente.lgpd import FINALIDADES, ConsentimentoStore, PoliticaDeRete
 from contabil_agente.documentos.leitura import TAMANHO_MAXIMO, ArquivoInvalido
 from contabil_agente.documentos.tipos import TIPOS as TIPOS_DOCUMENTO
 from contabil_agente.pipeline import DocumentDispatcher, HistoricoDocumentos, destinos_do_ambiente, provedores_do_ambiente
-from contabil_agente.security.worm_audit import WormAudit
+from contabil_agente.security.ancoragem import ErroDeAncora, ancoragem_do_ambiente
+from contabil_agente.security.worm_audit import AuditoriaError, WormAudit
 from contabil_agente.security.auth import (
     AuthSettings,
     PAPEIS_VALIDOS,
     AuthError,
     AuthLockedError,
+    AuthMFANecessario,
     AuthService,
     Principal,
 )
@@ -71,6 +73,7 @@ logger = logging.getLogger("agente_v2")
 LOGINS = Counter("agente_logins_total", "Tentativas de login", ["resultado"])
 CALCULOS = Counter("agente_calculos_total", "Cálculos executados", ["tipo", "resultado"])
 MENSAGENS = Counter("agente_chat_mensagens_total", "Mensagens de chat processadas")
+INJECOES = Counter("agente_prompt_injection_total", "Possíveis prompt injections detectadas", ["origem"])
 
 TAMANHO_MAXIMO_JSON = 1_000_000
 WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -130,6 +133,11 @@ class NovoUsuario(BaseModel):
     password: str
     roles: list[str]
     tenant_id: Optional[str] = None
+
+
+class PedidoSegundoFator(BaseModel):
+    senha: str = Field(min_length=1, max_length=200)
+    codigo: str = Field(min_length=1, max_length=32)
 
 
 # ------------------------------------------------------------------- utilidades
@@ -211,6 +219,7 @@ def create_app(
     lgpd: Optional[ServicoLGPD] = None,
     governanca: Optional[GovernanceManager] = None,
     stt: Any = None,
+    ancorador: Any = None,
 ) -> FastAPI:
     app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs" if settings.ENV == "dev" else None, redoc_url=None)
     precisa_de_segredos = auth is None or audit is None or engine is None or dispatcher is None
@@ -224,6 +233,8 @@ def create_app(
     app.state.chat_store = store or ChatStore(settings.CHAT_DB_PATH)
     app.state.stt = stt if stt is not None else stt_do_ambiente(segredos)  # voz: Whisper pela Groq quando há GROQ_API_KEY
     app.state.audit = audit or AuditTrailManager(worm=WormAudit.do_ambiente(settings.AUDIT_DIR, segredos))
+    # âncora externa (AUDIT_ANCHOR_DIR / AUDIT_ANCHOR_URL): o cabeçalho da trilha publicado onde este servidor não reescreve
+    app.state.ancorador = ancorador if ancorador is not None else ancoragem_do_ambiente(app.state.audit.worm, segredos)
     if dispatcher is None:
         provedores = provedores_do_ambiente(segredos)
         dispatcher = DocumentDispatcher(
@@ -281,12 +292,21 @@ def create_app(
 
     # ---------------------------------------------------------- autenticação
     @app.post("/token")
-    def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), auth: AuthService = Depends(get_auth)):
+    def login(
+        request: Request,
+        form: OAuth2PasswordRequestForm = Depends(),
+        codigo_2fa: Optional[str] = Form(default=None, max_length=32),
+        auth: AuthService = Depends(get_auth),
+    ):
         ip = request.client.host if request.client else "?"
         if not request.app.state.limite_login.permitir(ip):
             raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde um minuto.")
         try:
-            principal = auth.autenticar(form.username, form.password)
+            principal = auth.autenticar(form.username, form.password, codigo_2fa)
+        except AuthMFANecessario as exc:
+            # senha certa: a tela pede o código do aplicativo (o cabeçalho diz que é isso, sem mudar o 401 do OAuth2)
+            LOGINS.labels("mfa_pendente").inc()
+            raise HTTPException(status_code=401, detail=str(exc), headers={"WWW-Authenticate": "Bearer", "X-MFA-Required": "totp"})
         except AuthLockedError as exc:
             LOGINS.labels("bloqueado").inc()
             _auditar(request, "access_denied", None, "Login em conta bloqueada", sucesso=False, obrigatoria=False)
@@ -296,7 +316,8 @@ def create_app(
             _auditar(request, "access_denied", None, "Falha de login", sucesso=False, obrigatoria=False)
             raise HTTPException(status_code=401, detail=str(exc), headers={"WWW-Authenticate": "Bearer"})
         LOGINS.labels("ok").inc()
-        _auditar(request, "login", principal, "Login realizado")
+        duas_etapas = auth.estado_mfa(principal.user_id)["ativo"]
+        _auditar(request, "login", principal, "Login realizado (com verificação em duas etapas)" if duas_etapas else "Login realizado")
         return {
             "access_token": auth.emitir_token(principal),
             "token_type": "bearer",
@@ -316,6 +337,58 @@ def create_app(
     @app.get("/users/me")
     def eu(usuario: Principal = Depends(usuario_atual)):
         return usuario.to_dict()
+
+    # ------------------------------------------------ verificação em duas etapas
+    def _limite_2fa(request: Request, usuario: Principal) -> None:
+        if not request.app.state.limite_login.permitir(f"2fa:{usuario.user_id}"):
+            raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde um minuto.")
+
+    @app.get("/users/me/2fa")
+    def estado_2fa(usuario: Principal = Depends(usuario_atual), auth: AuthService = Depends(get_auth)):
+        return auth.estado_mfa(usuario.user_id)
+
+    @app.post("/users/me/2fa/iniciar")
+    def iniciar_2fa(request: Request, usuario: Principal = Depends(usuario_atual), auth: AuthService = Depends(get_auth)):
+        """Segredo novo (pendente) com o QR code para o aplicativo autenticador. Só vale depois de confirmado com um código."""
+        try:
+            dados = auth.iniciar_mfa(usuario)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        _auditar(request, "config_changed", usuario, "Configuração da verificação em duas etapas iniciada")
+        return dados
+
+    # erros de senha ou código aqui são 400 (não 401): 401 faria a tela achar que a sessão caiu
+    @app.post("/users/me/2fa/ativar")
+    def ativar_2fa(dados: PedidoSegundoFator, request: Request, usuario: Principal = Depends(usuario_atual),
+                   auth: AuthService = Depends(get_auth)):
+        _limite_2fa(request, usuario)
+        try:
+            codigos = auth.ativar_mfa(usuario, dados.senha, dados.codigo)
+        except AuthLockedError as exc:
+            raise HTTPException(status_code=423, detail=str(exc))
+        except AuthError as exc:
+            _auditar(request, "access_denied", usuario, "Ativação da verificação em duas etapas recusada", sucesso=False, obrigatoria=False)
+            raise HTTPException(status_code=400, detail=str(exc))
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        _auditar(request, "mfa_enabled", usuario, "Verificação em duas etapas ativada")
+        return {"ativo": True, "codigos_de_recuperacao": codigos}
+
+    @app.post("/users/me/2fa/desativar")
+    def desativar_2fa(dados: PedidoSegundoFator, request: Request, usuario: Principal = Depends(usuario_atual),
+                      auth: AuthService = Depends(get_auth)):
+        _limite_2fa(request, usuario)
+        try:
+            auth.desativar_mfa(usuario, dados.senha, dados.codigo)
+        except AuthLockedError as exc:
+            raise HTTPException(status_code=423, detail=str(exc))
+        except AuthError as exc:
+            _auditar(request, "access_denied", usuario, "Desativação da verificação em duas etapas recusada", sucesso=False, obrigatoria=False)
+            raise HTTPException(status_code=400, detail=str(exc))
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        _auditar(request, "mfa_disabled", usuario, "Verificação em duas etapas desativada")
+        return {"ativo": False}
 
     @app.post("/users", status_code=201)
     def criar_usuario(
@@ -366,6 +439,12 @@ def create_app(
         loja.salvar(sid, usuario.user_id, usuario.tenant_id, estado)
         MENSAGENS.inc()
         _auditar(request, "read", usuario, "Mensagem de chat", sessao=sid, tamanho=len(dados.message))
+        seguranca = resultado.get("seguranca") or []
+        if seguranca:  # origem e motivos, sem o texto da conversa
+            for evento in seguranca:
+                INJECOES.labels(evento["origem"].split(":")[0]).inc()
+            _auditar(request, "security_alert", usuario, "Possível prompt injection na conversa", sucesso=False, obrigatoria=False,
+                     sessao=sid, eventos=seguranca)
         return {
             "session_id": sid,
             "response": resultado["resposta"],
@@ -373,6 +452,7 @@ def create_app(
             "tipo": resultado.get("tipo"),
             "dados_calculados": resultado.get("dados_calculados"),
             "ferramentas": resultado.get("ferramentas") or [],
+            "alerta_de_seguranca": bool(seguranca),
         }
 
     @app.get("/api/chat/{session_id}")
@@ -661,13 +741,37 @@ def create_app(
     def verificar_auditoria(
         request: Request, usuario: Principal = Depends(exigir(Permission.VIEW_AUDIT_LOGS)),
     ):
-        """Confere a cadeia HMAC da trilha do próprio tenant (e devolve a âncora para guardar fora do servidor)."""
+        """Confere a cadeia HMAC da trilha do próprio tenant e, se houver âncora externa, a trilha contra as âncoras publicadas."""
         worm = request.app.state.audit.worm
         v = worm.verificar(usuario.tenant_id)
         resposta = v.to_dict()
         if v.head_seq:
             resposta["ancora"] = worm.ancora(usuario.tenant_id)
+        ancorador = request.app.state.ancorador
+        resposta["ancoragem"] = {"configurada": ancorador is not None}
+        if ancorador is not None:
+            conferencias = ancorador.conferir(usuario.tenant_id)
+            resposta["ancoragem"].update(ok=all(c.ok for c in conferencias), destinos=[c.to_dict() for c in conferencias])
+            problemas = [p for c in conferencias for p in c.problemas]
+            if problemas:  # cadeia refeita com a chave ou trilha restaurada: a cadeia sozinha não acusa, a âncora acusa
+                resposta["ok"], resposta["problemas"] = False, resposta["problemas"] + problemas
         return resposta
+
+    @app.post("/api/v1/auditoria/ancorar")
+    def ancorar_auditoria(request: Request, usuario: Principal = Depends(exigir(Permission.VIEW_AUDIT_LOGS))):
+        """Publica agora o cabeçalho da trilha do próprio tenant nos destinos externos configurados."""
+        ancorador = request.app.state.ancorador
+        if ancorador is None:
+            raise HTTPException(status_code=409, detail="Nenhum destino de âncora configurado (AUDIT_ANCHOR_DIR ou AUDIT_ANCHOR_URL).")
+        try:
+            publicado = ancorador.ancorar(usuario.tenant_id)
+        except AuditoriaError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except ErroDeAncora as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        _auditar(request, "audit_anchored", usuario, "Âncora da trilha publicada", seq=publicado["ancora"]["seq"],
+                 destinos=[r["destino"] for r in publicado["recibos"]])
+        return publicado
 
     # ------------------------------------------------------------------- web
     if WEB_DIR.is_dir():

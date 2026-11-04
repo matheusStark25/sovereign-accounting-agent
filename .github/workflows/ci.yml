@@ -40,6 +40,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # o gitleaks confere os commits novos, não só a última foto do repositório
+          persist-credentials: false  # sem o token do Actions no .git/config (o gitleaks varre a pasta inteira)
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -47,6 +50,32 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r requirements.txt
+      - name: Análise estática do código (bandit, gravidade e confiança média ou alta; cada achado vira anotação)
+        run: |
+          pip install "bandit==1.9.4"
+          bandit -r agente_v2 contabil_agente -x '*/tests/*,*/security/test_security.py' \
+            -ll -ii -f custom --msg-template '::error file={relpath},line={line},title=bandit {test_id} ({severity})::{msg}'
+      - name: Segredo esquecido nos arquivos e nos commits novos (gitleaks)
+        run: |
+          versao=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${versao}/gitleaks_${versao}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks version
+          ./gitleaks dir . --redact --no-banner --report-format json --report-path gitleaks-arquivos.json
+          base="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then base="origin/${{ github.base_ref }}"; fi
+          if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then base="HEAD~1"; fi
+          ./gitleaks git . --log-opts="${base}..HEAD" --redact --no-banner --report-format json --report-path gitleaks-commits.json
+      - name: Achado do gitleaks como anotação (sem mostrar o segredo)
+        if: failure()
+        run: |
+          python - <<'EOF'
+          import json, pathlib
+          for nome in ("gitleaks-arquivos.json", "gitleaks-commits.json"):
+              p = pathlib.Path(nome)
+              for f in (json.loads(p.read_text() or "[]") if p.exists() else []):
+                  commit = (f.get("Commit") or "")[:8] or "arquivo atual"
+                  print(f"::error file={f['File']},line={f['StartLine']},title=gitleaks {f['RuleID']}::possível segredo em {f['File']}:{f['StartLine']} ({commit})")
+          EOF
 
   imagem:
     runs-on: ubuntu-latest
@@ -64,6 +93,24 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://localhost:8000/health && exit 0; sleep 2; done
           docker logs api
           exit 1
+      - name: Vulnerabilidades da imagem (trivy, HIGH e CRITICAL que já têm correção)
+        run: |
+          mkdir -p "$HOME/.cache/trivy"
+          trivy() { docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/trivy" -v "$PWD:/saida" aquasec/trivy:0.58.1 "$@"; }
+          trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress sovereign-accounting-agent:ci
+          trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --no-progress --skip-db-update \
+            --exit-code 1 --format json --output /saida/trivy.json sovereign-accounting-agent:ci
+      - name: Achados do trivy como anotação
+        if: failure()
+        run: |
+          python3 - <<'EOF'
+          import json, pathlib
+          p = pathlib.Path("trivy.json")
+          relatorio = json.loads(p.read_text()) if p.exists() else {}
+          achados = [(r.get("Target"), v) for r in relatorio.get("Results") or [] for v in r.get("Vulnerabilities") or []]
+          for alvo, v in achados[:30]:
+              print(f"::error title=trivy {v['VulnerabilityID']} ({v['Severity']})::{v['PkgName']} {v.get('InstalledVersion')} -> {v.get('FixedVersion')} em {alvo}")
+          EOF
 
   pilha:
     # Sobe a pilha inteira do docker-compose (API, worker, Redis com senha e nginx com TLS e mTLS) e confere o que o README promete.

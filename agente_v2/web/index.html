@@ -33,6 +33,11 @@
       <input id="usuario" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
       <label for="senha">Senha</label>
       <input id="senha" name="password" type="password" autocomplete="current-password" required>
+      <div id="campo-2fa" hidden>
+        <label for="codigo-2fa">Código de verificação</label>
+        <input id="codigo-2fa" name="codigo_2fa" inputmode="numeric" autocomplete="one-time-code" maxlength="12" spellcheck="false" placeholder="6 dígitos do aplicativo">
+        <p class="nota">Abra o aplicativo autenticador do celular. Sem o celular, use um dos códigos de recuperação.</p>
+      </div>
       <p id="erro-login" class="erro" role="alert" hidden></p>
       <button class="botao primario" type="submit" id="botao-entrar">Entrar</button>
       <p class="nota">Acesso restrito. Cada ação fica registrada na trilha de auditoria.</p>
@@ -131,6 +136,13 @@
         <h2><span class="num">04</span> Integridade da auditoria</h2>
         <button class="botao" id="botao-auditoria" type="button">Verificar trilha</button>
         <p id="status-auditoria" class="status" role="status"></p>
+      </article>
+
+      <article class="cartao">
+        <h2><span class="num">05</span> Verificação em duas etapas</h2>
+        <p class="nota">Além da senha, o login pede o código de 6 dígitos de um aplicativo autenticador (Google Authenticator, Microsoft Authenticator, Authy…).</p>
+        <div id="area-2fa"><p class="nota">Carregando…</p></div>
+        <p id="status-2fa" class="status" role="status"></p>
       </article>
     </div>
   </section>

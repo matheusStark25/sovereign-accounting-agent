@@ -230,6 +230,44 @@ def test_painel_e_sair(pagina):
     assert pagina.evaluate("() => sessionStorage.getItem('mh_token')") is None
 
 
+def test_login_com_duas_etapas_pede_o_codigo_e_entra(pagina):
+    from contabil_agente.security import mfa
+
+    auth = APP["app"].state.auth
+    p = auth.criar_usuario("carla", SENHA, "empresa_a", ["accountant"])
+    dados = auth.iniciar_mfa(p)
+    auth.ativar_mfa(p, SENHA, mfa.totp(dados["segredo"]))
+    entrar(pagina, "carla")
+    pagina.wait_for_selector("#codigo-2fa", state="visible")
+    assert "código" in pagina.inner_text("#erro-login").lower()
+    pagina.fill("#codigo-2fa", mfa.totp(dados["segredo"], time.time() + 30))  # o do passo atual já foi gasto na ativação
+    pagina.click("#botao-entrar")
+    pagina.wait_for_selector("#app:not([hidden])")
+    assert pagina.inner_text("#quem").startswith("carla")
+
+
+def test_painel_ativa_as_duas_etapas_com_qr_code_e_mostra_os_codigos_de_recuperacao(pagina):
+    from contabil_agente.security import mfa
+    from contabil_agente.security.auth import AuthMFANecessario
+
+    auth = APP["app"].state.auth
+    auth.criar_usuario("bruna", SENHA, "empresa_a", ["accountant"])
+    entrar(pagina, "bruna")
+    pagina.wait_for_selector("#app:not([hidden])")
+    pagina.click("button[data-aba='painel']")
+    pagina.click("#botao-ativar-2fa")
+    pagina.wait_for_selector("img.qr-2fa")
+    segredo = pagina.inner_text("#segredo-2fa").replace(" ", "")
+    form = pagina.locator("form.form-2fa")
+    form.locator("input[type=password]").fill(SENHA)
+    form.locator("input[inputmode=numeric]").fill(mfa.totp(segredo))
+    form.locator("button[type=submit]").click()
+    pagina.wait_for_selector("#codigos-2fa li")
+    assert pagina.locator("#codigos-2fa li").count() == 10
+    with pytest.raises(AuthMFANecessario):
+        auth.autenticar("bruna", SENHA)  # dali em diante o login pede o código
+
+
 def test_sem_erros_de_console_nem_violacao_de_csp(pagina):
     entrar(pagina)
     pagina.wait_for_selector("#app:not([hidden])")

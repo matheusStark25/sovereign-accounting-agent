@@ -1,0 +1,19 @@
+# gitleaks: as regras padrão, mais as exceções para o que só PARECE segredo.
+# Os testes usam segredos falsos de propósito (gerados na hora ou escritos como "s" * 40); o CI usa valores de teste que não
+# abrem nada; e os nomes das classes de chave pós-quântica parecem chave para a regra genérica.
+title = "Sovereign Accounting Agent"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores de teste e nomes de classe que parecem segredo"
+paths = [
+  '''(^|/)agente_v2/tests/''',
+  '''(^|/)contabil_agente/tests/''',
+  '''(^|/)contabil_agente/security/test_security\.py$''',
+]
+regexes = [
+  '''ci-(segredo|hmac)-de-teste-com-mais-de-32-caracteres-0000''',
+  '''^(MLDSA65|MLKEM768|X25519)(Private|Public)Key$''',
+]

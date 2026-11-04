@@ -51,14 +51,25 @@
   }
 
   /* --------------------------------------------------------------- sessão */
-  function mostrarLogin() { $("app").hidden = true; $("tela-login").hidden = false; $("usuario").focus(); }
+  function mostrarLogin() {
+    $("app").hidden = true; $("tela-login").hidden = false;
+    $("campo-2fa").hidden = true; $("codigo-2fa").value = "";
+    $("usuario").focus();
+  }
   function mostrarApp() { $("tela-login").hidden = true; $("app").hidden = false; }
 
-  async function entrar(usuario, senha) {
+  async function entrar(usuario, senha, codigo) {
     const corpo = new URLSearchParams({ username: usuario, password: senha });
+    if (codigo) corpo.set("codigo_2fa", codigo);
     const r = await fetch("/token", { method: "POST", body: corpo });
     const dados = await r.json().catch(() => ({}));
+    if (r.status === 401 && r.headers.get("X-MFA-Required")) {
+      // senha certa e a conta tem verificação em duas etapas: aparece o campo do código
+      $("campo-2fa").hidden = false; $("codigo-2fa").focus();
+      throw new Error(dados.detail || "Digite o código do aplicativo autenticador.");
+    }
     if (!r.ok) throw new Error(dados.detail || "Não consegui entrar.");
+    $("campo-2fa").hidden = true; $("codigo-2fa").value = "";
     estado.token = dados.access_token;
     sessionStorage.setItem(CHAVE_TOKEN, estado.token);
     await carregarUsuario();
@@ -388,6 +399,66 @@
   async function carregarPainel() {
     carregarPendentes();
     carregarConsentimento();
+    carregarSegundoFator();
+  }
+
+  /* Verificação em duas etapas (TOTP): o QR code vem pronto do servidor (imagem data:, nada de fora), a pessoa confirma
+     com a senha e um código do aplicativo e recebe os códigos de recuperação uma vez só. */
+  async function carregarSegundoFator() {
+    const area = $("area-2fa");
+    try {
+      const e = await api("/users/me/2fa");
+      if (e.ativo) {
+        area.replaceChildren(
+          el("p", { class: "status ok", texto: `Ativa · ${e.codigos_de_recuperacao_restantes} código(s) de recuperação sobrando.` }),
+          formularioSegundoFator("Desativar", "/users/me/2fa/desativar", "Código do aplicativo ou de recuperação",
+            () => { avisar("Verificação em duas etapas desativada."); carregarSegundoFator(); }));
+      } else {
+        area.replaceChildren(
+          el("p", { class: "status", texto: "Desligada: hoje basta a senha para entrar." }),
+          el("button", { class: "botao primario", type: "button", id: "botao-ativar-2fa", texto: "Ativar", onclick: iniciarSegundoFator }));
+      }
+    } catch (err) { area.replaceChildren(el("p", { class: "nota", texto: err.message })); }
+  }
+
+  function formularioSegundoFator(rotulo, rota, dica, aoConcluir) {
+    const senha = el("input", { type: "password", autocomplete: "current-password", placeholder: "Sua senha", "aria-label": "Sua senha", required: "" });
+    const codigo = el("input", { inputmode: "numeric", autocomplete: "one-time-code", maxlength: "12", placeholder: dica, "aria-label": dica, required: "" });
+    const form = el("form", { class: "linha quebra form-2fa" }, senha, codigo, el("button", { class: "botao primario", type: "submit", texto: rotulo }));
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const st = $("status-2fa"); st.className = "status"; st.textContent = "Conferindo…";
+      try {
+        const r = await api(rota, { metodo: "POST", corpo: { senha: senha.value, codigo: codigo.value.trim() } });
+        st.textContent = "";
+        aoConcluir(r);
+      } catch (err) { st.className = "status falha"; st.textContent = err.message; }
+      finally { senha.value = ""; }
+    });
+    return form;
+  }
+
+  async function iniciarSegundoFator() {
+    const st = $("status-2fa"); st.className = "status"; st.textContent = "";
+    try {
+      const d = await api("/users/me/2fa/iniciar", { metodo: "POST" });
+      $("area-2fa").replaceChildren(
+        el("ol", { class: "passos-2fa" },
+          el("li", { texto: "No aplicativo autenticador, adicione uma conta lendo o QR code (ou digitando a chave abaixo)." }),
+          el("li", { texto: "Digite a sua senha e o código de 6 dígitos que o aplicativo mostrar." })),
+        d.qr_code ? el("img", { class: "qr-2fa", src: d.qr_code, alt: "QR code para o aplicativo autenticador", width: "180", height: "180" }) : null,
+        el("p", { class: "segredo-2fa", id: "segredo-2fa", texto: d.segredo.match(/.{1,4}/g).join(" ") }),
+        el("a", { class: "nota", href: d.uri, texto: "Está no celular? Toque aqui para abrir no aplicativo." }),
+        formularioSegundoFator("Confirmar", "/users/me/2fa/ativar", "Código de 6 dígitos", mostrarCodigosDeRecuperacao));
+    } catch (err) { st.className = "status falha"; st.textContent = err.message; }
+  }
+
+  function mostrarCodigosDeRecuperacao(r) {
+    $("area-2fa").replaceChildren(
+      el("p", { class: "status ok", texto: "Pronto: a partir de agora o login pede o código do aplicativo." }),
+      el("p", { class: "nota", texto: "Guarde estes códigos de recuperação num lugar seguro. Cada um entra uma vez se você perder o celular, e eles não aparecem de novo." }),
+      el("ul", { class: "codigos-2fa", id: "codigos-2fa" }, ...r.codigos_de_recuperacao.map((c) => el("li", { texto: c }))),
+      el("button", { class: "botao", type: "button", texto: "Já guardei", onclick: carregarSegundoFator }));
   }
 
   async function carregarPendentes() {
@@ -512,8 +583,10 @@
     const st = $("status-auditoria"); st.className = "status"; st.textContent = "Verificando…";
     try {
       const r = await api("/api/v1/auditoria/verificar");
+      const anc = r.ancoragem && r.ancoragem.configurada
+        ? ` Âncora externa: ${r.ancoragem.destinos.reduce((s, d) => s + d.conferidas, 0)} conferida(s).` : "";
       st.className = `status ${r.ok ? "ok" : "falha"}`;
-      st.textContent = r.ok ? `Íntegra: ${r.entradas} registro(s) encadeados.` : `ADULTERAÇÃO DETECTADA: ${r.problemas[0]}`;
+      st.textContent = r.ok ? `Íntegra: ${r.entradas} registro(s) encadeados.${anc}` : `ADULTERAÇÃO DETECTADA: ${r.problemas[0]}`;
     } catch (e) { st.className = "status falha"; st.textContent = e.status === 403 ? "Seu perfil não consulta a trilha de auditoria." : e.message; }
   }
 
@@ -532,7 +605,8 @@
       ev.preventDefault();
       const erro = $("erro-login"), botao = $("botao-entrar");
       erro.hidden = true; botao.disabled = true; botao.textContent = "Entrando…";
-      try { await entrar($("usuario").value.trim(), $("senha").value); $("senha").value = ""; }
+      const codigo = $("campo-2fa").hidden ? "" : $("codigo-2fa").value.trim();
+      try { await entrar($("usuario").value.trim(), $("senha").value, codigo); $("senha").value = ""; }
       catch (e) { erro.textContent = e.message; erro.hidden = false; }
       finally { botao.disabled = false; botao.textContent = "Entrar"; }
     });

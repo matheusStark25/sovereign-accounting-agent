@@ -1,8 +1,11 @@
 """Linha de comando de administração.
 
     python -m agente_v2.cli criar-usuario --usuario maria --tenant empresa_a --papeis accountant
+    python -m agente_v2.cli desativar-2fa --usuario maria              # perdeu o celular e os códigos de recuperação
     python -m agente_v2.cli gerar-chaves-rpa --saida ./chaves
     python -m agente_v2.cli verificar-auditoria --tenant empresa_a
+    python -m agente_v2.cli ancorar-auditoria                        # publica o cabeçalho das trilhas fora do servidor
+    python -m agente_v2.cli conferir-ancoras                         # trilha contra as âncoras publicadas
     python -m agente_v2.cli gerar-segredo
     python -m agente_v2.cli gerar-chave-governanca
     python -m agente_v2.cli verificar-ia --env-file .env
@@ -60,6 +63,15 @@ def gerar_chaves_rpa(args: argparse.Namespace) -> int:
     return 0
 
 
+def desativar_2fa(args: argparse.Namespace) -> int:
+    """Para quem perdeu o celular E os códigos de recuperação: o administrador desliga e a pessoa ativa de novo no painel."""
+    if not _auth().redefinir_mfa(args.usuario):
+        print(f"Erro: usuário {args.usuario!r} não encontrado.", file=sys.stderr)
+        return 1
+    print(f"Verificação em duas etapas desligada para {args.usuario}: o próximo login pede só a senha. Peça para ativar de novo no painel.")
+    return 0
+
+
 def verificar_auditoria(args: argparse.Namespace) -> int:
     from agente_v2.config import settings
     from contabil_agente.security.worm_audit import WormAudit
@@ -71,6 +83,51 @@ def verificar_auditoria(args: argparse.Namespace) -> int:
         v = worm.verificar(t)
         print(json.dumps(v.to_dict(), ensure_ascii=False))
         ruim += 0 if v.ok else 1
+    return 1 if ruim else 0
+
+
+def _ancorador():
+    from agente_v2.config import settings
+    from contabil_agente.security.ancoragem import ancoragem_do_ambiente
+    from contabil_agente.security.worm_audit import WormAudit
+
+    worm = WormAudit.do_ambiente(settings.AUDIT_DIR)
+    ancorador = ancoragem_do_ambiente(worm)
+    if ancorador is None:
+        print("Erro: defina AUDIT_ANCHOR_DIR (pasta em outro volume) e/ou AUDIT_ANCHOR_URL (serviço HTTPS).", file=sys.stderr)
+    return worm, ancorador
+
+
+def ancorar_auditoria(args: argparse.Namespace) -> int:
+    """Publica o cabeçalho de cada trilha fora do servidor. Agende de hora em hora (cron ou agendador de tarefas)."""
+    from contabil_agente.security.ancoragem import ErroDeAncora
+    from contabil_agente.security.worm_audit import AuditoriaError
+
+    worm, ancorador = _ancorador()
+    if ancorador is None:
+        return 2
+    if args.tenant:
+        try:
+            saida = [{"tenant": args.tenant, **ancorador.ancorar(args.tenant)}]
+        except (AuditoriaError, ErroDeAncora) as exc:
+            saida = [{"tenant": args.tenant, "erro": str(exc)}]
+    else:
+        saida = ancorador.ancorar_todos()
+    for item in saida:
+        print(json.dumps(item, ensure_ascii=False))
+    return 1 if any("erro" in item for item in saida) else 0
+
+
+def conferir_ancoras(args: argparse.Namespace) -> int:
+    """Confere cada trilha contra as âncoras publicadas: acusa cadeia refeita com a chave e trilha restaurada de backup."""
+    worm, ancorador = _ancorador()
+    if ancorador is None:
+        return 2
+    ruim = 0
+    for tenant in [args.tenant] if args.tenant else worm.tenants():
+        for c in ancorador.conferir(tenant):
+            print(json.dumps({"tenant": tenant, **c.to_dict()}, ensure_ascii=False))
+            ruim += 0 if c.ok else 1
     return 1 if ruim else 0
 
 
@@ -269,12 +326,21 @@ def main(argv=None) -> int:
     c.add_argument("--tenant", required=True)
     c.add_argument("--papeis", required=True, help="separados por vírgula: super_admin,tenant_admin,accountant,auditor,viewer")
     c.set_defaults(func=criar_usuario)
+    d = sub.add_parser("desativar-2fa", help="desliga a verificação em duas etapas de quem perdeu o celular e os códigos de recuperação")
+    d.add_argument("--usuario", required=True)
+    d.set_defaults(func=desativar_2fa)
     k = sub.add_parser("gerar-chaves-rpa")
     k.add_argument("--saida", default="./chaves")
     k.set_defaults(func=gerar_chaves_rpa)
     a = sub.add_parser("verificar-auditoria")
     a.add_argument("--tenant")
     a.set_defaults(func=verificar_auditoria)
+    an = sub.add_parser("ancorar-auditoria", help="publica o cabeçalho das trilhas em AUDIT_ANCHOR_DIR/AUDIT_ANCHOR_URL (agende de hora em hora)")
+    an.add_argument("--tenant")
+    an.set_defaults(func=ancorar_auditoria)
+    ca = sub.add_parser("conferir-ancoras", help="confere as trilhas contra as âncoras publicadas fora do servidor")
+    ca.add_argument("--tenant")
+    ca.set_defaults(func=conferir_ancoras)
     s = sub.add_parser("gerar-segredo")
     s.set_defaults(func=gerar_segredo)
     g = sub.add_parser("gerar-chave-governanca")

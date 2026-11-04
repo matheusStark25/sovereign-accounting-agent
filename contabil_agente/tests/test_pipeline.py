@@ -517,3 +517,37 @@ def test_groq_formato_da_requisicao_e_papeis_conforme_as_chaves():
     misto = provedores_do_ambiente({"GROQ_API_KEY": "k", "DEEPSEEK_API_KEY": "d"})
     assert misto["worker"].nome == "deepseek" and misto["revisor"].nome == "groq"  # as chaves específicas têm prioridade
     assert provedores_do_ambiente({}) == {"worker": None, "revisor": None}
+
+
+# ----------------------------------------------------------------------- valor proposto pelo LLM no formato do documento
+def test_corretor_traz_o_valor_no_formato_brasileiro_para_o_formato_do_sistema():
+    r = AgenteCorretor().corrigir("Total de proventos 6.000,00", {"total_proventos": "5000.00"},
+                                  [Divergencia("total_proventos", "diverge do texto", "5000.00", "6.000,00", "llm")])
+    assert r.dados["total_proventos"] == "6000.00"
+
+
+def test_corretor_recusa_texto_no_lugar_de_numero():
+    r = AgenteCorretor().corrigir("Total de proventos seis mil", {"total_proventos": "6000.00"},
+                                  [Divergencia("total_proventos", "por extenso", "6000.00", "seis mil", "llm")])
+    assert r.dados["total_proventos"] == "6000.00" and r.rejeitadas[0]["rejeitada_porque"].startswith("o campo é numérico")
+
+
+def test_sugestao_do_worker_no_formato_brasileiro_entra_no_formato_do_sistema():
+    assert AgenteCorretor().corrigir("FGTS 480,00", {}, [], {"fgts": "480,00"}).dados["fgts"] == "480.00"
+
+
+def test_revisor_que_copia_o_valor_como_o_documento_escreve_nao_derruba_o_pipeline(tmp_path):
+    # achado no teste ao vivo com a Groq: o revisor propôs "6.000,00" e a reconferência tentava Decimal("6.000,00")
+    class RevisorQueCopiaDoTexto:
+        nome = "falso"
+
+        def gerar_json(self, sistema, usuario):
+            return {"concorda": False, "divergencias": [
+                {"campo": "total_proventos", "valor_proposto": "6.000,00", "motivo": "como está no documento"},
+                {"campo": "inss", "valor_proposto": "seiscentos e quarenta e um", "motivo": "por extenso"},
+            ]}
+
+    disp = DocumentDispatcher(WormAudit(tmp_path / "audit", "a" * 40, fsync=False), HistoricoDocumentos(tmp_path / "h.db"),
+                              revisor_llm=RevisorQueCopiaDoTexto(), destinos=[ArquivoDestino(tmp_path / "arq")])
+    r = disp.process(conteudo=HOLERITE, nome="holerite.txt", tenant="t1", ator="u")
+    assert r.estado == "ARCHIVED" and r.extracted_data["total_proventos"] == "6000.00" and r.extracted_data["inss"] == "641.51"

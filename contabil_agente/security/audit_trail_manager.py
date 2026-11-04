@@ -51,6 +51,11 @@ class AuditAction(Enum):
     DATA_ERASURE = "data_erasure"
     CONSENT_CHANGED = "consent_changed"
 
+    MFA_ENABLED = "mfa_enabled"
+    MFA_DISABLED = "mfa_disabled"
+    SECURITY_ALERT = "security_alert"  # por exemplo, uma instrução escondida para a IA (prompt injection)
+    AUDIT_ANCHORED = "audit_anchored"  # cabeçalho da trilha publicado fora do servidor
+
 
 class AuditSeverity(Enum):
     INFO = "INFO"

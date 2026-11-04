@@ -8,12 +8,16 @@ Regras que este módulo garante:
 * Quem é o usuário, o tenant e os papéis vêm do token assinado, nunca de cabeçalhos
   enviados pelo cliente.
 * Cinco senhas erradas seguidas bloqueiam a conta por 15 minutos.
+* Verificação em duas etapas (TOTP) opcional por usuário: com ela ativa, o login pede também o código do aplicativo
+  autenticador (ou um código de recuperação). Código errado conta como tentativa errada (vale o mesmo bloqueio), e o
+  segredo fica cifrado no banco (``security/mfa.py``).
 * Logout revoga o token (lista de ``jti`` revogados).
 * A autorização usa o ``RBACManager`` (papéis, permissões e isolamento entre tenants).
 """
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -31,6 +35,7 @@ from typing import Any, FrozenSet, Iterator, Mapping, Optional
 import bcrypt
 import jwt
 
+from . import mfa
 from .rbac_manager import Permission, RBACManager, Role
 
 logger = logging.getLogger(__name__)
@@ -58,6 +63,10 @@ class AuthLockedError(AuthError):
     """Conta temporariamente bloqueada por tentativas erradas."""
 
 
+class AuthMFANecessario(AuthError):
+    """Senha certa, mas a conta tem verificação em duas etapas: falta o código do aplicativo."""
+
+
 @dataclass(frozen=True)
 class Principal:
     user_id: str
@@ -79,6 +88,7 @@ class AuthSettings:
     secret: str
     db_path: str
     access_minutes: int = 30
+    mfa_key: Optional[str] = None  # cifra o segredo TOTP no banco; sem ela, derivada do JWT_SECRET (HKDF, rótulo próprio)
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "AuthSettings":
@@ -100,7 +110,10 @@ class AuthSettings:
         minutos = int(env.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
         if not 1 <= minutos <= 24 * 60:
             raise AuthConfigError("ACCESS_TOKEN_EXPIRE_MINUTES deve ficar entre 1 e 1440.")
-        return cls(secret=secret, db_path=db_path, access_minutes=minutos)
+        chave_mfa = env.get("MFA_ENCRYPTION_KEY") or None
+        if chave_mfa is not None and len(chave_mfa) < 32:
+            raise AuthConfigError("MFA_ENCRYPTION_KEY precisa ter pelo menos 32 caracteres.")
+        return cls(secret=secret, db_path=db_path, access_minutes=minutos, mfa_key=chave_mfa)
 
 
 def validar_senha(senha: str) -> None:
@@ -138,6 +151,7 @@ class AuthService:
     def __init__(self, settings: Optional[AuthSettings] = None, rbac: Optional[RBACManager] = None):
         self.settings = settings or AuthSettings.from_env()
         self._rbac = rbac or RBACManager()
+        self._cifra = mfa.CifraDeSegredos(self.settings.mfa_key or self.settings.secret)
         Path(self.settings.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._criar_tabelas()
 
@@ -177,6 +191,17 @@ class AuthService:
                 );
                 """
             )
+            # verificação em duas etapas: colunas novas também em bancos criados antes dela
+            colunas = {linha["name"] for linha in con.execute("PRAGMA table_info(users)")}
+            for nome, definicao in (
+                ("mfa_enabled", "INTEGER NOT NULL DEFAULT 0"),
+                ("mfa_secret", "TEXT"),        # segredo TOTP cifrado (AES-256-GCM)
+                ("mfa_pending", "TEXT"),       # segredo novo, ainda não confirmado com um código
+                ("mfa_last_step", "INTEGER NOT NULL DEFAULT 0"),  # último passo aceito: o mesmo código não vale duas vezes
+                ("mfa_recovery", "TEXT"),      # JSON com o HMAC dos códigos de recuperação ainda não usados
+            ):
+                if nome not in colunas:
+                    con.execute(f"ALTER TABLE users ADD COLUMN {nome} {definicao}")  # nome e definição vêm da lista fixa acima
 
     # --------------------------------------------------------------- usuários
     def contar_usuarios(self) -> int:
@@ -212,7 +237,8 @@ class AuthService:
         return Principal(linha["id"], linha["username"], linha["tenant_id"], frozenset(json.loads(linha["roles"])))
 
     # ------------------------------------------------------------ autenticação
-    def autenticar(self, username: str, senha: str) -> Principal:
+    def autenticar(self, username: str, senha: str, codigo: Optional[str] = None) -> Principal:
+        """Confere a senha e, se a conta tiver verificação em duas etapas, o código (``AuthMFANecessario`` se faltar)."""
         agora = time.time()
         with self._db() as con:
             linha = con.execute("SELECT * FROM users WHERE username = ?", (username or "",)).fetchone()
@@ -222,10 +248,20 @@ class AuthService:
         if linha["locked_until"] > agora:
             raise AuthLockedError("Conta bloqueada por tentativas erradas. Tente novamente mais tarde.")
         if linha["active"] and conferir_senha(senha or "", linha["password_hash"]):
+            if linha["mfa_enabled"]:
+                if not str(codigo or "").strip():
+                    raise AuthMFANecessario("Digite o código de 6 dígitos do aplicativo autenticador.")
+                if self._segundo_fator(linha, codigo) is None:
+                    self._registrar_falha(linha, agora)
+                    raise AuthError("Código de verificação inválido ou já usado.")
             with self._db() as con:
                 con.execute("UPDATE users SET failed_attempts = 0, locked_until = 0 WHERE id = ?", (linha["id"],))
             return self._principal(linha)
-        # Falha: grava o erro numa transação própria e só depois levanta a exceção
+        self._registrar_falha(linha, agora)
+        raise AuthError("Usuário ou senha inválidos.")
+
+    def _registrar_falha(self, linha: sqlite3.Row, agora: float) -> None:
+        # Grava o erro numa transação própria; quem chama levanta a exceção depois
         # (levantar dentro do ``with`` desfaria a gravação).
         with self._db() as con:
             con.execute("UPDATE users SET failed_attempts = failed_attempts + 1 WHERE id = ?", (linha["id"],))
@@ -236,7 +272,112 @@ class AuthService:
                     (agora + BLOQUEIO_SEGUNDOS, linha["id"]),
                 )
                 logger.warning("Conta %s bloqueada após %d tentativas erradas.", linha["username"], MAX_TENTATIVAS)
-        raise AuthError("Usuário ou senha inválidos.")
+
+    # ------------------------------------------------------- duas etapas (TOTP)
+    def _linha(self, user_id: str) -> sqlite3.Row:
+        with self._db() as con:
+            linha = con.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if linha is None or not linha["active"]:
+            raise AuthError("Usuário inexistente ou desativado.")
+        return linha
+
+    def _segundo_fator(self, linha: sqlite3.Row, codigo: Optional[str]) -> Optional[str]:
+        """Consome o código (TOTP ou de recuperação). Devolve ``"totp"``, ``"recuperacao"`` ou ``None`` se não vale."""
+        if not linha["mfa_enabled"] or not linha["mfa_secret"]:
+            return None
+        if mfa.parece_codigo_de_recuperacao(codigo or ""):
+            guardados = json.loads(linha["mfa_recovery"] or "[]")
+            alvo = self._cifra.hash_recuperacao(codigo or "")
+            restantes = [h for h in guardados if not hmac.compare_digest(h, alvo)]
+            if len(restantes) == len(guardados):
+                return None
+            with self._db() as con:  # compara e troca: o mesmo código não entra duas vezes nem em requisições simultâneas
+                cur = con.execute("UPDATE users SET mfa_recovery = ? WHERE id = ? AND mfa_recovery = ?",
+                                  (json.dumps(restantes), linha["id"], linha["mfa_recovery"]))
+            if cur.rowcount != 1:
+                return None
+            logger.warning("Código de recuperação usado pela conta %s (%d restante(s)).", linha["username"], len(restantes))
+            return "recuperacao"
+        try:
+            segredo = self._cifra.decifrar(linha["mfa_secret"], linha["id"])
+        except mfa.SegredoInvalido:
+            logger.error("O segredo TOTP da conta %s não abre: MFA_ENCRYPTION_KEY/JWT_SECRET trocado? Redefina pela CLI.", linha["username"])
+            return None
+        passo = mfa.conferir_totp(segredo, codigo or "", ultimo_passo=int(linha["mfa_last_step"] or 0))
+        if passo is None:
+            return None
+        with self._db() as con:  # só grava se ninguém usou um passo igual ou maior nesse meio-tempo
+            cur = con.execute("UPDATE users SET mfa_last_step = ? WHERE id = ? AND mfa_last_step < ?", (passo, linha["id"], passo))
+        return "totp" if cur.rowcount == 1 else None
+
+    def estado_mfa(self, user_id: str) -> dict:
+        linha = self._linha(user_id)
+        return {"ativo": bool(linha["mfa_enabled"]),
+                "codigos_de_recuperacao_restantes": len(json.loads(linha["mfa_recovery"] or "[]")) if linha["mfa_enabled"] else 0}
+
+    def iniciar_mfa(self, principal: Principal) -> dict:
+        """Gera o segredo (ainda pendente) e devolve o QR code e o segredo para o aplicativo autenticador."""
+        linha = self._linha(principal.user_id)
+        if linha["mfa_enabled"]:
+            raise ValueError("A verificação em duas etapas já está ativa. Desative antes de configurar outro celular.")
+        segredo = mfa.gerar_segredo()
+        with self._db() as con:
+            con.execute("UPDATE users SET mfa_pending = ? WHERE id = ?", (self._cifra.cifrar(segredo, linha["id"]), linha["id"]))
+        uri = mfa.uri_de_configuracao(segredo, linha["username"])
+        return {"segredo": segredo, "uri": uri, "qr_code": mfa.qr_code(uri)}
+
+    def _conferir_senha_da_conta(self, linha: sqlite3.Row, senha: str) -> None:
+        agora = time.time()
+        if linha["locked_until"] > agora:
+            raise AuthLockedError("Conta bloqueada por tentativas erradas. Tente novamente mais tarde.")
+        if not conferir_senha(senha or "", linha["password_hash"]):
+            self._registrar_falha(linha, agora)  # quem roubou só o token não descobre a senha por aqui
+            raise AuthError("Senha incorreta.")
+
+    def ativar_mfa(self, principal: Principal, senha: str, codigo: str) -> list[str]:
+        """Confirma o segredo pendente com a senha e um código do aplicativo; devolve os códigos de recuperação (uma vez só)."""
+        linha = self._linha(principal.user_id)
+        if linha["mfa_enabled"]:
+            raise ValueError("A verificação em duas etapas já está ativa.")
+        if not linha["mfa_pending"]:
+            raise ValueError("Comece pela configuração: gere o QR code primeiro.")
+        self._conferir_senha_da_conta(linha, senha)
+        try:
+            segredo = self._cifra.decifrar(linha["mfa_pending"], linha["id"])
+        except mfa.SegredoInvalido as exc:
+            raise ValueError("A configuração pendente não abre mais: gere o QR code de novo.") from exc
+        passo = mfa.conferir_totp(segredo, codigo)
+        if passo is None:
+            self._registrar_falha(linha, time.time())
+            raise AuthError("Código inválido. Confira se a hora do celular está certa e digite o código que está na tela agora.")
+        codigos = mfa.gerar_codigos_de_recuperacao()
+        with self._db() as con:
+            con.execute(
+                "UPDATE users SET mfa_enabled = 1, mfa_secret = mfa_pending, mfa_pending = NULL, mfa_last_step = ?, "
+                "mfa_recovery = ?, failed_attempts = 0 WHERE id = ?",
+                (passo, json.dumps([self._cifra.hash_recuperacao(c) for c in codigos]), linha["id"]),
+            )
+        return codigos
+
+    def desativar_mfa(self, principal: Principal, senha: str, codigo: str) -> None:
+        """Desliga a verificação em duas etapas: pede a senha e um código (do aplicativo ou de recuperação)."""
+        linha = self._linha(principal.user_id)
+        if not linha["mfa_enabled"]:
+            raise ValueError("A verificação em duas etapas não está ativa.")
+        self._conferir_senha_da_conta(linha, senha)
+        if self._segundo_fator(linha, codigo) is None:
+            self._registrar_falha(linha, time.time())
+            raise AuthError("Código de verificação inválido ou já usado.")
+        self.redefinir_mfa(linha["username"])
+
+    def redefinir_mfa(self, username: str) -> bool:
+        """Apaga a verificação em duas etapas da conta (pelo próprio usuário ou, se ele perdeu tudo, pelo administrador na CLI)."""
+        with self._db() as con:
+            cur = con.execute(
+                "UPDATE users SET mfa_enabled = 0, mfa_secret = NULL, mfa_pending = NULL, mfa_last_step = 0, mfa_recovery = NULL "
+                "WHERE username = ?", (username,),
+            )
+        return cur.rowcount == 1
 
     # ------------------------------------------------------------------ tokens
     def emitir_token(self, principal: Principal) -> str:

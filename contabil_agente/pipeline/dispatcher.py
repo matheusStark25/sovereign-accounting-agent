@@ -5,6 +5,8 @@
 * Cada transição vira uma entrada da trilha WORM (HMAC encadeado); ``audit_trail_id`` aponta para a última.
 * Worker (DeepSeek), Revisor (Gemini) e Corretor trabalham em modo determinístico se não houver chave de API.
 * O pipeline nunca aceita do LLM um valor que não esteja no documento.
+* Documento com instrução escondida para a IA (prompt injection, ``security/injecao.py``) não vai para nenhum LLM: é conferido
+  só pelas regras, ganha o alerta ``instrucao_para_ia`` e fica marcado para revisão humana.
 * Se uma etapa falha, a máquina fica no estado em que parou; só ``ARCHIVED`` quer dizer concluído.
 """
 
@@ -20,6 +22,7 @@ from contabil_agente.documentos.leitura import ArquivoInvalido, Conteudo, ler_do
 from contabil_agente.documentos.processador import ResultadoDocumento, classificar, processar_conteudo, resolver_tipo_informado
 from contabil_agente.documentos.tipos import TIPOS, Alerta, corpus
 from contabil_agente.lgpd.anonimizacao import PIIAnonymizer
+from contabil_agente.security.injecao import analisar as analisar_injecao
 from contabil_agente.security.worm_audit import AuditoriaError, WormAudit
 
 from .agentes import AgenteCorretor, AgenteRevisor, AgenteWorker, Divergencia
@@ -115,6 +118,10 @@ class DocumentDispatcher:
 
         worker_llm = self.worker_llm if usar_ia else None
         revisor_llm = self.revisor_llm if usar_ia else None
+        triagem = analisar_injecao(conteudo_lido.texto or "")
+        if triagem.suspeito:  # instrução escondida para a IA: o documento segue só pelas regras, sem nenhum LLM
+            worker_llm = revisor_llm = None
+            auditar("instrucao_suspeita", {"motivos": list(triagem.motivos)})
 
         # CLASSIFYING ----------------------------------------------------------
         maquina.transitar(Estado.CLASSIFYING, "identificando o tipo do documento")
@@ -129,7 +136,15 @@ class DocumentDispatcher:
         texto = corpus(conteudo_lido)
         worker = AgenteWorker(worker_llm, persona or self.persona).processar(texto, tipo_codigo, resultado.extracted_data, resultado.resumo)
         resultado.agentes = {"worker": worker.origem}
-        if not usar_ia and (self.worker_llm or self.revisor_llm):
+        if triagem.suspeito:
+            resultado.alertas.append(Alerta(
+                "instrucao_para_ia",
+                "O documento tem um texto que parece uma instrução escondida para a IA (" + ", ".join(triagem.motivos) + "). "
+                "Ele foi conferido só pelas regras, sem IA, e precisa de revisão humana.",
+                "erro",
+            ))
+            resultado.avisos.append("IA externa não usada: o documento parece conter uma instrução para a IA (prompt injection).")
+        elif not usar_ia and (self.worker_llm or self.revisor_llm):
             resultado.avisos.append("IA externa não usada: não há consentimento registrado para o envio a provedores de IA (LGPD).")
         if worker.erro:
             resultado.avisos.append(f"Worker em modo determinístico: {worker.erro}")
@@ -241,7 +256,12 @@ class DocumentDispatcher:
         tipo = TIPOS[codigo]
         resultado.faltando = [k for k in tipo.esperados if k not in resultado.extracted_data]
         if tipo.conferir is not None:
-            alertas, calculos = tipo.conferir(resultado.extracted_data, c)
+            try:
+                alertas, calculos = tipo.conferir(resultado.extracted_data, c)
+            except (ArithmeticError, ValueError, TypeError) as exc:  # valor corrigido que a conferência não sabe ler
+                logger.warning("Reconferência de %s falhou: %s", codigo, type(exc).__name__)
+                resultado.alertas.append(Alerta("conferencia_incompleta", "Um valor corrigido não pôde ser conferido: revisão humana necessária.", "erro"))
+                return
             antigos = [a for a in resultado.alertas if a.codigo in ("tipo_nao_confirmado", "tipo_informado_diverge")]
             resultado.alertas, resultado.calculations = antigos + alertas, calculos
 

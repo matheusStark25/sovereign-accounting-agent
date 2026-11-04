@@ -287,6 +287,13 @@ input:focus, textarea:focus { border-color: var(--verde); outline: none; box-sha
 .chave input { width: 22px; height: 22px; margin-top: .15rem; flex: none; accent-color: var(--verde); }
 .lista-nfe { margin-top: .4rem; }
 .nota-nfe + .nota-nfe { border-top: 1px dotted var(--pauta-forte); margin-top: .6rem; padding-top: .3rem; }
+
+/* verificação em duas etapas */
+.passos-2fa { margin: .55rem 0 0; padding-left: 1.2rem; display: grid; gap: .3rem; font-size: .92rem; }
+.qr-2fa { display: block; width: 180px; height: 180px; margin: .8rem 0 .35rem; padding: 6px; background: #fff; border: 1px solid var(--pauta); border-radius: 8px; image-rendering: pixelated; }
+.segredo-2fa { font: 600 .95rem/1.45 var(--mono); letter-spacing: .04em; overflow-wrap: anywhere; margin-top: .35rem; }
+a.nota { display: inline-block; color: var(--azul-tinta); }
+.codigos-2fa { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem .9rem; margin: .7rem 0 .9rem; padding: .75rem .85rem; border: 1px dashed var(--pauta-forte); border-radius: 8px; font: 500 .95rem/1.3 var(--mono); background: var(--papel); }
 .resumo-nfe { display: grid; grid-template-columns: max-content 1fr; gap: .25rem .8rem; margin-top: .6rem; font-size: .9rem; }
 .resumo-nfe dt { color: var(--tinta-suave); }
 .resumo-nfe dd { margin: 0; overflow-wrap: anywhere; }
