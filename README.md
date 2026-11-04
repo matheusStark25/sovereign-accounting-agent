@@ -5,185 +5,222 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/matheusStark25/sovereign-accounting-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/matheusStark25/sovereign-accounting-agent/actions/workflows/ci.yml)
 
-Assistente de **Departamento Pessoal e contabilidade** para a legislação brasileira: calcula rescisão, férias,
-13º, INSS, IRRF, FGTS e folha com aritmética decimal exata, gera o PDF do cálculo, lê e confere 27 tipos de
-documento (holerite, TRCT, guias, SPED, XMLs), busca o extrato do FGTS, o extrato do PGMEI e o resumo de NF-e, CT-e e
-NFC-e com robôs que **pausam para uma pessoa** resolver login e captcha, e baixa o XML completo da NF-e pelo web service
-oficial da SEFAZ com o certificado digital da empresa. Tudo passa por autenticação, isolamento entre empresas e uma trilha de
-auditoria à prova de adulteração.
+**English** · [Português](README.pt-BR.md)
 
-> Os valores calculados vêm do código, nunca de um modelo de linguagem. O LLM só conversa sobre o que não é
-> cálculo — e só se a empresa deixar. Se faltar dado ou a tabela de uma competência não existir, o sistema
-> **pergunta ou recusa**; ele não estima.
+A **payroll and accounting assistant** for Brazilian law. It computes termination pay, vacation pay, the 13th salary,
+social security (INSS), withholding income tax (IRRF), the severance fund (FGTS) and full payroll with exact decimal
+arithmetic, and it generates the calculation PDF. It reads and checks 27 document types (payslips, termination
+statements, tax slips, SPED files, XMLs). It fetches FGTS and MEI statements and electronic invoice summaries (NF-e, CT-e,
+NFC-e) with bots that **pause for a person** to solve the login or CAPTCHA, and it downloads the full NF-e XML from the
+official tax authority web service using the company's digital certificate. Everything runs behind authentication with
+two-factor login, per-company isolation, prompt-injection defenses and a tamper-evident audit trail anchored outside the
+server.
 
-![Maria Helena: demonstrativo de rescisão calculado pelo motor](docs/interface-chat.png)
+> Amounts always come from code, never from a language model. The LLM only talks about what is not a calculation, and
+> only if the company allows it. If data is missing or there is no tax table for a period, the system **asks or refuses**;
+> it never guesses.
 
-*Captura da interface real: o demonstrativo da rescisão (valores de exemplo), com cada número vindo do motor de cálculo, o total
-com sublinhado duplo, as premissas e as tabelas usadas.*
+The product is built for Brazilian accounting offices, so the interface and the assistant (Maria Helena) speak Portuguese,
+and most code identifiers are in Portuguese too.
 
-![Maria Helena conferindo o holerite que a empresa enviou](docs/interface-conferencia.png)
+![Maria Helena: termination statement computed by the calculation engine](docs/interface-chat.png)
 
-*Também real, com a Groq: a pessoa manda um holerite, a ficha sai com o carimbo da conferência e, perguntada, a Maria Helena
-consulta os documentos da empresa e explica a divergência do INSS em reais, com a lei certa. O rodapé diz que ferramenta ela usou.*
+*Screenshot of the real interface: a termination statement (sample values) where every number comes from the calculation
+engine, with the double-underlined total, the assumptions and the tax tables used.*
+
+![Maria Helena checking a payslip the company sent](docs/interface-conferencia.png)
+
+*Also real, with Groq: the user sends a payslip, the card comes back with the check stamp and, when asked, Maria Helena
+looks up the company's documents and explains the INSS discrepancy in reais, citing the right law. The footer shows which
+tool she used.*
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/interface-login.png" alt="Tela de entrada: capa de livro-razão e ficha de acesso"></td>
-    <td width="50%"><img src="docs/interface-escuro.png" alt="Tema escuro: demonstrativo de férias calculado pelo motor"></td>
+    <td width="50%"><img src="docs/interface-login.png" alt="Login screen: ledger-style cover and access card"></td>
+    <td width="50%"><img src="docs/interface-escuro.png" alt="Dark theme: vacation pay statement computed by the engine"></td>
   </tr>
   <tr>
-    <td><em>Entrada: a capa diz o que o sistema faz; a ficha pede usuário e senha.</em></td>
-    <td><em>Tema escuro (segue o do sistema operacional): demonstrativo de férias calculado pelo motor.</em></td>
+    <td><em>Login: the cover says what the system does; the card asks for user and password.</em></td>
+    <td><em>Dark theme (follows the OS setting): vacation pay statement computed by the engine.</em></td>
   </tr>
   <tr>
-    <td><img src="docs/interface-painel.png" alt="Painel do escritório: robôs dos portais, aprovações, LGPD e auditoria"></td>
-    <td align="center"><img src="docs/interface-celular.png" alt="No celular: demonstrativo do pró-labore" width="62%"></td>
+    <td><img src="docs/interface-painel.png" alt="Office dashboard: portal bots, approvals, privacy and audit"></td>
+    <td align="center"><img src="docs/interface-celular.png" alt="On a phone: owner's salary statement" width="62%"></td>
   </tr>
   <tr>
-    <td><em>Painel: robôs dos portais (FGTS, PGMEI e notas fiscais), aprovações pendentes, consentimento de IA e verificação da trilha.</em></td>
-    <td><em>No celular: "quanto custa um pró-labore de 8 mil?" vira o demonstrativo do motor, com as premissas e as tabelas.</em></td>
+    <td><em>Dashboard: portal bots (FGTS, MEI and invoices), pending approvals, AI consent and audit-trail verification.</em></td>
+    <td><em>On a phone: "how much does an 8k owner's salary cost?" becomes the engine's statement, with assumptions and tables.</em></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/interface-2fa.png" alt="Two-factor setup: server-side QR code, key and confirmation with password and code" width="62%"></td>
+    <td><em>Two-factor setup: the QR code is generated on the server (the page loads nothing from outside). The user confirms with the password and an app code and gets 10 recovery codes.</em></td>
   </tr>
 </table>
 
-*Todas as telas foram capturadas do sistema rodando de verdade (`uvicorn agente_v2.main:app`), com valores e nomes de exemplo.*
+*Every screen was captured from the system actually running (`uvicorn agente_v2.main:app`), with sample names and values.*
+
+## Highlights
+
+- **LLM tool calling, done safely:** the model picks the tool and deterministic code does the math (decimal arithmetic,
+  official tables). Personal IDs (CPF, CNPJ) become placeholders before anything reaches the provider, and a layered
+  prompt-injection defense screens input, sanitizes tool output, detects system-prompt leaks with a canary and logs every
+  case to the audit trail.
+- **Security in depth:** two-factor login (TOTP, RFC 6238), JWT with revocation, RBAC with per-company isolation, an
+  HMAC-chained tamper-evident audit trail with external anchoring, mTLS, HashiCorp Vault and post-quantum cryptography
+  (ML-KEM-768 + X25519, ML-DSA-65).
+- **Production engineering:** 1,000+ automated tests (including end-to-end tests in a real browser) and a CI pipeline
+  with lint, tests, pip-audit, bandit, gitleaks, trivy, the full docker-compose stack and an end-to-end observability check
+  (Prometheus, Alertmanager and Grafana).
+- **Real domain:** Brazilian labor and tax rules, 27 document types and government-portal bots where a person solves the
+  CAPTCHA (never bypassed).
 
 ---
 
-## Sumário
+## Contents
 
-- [Como funciona](#como-funciona)
-- [O que existe de verdade](#o-que-existe-de-verdade)
-- [Começando](#começando)
+- [Highlights](#highlights)
+- [How it works](#how-it-works)
+- [What is actually implemented](#what-is-actually-implemented)
+- [Getting started](#getting-started)
 - [API](#api)
-- [Documentos](#documentos)
-- [RPA: FGTS, PGMEI e notas fiscais](#rpa-fgts-pgmei-e-notas-fiscais)
-- [Segurança e LGPD](#segurança-e-lgpd)
-- [Docker, gateway e Vault](#docker-gateway-e-vault)
-- [Estrutura do projeto](#estrutura-do-projeto)
-- [Testes](#testes)
-- [Licença](#licença)
+- [Documents](#documents)
+- [RPA: FGTS, MEI and invoices](#rpa-fgts-mei-and-invoices)
+- [Security and LGPD](#security-and-lgpd)
+- [Docker, gateway and Vault](#docker-gateway-and-vault)
+- [Project structure](#project-structure)
+- [Tests](#tests)
+- [License](#license)
 
 ---
 
-## Como funciona
+## How it works
 
 ```mermaid
 graph LR
-    U[Navegador<br/>agente_v2/web] --> A[API FastAPI<br/>agente_v2.main]
-    A --> C[Chat<br/>cálculo determinístico primeiro]
-    C -->|só conversa geral<br/>e com consentimento| L[LLM opcional<br/>Groq]
-    A --> K[Motor de cálculo<br/>Decimal + tabelas YAML]
-    K --> P[PDF com campos<br/>reportlab + AcroForm]
-    A --> D[Pipeline de documentos<br/>7 estados]
-    D --> W[Worker<br/>DeepSeek opcional]
-    D --> R[Revisor<br/>Gemini opcional]
-    D --> O[Corretor<br/>regra de evidência]
-    O --> N[Detector de anomalias]
-    N --> X[Destinos<br/>arquivo, webhook HMAC]
-    A -->|fila rpa| Q[Worker Celery do RPA<br/>navegador com a pessoa]
-    A -->|fila documentos| B[Worker Celery de lote]
-    A --> T[(Auditoria WORM<br/>cadeia HMAC-SHA256)]
+    U[Browser<br/>agente_v2/web] --> A[FastAPI<br/>agente_v2.main]
+    A --> C[Chat<br/>deterministic calculation first]
+    C -->|general conversation only<br/>and with consent| L[Optional LLM<br/>Groq]
+    A --> K[Calculation engine<br/>Decimal + YAML tables]
+    K --> P[PDF with fields<br/>reportlab + AcroForm]
+    A --> D[Document pipeline<br/>7 states]
+    D --> W[Worker<br/>optional DeepSeek]
+    D --> R[Reviewer<br/>optional Gemini]
+    D --> O[Corrector<br/>evidence rule]
+    O --> N[Anomaly detector]
+    N --> X[Destinations<br/>archive, HMAC webhook]
+    A -->|rpa queue| Q[Celery RPA worker<br/>browser with a person]
+    A -->|documents queue| B[Celery batch worker]
+    A --> T[(WORM audit<br/>HMAC-SHA256 chain)]
     D --> T
     Q --> T
+    T -.->|head published| E[External anchor<br/>other volume or HTTPS]
 ```
 
-- **Chat (Maria Helena):** primeiro o `DialogoCalculo` tenta entender o pedido ("calcular rescisão…") e conduz as
-  perguntas que faltam; se tudo estiver completo, calcula pelo motor. Pergunta sobre um documento enviado ou sobre a regra
-  (prazo, direito, tabela) não vira formulário de cálculo: vai para a Maria Helena, que responde com **ferramentas do
-  sistema** em vez de memória: `calcular` (o motor), `tabela_vigente` (faixas, teto e a norma de INSS e IRRF),
-  `documentos_recentes` (o que a empresa enviou, com os alertas da conferência), `conciliar_fechamento`,
-  `validar_identificadores` e `verificar_conformidade`. Ela nunca soma encargo por conta própria e só cita leis de uma
-  lista conferida. CPF, CNPJ, PIS e chave de acesso viram marcadores (`[CPF_1]`) antes de ir ao provedor; a ferramenta
-  recebe o valor real só dentro da requisição. Tudo isso só com o consentimento `envio_a_provedor_de_ia`; sem chave de
-  LLM o sistema continua funcionando para cálculos e regras.
-- **Pipeline de documentos:** `RECEIVED → CLASSIFYING → PROCESSING → REVIEWING → CORRECTING → DISPATCHING →
-  ARCHIVED`. Worker e Revisor têm modo determinístico (sempre disponível) e usam DeepSeek/Gemini (ou a Groq) quando há
-  chave **e** consentimento. O Corretor só aceita um valor sugerido se ele aparecer no texto do documento
-  (regra de evidência): o LLM sugere, o documento decide.
-- **Auditoria:** cada evento é gravado com PII mascarada numa cadeia HMAC-SHA256 por empresa, com cabeça
-  assinada para detectar truncamento. Se a auditoria falhar, a operação falha (a API responde 503).
+- **Chat (Maria Helena):** `DialogoCalculo` first tries to understand the request ("calculate termination pay…") and asks
+  for whatever is missing; once complete, the engine computes it. Questions about an uploaded document or about a rule
+  (deadlines, rights, tables) don't become a calculation form: they go to Maria Helena, who answers with **system tools**
+  instead of memory: `calcular` (the engine), `tabela_vigente` (INSS and IRRF brackets, ceiling and the legal act),
+  `documentos_recentes` (what the company sent, with the check alerts), `conciliar_fechamento`, `validar_identificadores`
+  and `verificar_conformidade`. She never adds a charge on her own and only cites laws from a vetted list. CPF, CNPJ, PIS
+  and invoice keys become placeholders (`[CPF_1]`) before reaching the provider; the tool gets the real value only inside
+  the request. All of this requires the `envio_a_provedor_de_ia` consent; without an LLM key the system keeps working for
+  calculations and rules. A message that tries to change the rules gets a system reminder, tool output is sanitized before
+  it goes back to the model, and a response that leaks the prompt is replaced with a refusal (see
+  [Security and LGPD](#security-and-lgpd)).
+- **Document pipeline:** `RECEIVED → CLASSIFYING → PROCESSING → REVIEWING → CORRECTING → DISPATCHING → ARCHIVED`.
+  Worker and Reviewer have a deterministic mode (always available) and use DeepSeek/Gemini (or Groq) when there is a key
+  **and** consent. The Corrector only accepts a suggested value if it appears in the document text (evidence rule): the
+  LLM suggests, the document decides. A document with a hidden instruction for the AI never reaches any LLM: it is checked
+  by rules only and flagged for human review.
+- **Audit:** every event is written, with PII masked, into a per-company HMAC-SHA256 chain with a signed head to detect
+  truncation. If the audit write fails, the operation fails (the API answers 503). The head is published outside the server
+  (external anchor), which catches even someone who holds the key and rebuilds the chain.
 
-## O que existe de verdade
+## What is actually implemented
 
-| Área | O que está implementado |
+| Area | What is implemented |
 |---|---|
-| **Cálculo** | Rescisão (sem justa causa, justa causa, pedido de demissão, acordo), férias (com 1/3 e abono pecuniário), 13º, INSS progressivo, IRRF (com a redução da Lei 15.270/2025), FGTS (8%; multa de 40% sem justa causa e 20% em acordo; doméstico 8% + 3,2%), adicionais (horas extras, adicional noturno, insalubridade, periculosidade), folha completa, pró-labore (INSS do sócio, IRRF e custo da empresa), GPS (20%, 11% e 5%), DAS do MEI (INSS + ICMS e/ou ISS) e DARF em atraso (multa e juros da Lei 9.430/1996, com a SELIC acumulada informada, nunca chutada). `Decimal` em tudo; as tabelas ficam em um único arquivo, [`calc/data/tabelas.yaml`](contabil_agente/calc/data/tabelas.yaml). Competência sem tabela → erro explícito. |
-| **PDF** | PDF do cálculo com campos AcroForm preenchidos (`/api/v1/calculo/{tipo}/pdf` e no chat). |
-| **Documentos** | 27 tipos classificados e extraídos; conferências automáticas em 16 deles (veja [Documentos](#documentos)); detector de anomalias (escore z robusto, duplicidade, competência repetida/futura/antiga); lote assíncrono de até 50 arquivos. |
-| **Autenticação** | Login com bcrypt, JWT, bloqueio da conta após 5 senhas erradas (15 min), papéis lidos do banco (cabeçalhos de identidade enviados pelo cliente são ignorados), isolamento por empresa (tenant). |
-| **RBAC** | `super_admin`, `tenant_admin`, `accountant`, `auditor`, `viewer`, `guest` com permissões por rota. |
-| **LGPD** | Base legal (art. 7) exigida antes de tratar, consentimento por titular e por finalidade, retenção configurável, exclusão de titular respeitando a guarda legal (art. 16), mascaramento de PII em logs e auditoria. |
-| **Governança** | Decisões críticas assinadas com ML-DSA-65 (Dilithium); acima do limite do tipo ficam `PENDENTE` até outra pessoa aprovar (regra das duas pessoas); limites em `GOVERNANCA_LIMITES`. |
-| **Segredos** | Variáveis de ambiente ou HashiCorp Vault (token ou AppRole). Vault configurado e fora do ar → a API se recusa a subir (sem fallback silencioso). Sem `JWT_SECRET`, `AUDIT_HMAC_KEY` ou `GOVERNANCA_DSA_KEY` ela também não sobe. |
-| **Criptografia** | CPF cifrado com ML-KEM-768 + X25519 + AES-GCM (pacote `cryptography`) antes de entrar na fila do Celery; mTLS no gateway (porta 8443) e utilitários mTLS/XML-DSig em `agente_v2/`. |
-| **Resiliência** | Circuit breaker, retentativas com backoff exponencial, timeouts, degradação controlada, `/health` e `/ready`. |
-| **Agentes** | `TaxAgent` (cálculos), `ValidationAgent` (CPF, CNPJ, PIS, chave de NF-e e documentos), `ReconciliationAgent` (concilia holerites com a guia do FGTS, a GPS e o DARF do IRRF e aponta a diferença em reais), `ComplianceAgent` (regras de conformidade e base legal da LGPD) e `RPAAgent` (extrato do FGTS e do PGMEI, resumo de NF-e, CT-e e NFC-e), orquestrados pela API em `/api/v1/agentes`: uma ação de um agente ou um plano de até 10 passos, com o resultado de um passo alimentando o seguinte. |
-| **Voz** | Microfone no navegador → WebSocket `/ws/voz` (áudio em pedaços) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → resposta frase por frase, lida em voz alta pela voz do navegador (Web Speech API). Exige o consentimento de IA externa (o áudio vai a um terceiro). A Maria Helena adapta o tom (formal, informal ou neutro) ao jeito de quem escreve ou fala e usa as mesmas ferramentas do chat escrito (o MARCOS segue disponível por `AGENTE_PERSONA=MARCOS`). |
-| **Observabilidade** | Métricas Prometheus em `/metrics`; log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados; e, no perfil `observabilidade` do compose, Prometheus, Alertmanager (7 alertas: API fora do ar, erros 5xx, latência, falha na trilha de auditoria, logins recusados, cálculos com erro, voz com falha) e Grafana com o painel "Sovereign Accounting Agent". |
-| **Interface web** | Identidade de escritório contábil (papel de livro-razão, selo "MH", demonstrativo com pontilhado e total com sublinhado duplo, carimbo de conferência nos documentos, tema escuro). Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (robôs do FGTS, do PGMEI e das notas fiscais, com uma ou várias chaves e o resumo de cada nota na tela; aprovações pendentes, consentimento de IA, verificação da trilha). Funciona no celular. |
-| **CLI** | `python -m agente_v2.cli` cria usuários, gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI e consulta NF-e, CT-e e NFC-e, com a pessoa resolvendo só o captcha (`baixar-extrato`), envia sozinho ao sistema o PDF que você baixou no navegador normal (`observar-pasta`) e baixa o XML da NF-e com o certificado A1 (`baixar-xml-nfe`). |
+| **Calculations** | Termination pay (without cause, for cause, resignation, mutual agreement), vacation pay (with the 1/3 bonus and sold days), 13th salary, progressive INSS, IRRF (with the Law 15.270/2025 reduction), FGTS (8%; 40% penalty without cause and 20% on agreement; domestic workers 8% + 3.2%), additions (overtime, night shift, hazard and unhealthy-work pay), full payroll, owner's salary (partner INSS, IRRF and company cost), GPS (20%, 11% and 5%), the MEI DAS (INSS + ICMS and/or ISS) and late DARF (fine and interest under Law 9.430/1996, with the accumulated SELIC rate given, never guessed). `Decimal` everywhere; tables live in a single file, [`calc/data/tabelas.yaml`](contabil_agente/calc/data/tabelas.yaml). A period without a table → explicit error. |
+| **PDF** | Calculation PDF with filled AcroForm fields (`/api/v1/calculo/{tipo}/pdf` and from the chat). |
+| **Documents** | 27 types classified and extracted; automatic checks for 16 of them (see [Documents](#documents)); anomaly detector (robust z-score, duplicates, repeated/future/old periods); async batches of up to 50 files. |
+| **Authentication** | bcrypt passwords, JWT (expires in 30 min and is revoked on logout), account lockout after 5 failed attempts (15 min), roles read from the database (identity headers sent by the client are ignored), per-company (tenant) isolation. |
+| **Two-factor (2FA)** | TOTP (RFC 6238, verified against the RFC test vectors), optional per user: server-side QR code, secret encrypted in the database with AES-256-GCM, a used code can't be replayed, 10 single-use recovery codes (stored as HMACs), and a wrong code counts as a failed attempt. Enabling and disabling require the password and a code; an admin can reset it from the CLI for someone who lost their phone. |
+| **Prompt injection** | Layered defense (`security/injecao.py`): screening in Portuguese and English (requests to ignore instructions, role changes, system-prompt requests, chat markers such as `<\|im_start\|>`, text hidden in Unicode "tag" characters, which is decoded and analyzed too, and bidirectional controls); tool output sanitized before it goes back to the model; a per-conversation canary and a prompt-leak check on the response; a document with a hidden instruction never reaches any LLM and goes to human review. Every case becomes a `security_alert` in the audit trail, a metric and an alert. Also tested live against the Groq model. |
+| **Audit** | Per-company WORM trail with a chained HMAC-SHA256 and a signed head, plus the external anchor (`AUDIT_ANCHOR_DIR` on another volume and/or `AUDIT_ANCHOR_URL` over HTTPS): it catches even someone who has the key and rebuilds the whole chain, or restores an old backup. |
+| **RBAC** | `super_admin`, `tenant_admin`, `accountant`, `auditor`, `viewer`, `guest`, with per-route permissions. |
+| **LGPD** | Legal basis (art. 7) required before processing, consent per data subject and purpose, configurable retention, data-subject erasure that respects legal retention (art. 16), PII masking in logs and audit. |
+| **Governance** | Critical decisions signed with ML-DSA-65 (Dilithium); above the per-type limit they stay `PENDENTE` until another person approves (four-eyes rule); limits in `GOVERNANCA_LIMITES`. |
+| **Secrets** | Environment variables or HashiCorp Vault (token or AppRole). Vault configured but down → the API refuses to start (no silent fallback). Without `JWT_SECRET`, `AUDIT_HMAC_KEY` or `GOVERNANCA_DSA_KEY` it refuses to start too. |
+| **Cryptography** | CPF encrypted with ML-KEM-768 + X25519 + AES-GCM (`cryptography` package) before entering the Celery queue; mTLS on the gateway (port 8443) and mTLS/XML-DSig utilities in `agente_v2/`. |
+| **Resilience** | Circuit breaker, retries with exponential backoff, timeouts, graceful degradation, `/health` and `/ready`. |
+| **Agents** | `TaxAgent` (calculations), `ValidationAgent` (CPF, CNPJ, PIS, NF-e key and documents), `ReconciliationAgent` (reconciles payslips with the FGTS slip, the GPS and the IRRF DARF and shows the difference in reais), `ComplianceAgent` (compliance rules and the LGPD legal basis) and `RPAAgent` (FGTS and MEI statements, NF-e, CT-e and NFC-e summaries), orchestrated by the API at `/api/v1/agentes`: one action of one agent, or a plan of up to 10 steps where each step's result feeds the next. |
+| **Voice** | Browser microphone → WebSocket `/ws/voz` (audio in chunks) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → answer sentence by sentence, read aloud by the browser voice (Web Speech API). Requires the external-AI consent (the audio goes to a third party). Maria Helena adapts her tone (formal, informal or neutral) to how the person writes or speaks and uses the same tools as the text chat (the MARCOS persona is still available with `AGENTE_PERSONA=MARCOS`). |
+| **Observability** | Prometheus metrics at `/metrics`; a log filter that masks CPF, CNPJ, e-mail, phone and labeled names; and, in the `observabilidade` compose profile, Prometheus, Alertmanager (8 alerts: API down, 5xx errors, latency, audit-trail failure, prompt-injection attempt, rejected logins, calculation errors, voice failures) and Grafana with the "Sovereign Accounting Agent" dashboard. |
+| **Web interface** | An accounting-office identity (ledger paper, "MH" seal, dotted statements with a double-underlined total, a check stamp on documents, dark theme). Login, chat with shortcuts, document upload, microphone and read-aloud answers, and a dashboard (FGTS, MEI and invoice bots, with one or many invoice keys and each invoice summary on screen; pending approvals, AI consent, audit-trail and anchor verification, two-factor setup with a QR code). Works on phones. |
+| **CLI** | `python -m agente_v2.cli` creates users, resets two-factor login for someone who lost their phone (`desativar-2fa`), generates secrets, RPA and ML-DSA keys, verifies the audit trail, publishes and checks the external anchors (`ancorar-auditoria`, `conferir-ancoras`), really tests the AI keys and models (`verificar-ia`), records portal calibration (`calibrar-fgts`), downloads FGTS and MEI statements and looks up NF-e, CT-e and NFC-e with the person solving only the CAPTCHA (`baixar-extrato`), uploads by itself the PDF you downloaded in your regular browser (`observar-pasta`) and downloads the NF-e XML with the A1 certificate (`baixar-xml-nfe`). |
 
-## Começando
+## Getting started
 
-Requisitos: Python 3.12. Redis só é necessário para as filas (lote de documentos e RPA).
+Requirements: Python 3.12. Redis is only needed for the queues (document batches and RPA).
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements.txt      # versões exatas testadas: requirements.lock
+pip install -r requirements.txt      # exact tested versions: requirements.lock
 ```
 
-Gere os segredos e preencha o `.env` (copie de `.env.example`):
+Generate the secrets and fill in `.env` (copy it from `.env.example`):
 
 ```bash
 cp .env.example .env
-python -m agente_v2.cli gerar-segredo              # cole em JWT_SECRET
-python -m agente_v2.cli gerar-segredo              # cole em AUDIT_HMAC_KEY
-python -m agente_v2.cli gerar-segredo              # cole em REDIS_PASSWORD
-python -m agente_v2.cli gerar-chave-governanca     # cole a linha GOVERNANCA_DSA_KEY=... inteira
+python -m agente_v2.cli gerar-segredo              # paste into JWT_SECRET
+python -m agente_v2.cli gerar-segredo              # paste into AUDIT_HMAC_KEY
+python -m agente_v2.cli gerar-segredo              # paste into REDIS_PASSWORD
+python -m agente_v2.cli gerar-chave-governanca     # paste the whole GOVERNANCA_DSA_KEY=... line
 ```
 
-Defina `ADMIN_USERNAME` e `ADMIN_PASSWORD` (cria um `super_admin` no primeiro acesso, se ainda não houver
-usuários; apague `ADMIN_PASSWORD` depois) e suba a API:
+Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` (it creates a `super_admin` on first start if there are no users yet; remove
+`ADMIN_PASSWORD` afterwards) and start the API:
 
 ```bash
 uvicorn agente_v2.main:app --env-file .env --host 127.0.0.1 --port 8000
 ```
 
-Abra <http://127.0.0.1:8000> e entre. Para criar outros usuários:
+Open <http://127.0.0.1:8000> and log in. To create more users:
 
 ```bash
 python -m agente_v2.cli criar-usuario --usuario maria --tenant empresa_a --papeis accountant
 ```
 
-Para desenvolvimento local use `AGENTE_ENV=dev`: se faltarem, a API cria um `JWT_SECRET` temporário e guarda uma
-chave de auditoria e uma chave de governança em `DATA_DIR`, e liga a documentação em `/docs`. Em produção (o
-padrão) ela recusa subir sem os segredos obrigatórios. As chaves de IA são opcionais: `GROQ_API_KEY` (conversa),
-`DEEPSEEK_API_KEY` (Worker) e `GEMINI_API_KEY` (Revisor); sem as duas últimas, a Groq faz esses papéis. Os provedores
-renomeiam e desligam modelos, então `python -m agente_v2.cli verificar-ia --env-file .env` confere chave, modelo e
-uma chamada real. Os dados ficam em `DATA_DIR` (padrão `contabil_agente/data`).
+For local development use `AGENTE_ENV=dev`: if they are missing, the API creates a temporary `JWT_SECRET`, stores an
+audit key and a governance key in `DATA_DIR`, and turns on the docs at `/docs`. In production (the default) it refuses to
+start without the required secrets. AI keys are optional: `GROQ_API_KEY` (chat), `DEEPSEEK_API_KEY` (Worker) and
+`GEMINI_API_KEY` (Reviewer); without the last two, Groq takes those roles. Providers rename and retire models, so
+`python -m agente_v2.cli verificar-ia --env-file .env` checks the key, the model and a real call. Data lives in `DATA_DIR`
+(default `contabil_agente/data`).
 
 ## API
 
-A documentação interativa (`/docs`) só fica ligada com `AGENTE_ENV=dev`. Rotas principais, todas com JWT
-(`POST /token`) exceto `/health`, `/ready` e `/metrics`:
+The interactive docs (`/docs`) are only on with `AGENTE_ENV=dev`. Main routes, all behind JWT (`POST /token`) except
+`/health`, `/ready` and `/metrics`:
 
-| Rota | Para quê |
+| Route | Purpose |
 |---|---|
-| `POST /token`, `POST /logout`, `GET /users/me`, `POST /users` | Login, logout, usuário atual, criar usuário (admin) |
-| `POST /api/chat`, `GET /api/chat/{sessao}`, `GET /api/chat/{sessao}/pdf` | Conversa, histórico e PDF do último cálculo |
-| `GET /api/v1/calculo/tipos`, `POST /api/v1/calculo/{tipo}`, `POST /api/v1/calculo/{tipo}/pdf` | Cálculo direto: `rescisao`, `ferias`, `decimo_terceiro`, `inss`, `irrf`, `fgts`, `folha`, `prolabore`, `gps`, `das_mei`, `darf` |
-| `GET /api/v1/documentos/tipos`, `POST /api/v1/documentos`, `POST /api/v1/documentos/lote` | Tipos aceitos, processar um arquivo, processar até 50 em segundo plano (202) |
-| `POST /api/v1/rpa/fgts`, `POST /api/v1/rpa/pgmei`, `POST /api/v1/rpa/nfe`, `GET /api/v1/rpa/jobs/{id}` | Pedir o extrato do FGTS (CPF), do PGMEI (CNPJ) ou o resumo de uma NF-e, CT-e ou NFC-e (chave de 44 dígitos) (202) e acompanhar o trabalho |
-| `POST /api/v1/rpa/nfe/lote` | Até 20 chaves de uma vez: um trabalho por chave (se uma for inválida, nenhuma entra na fila) |
-| `GET /api/v1/agentes`, `POST /api/v1/agentes/{agente}/{acao}`, `POST /api/v1/agentes/orquestrar` | Catálogo dos agentes, uma ação de um agente, ou um plano com vários passos |
-| `WS /ws/voz` | Canal de voz: o 1º quadro autentica (`{"tipo": "autenticar", "token": ...}`), depois `inicio`, áudio em pedaços e `fim` (ou `texto`); volta `transcricao`, `fala` frase por frase e `fim_resposta` |
-| `POST /api/v1/governanca/decisoes`, `GET …/pendentes`, `GET …/decisoes/{id}`, `POST …/aprovar`, `POST …/rejeitar` | Decisões críticas assinadas e aprovação por limite |
-| `GET /api/v1/lgpd/finalidades`, `POST/GET /api/v1/lgpd/consentimentos`, `DELETE /api/v1/lgpd/titular`, `GET /api/v1/lgpd/retencao`, `POST /api/v1/lgpd/retencao/executar` | Consentimento, exclusão de titular e retenção |
-| `GET /api/v1/auditoria/verificar` | Confere a cadeia HMAC da sua empresa e devolve a âncora para guardar fora do servidor |
-| `GET /health`, `GET /ready`, `GET /metrics` | Saúde, prontidão (espaço em disco e Vault, quando configurado) e métricas Prometheus |
+| `POST /token`, `POST /logout`, `GET /users/me`, `POST /users` | Login (with `codigo_2fa` when the account has two-factor login: without it the answer is 401 with `X-MFA-Required: totp`), logout, current user, create user (admin) |
+| `GET /users/me/2fa`, `POST /users/me/2fa/iniciar`, `POST /users/me/2fa/ativar`, `POST /users/me/2fa/desativar` | Two-factor login: status, QR code, enable with password and code (returns the recovery codes once) and disable |
+| `POST /api/chat`, `GET /api/chat/{sessao}`, `GET /api/chat/{sessao}/pdf` | Chat, history and the PDF of the last calculation |
+| `GET /api/v1/calculo/tipos`, `POST /api/v1/calculo/{tipo}`, `POST /api/v1/calculo/{tipo}/pdf` | Direct calculation: `rescisao`, `ferias`, `decimo_terceiro`, `inss`, `irrf`, `fgts`, `folha`, `prolabore`, `gps`, `das_mei`, `darf` |
+| `GET /api/v1/documentos/tipos`, `POST /api/v1/documentos`, `POST /api/v1/documentos/lote` | Accepted types, process one file, process up to 50 in the background (202) |
+| `POST /api/v1/rpa/fgts`, `POST /api/v1/rpa/pgmei`, `POST /api/v1/rpa/nfe`, `GET /api/v1/rpa/jobs/{id}` | Request the FGTS statement (CPF), the MEI statement (CNPJ) or an NF-e, CT-e or NFC-e summary (44-digit key) (202) and follow the job |
+| `POST /api/v1/rpa/nfe/lote` | Up to 20 keys at once: one job per key (if one is invalid, none is queued) |
+| `GET /api/v1/agentes`, `POST /api/v1/agentes/{agente}/{acao}`, `POST /api/v1/agentes/orquestrar` | Agent catalog, one action of one agent, or a multi-step plan |
+| `WS /ws/voz` | Voice channel: the 1st frame authenticates (`{"tipo": "autenticar", "token": ...}`), then `inicio`, audio chunks and `fim` (or `texto`); it sends back `transcricao`, `fala` sentence by sentence and `fim_resposta` |
+| `POST /api/v1/governanca/decisoes`, `GET …/pendentes`, `GET …/decisoes/{id}`, `POST …/aprovar`, `POST …/rejeitar` | Signed critical decisions and limit-based approval |
+| `GET /api/v1/lgpd/finalidades`, `POST/GET /api/v1/lgpd/consentimentos`, `DELETE /api/v1/lgpd/titular`, `GET /api/v1/lgpd/retencao`, `POST /api/v1/lgpd/retencao/executar` | Consent, data-subject erasure and retention |
+| `GET /api/v1/auditoria/verificar`, `POST /api/v1/auditoria/ancorar` | Checks your company's HMAC chain and the external anchors; publishes the anchor now |
+| `GET /health`, `GET /ready`, `GET /metrics` | Health, readiness (disk space and Vault, when configured) and Prometheus metrics |
 
-Exemplo (cálculo direto):
+Example (direct calculation):
 
 ```bash
 TOKEN=$(curl -s -d "username=maria&password=..." http://127.0.0.1:8000/token | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
@@ -192,221 +229,242 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   http://127.0.0.1:8000/api/v1/calculo/rescisao
 ```
 
-Nesse cenário a resposta traz `total_proventos` 10566.67, `total_descontos` 313.19, `total_liquido` 10253.48,
-multa de FGTS 5052.8 (40% sobre saldo + depósito rescisório) e depósito rescisório 632.0.
+In this scenario the response has `total_proventos` 10566.67, `total_descontos` 313.19, `total_liquido` 10253.48, an
+FGTS penalty of 5052.8 (40% of the balance plus the termination deposit) and a termination deposit of 632.0.
 
-## Documentos
+## Documents
 
-Classificação por assinaturas ponderadas (empate entre tipos reduz a confiança; se nenhum tipo atinge a
-pontuação mínima o resultado diz que não identificou o tipo, em vez de chutar) e extração por tipo. Aceita PDF,
-XML, TXT e CSV de até 25 MB. Os extratores só retêm CPF e CNPJ cujo dígito verificador é válido.
+Classification by weighted signatures (a tie between types lowers the confidence; if no type reaches the minimum score,
+the result says it couldn't identify the type instead of guessing) and per-type extraction. Accepts PDF, XML, TXT and CSV
+up to 25 MB. Extractors only keep CPFs and CNPJs with a valid check digit.
 
-| Categoria | Tipos | O que é conferido além da extração |
+| Category | Types | What is checked beyond extraction |
 |---|---|---|
-| Trabalhista | Holerite, TRCT, contrato de trabalho | Holerite: proventos − descontos = líquido e recálculo de INSS, IRRF (sem dependentes) e FGTS pelo motor. TRCT: verbas × total bruto, bruto − descontos = líquido, datas invertidas. Contrato: salário abaixo do mínimo da admissão, jornada acima de 44 h. |
-| Trabalhista (só extração) | Recibo de férias, ASO, CAGED, RAIS | — |
-| Federal | DARF, DIRF, informe de rendimentos | DARF: principal + multa + juros = total. Informe: IRRF maior que o rendimento, CPF inválido. DIRF: avisa que foi extinta. |
-| Federal (só extração) | DAS, DCTF, DCTFWeb, PER/DCOMP | — |
-| Previdenciário e FGTS | GPS, GRRF, guia do FGTS Digital, extrato do FGTS | GPS: soma dos componentes. GRRF/guia: 8% da base × valor da guia. Extrato: dígito verificador do PIS. |
-| Previdenciário (só extração) | GFIP/SEFIP | — |
-| SPED | ECD, ECF, EFD ICMS/IPI, EFD Contribuições | Estrutura dos registros, CNPJ do 0000, período invertido. |
-| XML | NF-e, eventos do eSocial | NF-e: dígito da chave de acesso, CNPJ e número dentro da chave, vNF = soma dos totais. eSocial: evento reconhecido, CPF e CNPJ válidos. |
-| XML / municipal (só extração) | EFD-Reinf, NFS-e | — |
+| Labor | Payslip, termination statement (TRCT), employment contract | Payslip: earnings − deductions = net pay, and INSS, IRRF (no dependents) and FGTS recomputed by the engine. TRCT: items × gross total, gross − deductions = net, inverted dates. Contract: salary below the minimum wage at hiring, more than 44 hours a week. |
+| Labor (extraction only) | Vacation receipt, ASO, CAGED, RAIS | — |
+| Federal | DARF, DIRF, income statement | DARF: principal + fine + interest = total. Income statement: IRRF above income, invalid CPF. DIRF: warns that it was discontinued. |
+| Federal (extraction only) | DAS, DCTF, DCTFWeb, PER/DCOMP | — |
+| Social security and FGTS | GPS, GRRF, FGTS Digital slip, FGTS statement | GPS: sum of the components. GRRF/slip: 8% of the base × slip amount. Statement: PIS check digit. |
+| Social security (extraction only) | GFIP/SEFIP | — |
+| SPED | ECD, ECF, EFD ICMS/IPI, EFD Contribuições | Record structure, CNPJ in record 0000, inverted period. |
+| XML | NF-e, eSocial events | NF-e: access-key check digit, CNPJ and number inside the key, vNF = sum of the totals. eSocial: recognized event, valid CPF and CNPJ. |
+| XML / municipal (extraction only) | EFD-Reinf, NFS-e | — |
 
-O detector de anomalias (histórico em SQLite, separado por empresa) marca: arquivo já processado, competência
-repetida, competência no futuro ou com mais de 5 anos, valor zerado, valor atípico (só com 5+ observações
-anteriores), INSS acima de 14% e IRRF acima de 27,5% dos proventos. Isso vira alerta no resultado e na
-auditoria; alerta de erro, arquivo duplicado ou valor atípico marcam `requer_revisao`.
+The anomaly detector (SQLite history, separated by company) flags: file already processed, repeated period, a period in
+the future or more than 5 years old, zero amount, atypical amount (only with 5+ previous observations), INSS above 14%
+and IRRF above 27.5% of earnings. These become alerts in the result and in the audit trail; an error alert, a duplicate
+file or an atypical amount set `requer_revisao`.
 
-**Destinos do resultado:** o arquivo (documento original + JSON em
-`DATA_DIR/arquivo/<empresa>/<tipo>/<sha256>`, permissão `0600`) está sempre ligado. Defina
-`DOCUMENTOS_WEBHOOK_URL` e `DOCUMENTOS_WEBHOOK_SECRET` para também enviar cada resultado por POST assinado
-(`X-Signature: sha256=<HMAC-SHA256 do corpo>`, HTTPS obrigatório, com retentativas e disjuntor); ele recebe o
-resultado de **todas** as empresas da instalação, então aponte só para um serviço seu. Uma falha do webhook
-vira alerta e não impede o arquivamento. Também existe `CallbackDestino` (uma função Python), disponível só
-pela API Python ao montar o `DocumentDispatcher`.
+**Result destinations:** the archive (original document + JSON under `DATA_DIR/arquivo/<company>/<type>/<sha256>`,
+permission `0600`) is always on. Set `DOCUMENTOS_WEBHOOK_URL` and `DOCUMENTOS_WEBHOOK_SECRET` to also send each result
+as a signed POST (`X-Signature: sha256=<HMAC-SHA256 of the body>`, HTTPS required, with retries and a circuit breaker);
+it receives the results of **all** companies in the installation, so point it only at a service you own. A webhook
+failure becomes an alert and doesn't block archiving. There is also `CallbackDestino` (a Python function), available
+only through the Python API when building the `DocumentDispatcher`.
 
-## RPA: FGTS, PGMEI e notas fiscais
+## RPA: FGTS, MEI and invoices
 
-Robôs (Playwright) com o mesmo princípio: **a pessoa só resolve o captcha (ou o login); o resto é do robô**, e o
-robô não trava por bobeira.
+Bots (Playwright) built on the same principle: **the person only solves the CAPTCHA (or the login); the bot does the
+rest**, and the bot doesn't get stuck on trivial problems.
 
-- **FGTS** (extrato por CPF) e **PGMEI** (extrato/DAS do MEI por CNPJ, portal público da Receita). O PDF baixado
-  entra no pipeline de documentos.
-- **Notas fiscais** pela chave de 44 dígitos; o modelo gravado na chave escolhe o portal: **NF-e** (portal nacional),
-  **CT-e** (portal nacional do CT-e) e **NFC-e** (SEFAZ-SP por padrão; outra UF por `NFCE_PORTAL_CONFIG`). A pessoa clica
-  no hCaptcha (NF-e e CT-e) ou digita o código da imagem (NFC-e de SP); o robô lê a tela da nota (número, série, emissão,
-  valor, situação, emitente, destinatário, tomador) por rótulos e grava `consulta_<modelo>_<sha>.json`. CPF de pessoa
-  física sai mascarado. Várias chaves de uma vez: pela API (`/api/v1/rpa/nfe/lote`), pelo painel (uma por linha) ou
-  repetindo `--documento` na CLI.
-- Só baixa PDF de verdade (confere a assinatura e o tamanho), calcula o SHA-256 e guarda `0600`. Captcha que vence
-  (ou código digitado errado) volta para a pessoa resolver de novo (até `tentativas_captcha`).
-- Só navega nos hosts permitidos, conferidos de novo depois de cada redirecionamento.
-- O CPF/CNPJ nunca vai em claro para o broker (cifrado com ML-KEM + X25519 + AES-GCM) e na auditoria só entra o hash.
-- Sem captcha solver e sem flags para esconder a automação (um teste confere que não existem no código).
+- **FGTS** (statement by CPF) and **PGMEI** (MEI statement/DAS by CNPJ, the Federal Revenue public portal). The
+  downloaded PDF goes into the document pipeline.
+- **Invoices** by the 44-digit key; the model encoded in the key picks the portal: **NF-e** (national portal), **CT-e**
+  (national CT-e portal) and **NFC-e** (SEFAZ-SP by default; another state via `NFCE_PORTAL_CONFIG`). The person clicks
+  the hCaptcha (NF-e and CT-e) or types the image code (NFC-e in São Paulo); the bot reads the invoice screen (number,
+  series, issue date, amount, status, issuer, recipient, payer) by labels and writes `consulta_<model>_<sha>.json`.
+  Individuals' CPFs are masked. Many keys at once: through the API (`/api/v1/rpa/nfe/lote`), the dashboard (one per line)
+  or by repeating `--documento` on the CLI.
+- It only downloads real PDFs (checks the signature and size), computes the SHA-256 and stores them with `0600`. An
+  expired CAPTCHA (or a mistyped code) goes back to the person (up to `tentativas_captcha`).
+- It only navigates allowed hosts, checked again after every redirect.
+- The CPF/CNPJ never goes to the broker in clear text (encrypted with ML-KEM + X25519 + AES-GCM), and the audit trail
+  only gets its hash.
+- No CAPTCHA solver and no flags to hide the automation (a test checks that they don't exist in the code).
 
-**Quando o site muda ou demora** (para não travar por bobeira):
+**When the site changes or is slow** (so the bot doesn't get stuck):
 
-1. **Espera** o elemento aparecer (`espera_elemento_s`, 15 s): páginas lentas ou que montam a tela por JavaScript.
-2. Procura em **todos os quadros** da página, inclusive `iframe`.
-3. Se o seletor configurado não acha nada, acha **pelo que o elemento é**: rótulo, placeholder, nome/id, texto do
-   botão ou do link (`rotulo_campo`, `rotulo_envio`, `rotulo_download`). Anota na trilha o passo `seletor_alternativo`
-   com o seletor que você deve pôr na configuração.
-4. Se ainda assim não achar, **pede ajuda na própria janela** em vez de abortar: aparece um aviso amarelo com o botão
-   "Terminei esta etapa". A pessoa faz o passo (ou clica no link do PDF, que o robô pega) e o robô continua dali
-   (`ajuda_humana`, ligado por padrão). Em todos os casos ele salva um `diagnostico_<etapa>_<hora>.json` com a
-   estrutura da página (botões, campos, links; números e e-mails mascarados), sem nada digitado.
-5. Se o portal **reprova o navegador automatizado** (ex.: "Comportamento de Robô"), ele falha na hora, com
-   mensagem clara e **sem nova tentativa** (insistir só piora): baixe o PDF no seu navegador normal. Com o
-   `observar-pasta` ligado ele entra sozinho no sistema (veja abaixo); no painel, o botão "Enviar o PDF que baixei" faz o
-   mesmo na hora.
+1. It **waits** for the element (`espera_elemento_s`, 15 s): slow pages or pages built by JavaScript.
+2. It searches **every frame** of the page, including `iframe`s.
+3. If the configured selector finds nothing, it finds the element **by what it is**: label, placeholder, name/id, button
+   or link text (`rotulo_campo`, `rotulo_envio`, `rotulo_download`). It logs a `seletor_alternativo` step with the selector
+   you should put in the configuration.
+4. If it still can't find it, it **asks for help in the browser window** instead of aborting: a yellow notice appears
+   with a "Terminei esta etapa" ("I finished this step") button. The person does the step (or clicks the PDF link, which
+   the bot captures) and the bot continues from there (`ajuda_humana`, on by default). In every case it saves a
+   `diagnostico_<step>_<time>.json` with the page structure (buttons, fields, links; numbers and e-mails masked), with
+   nothing that was typed.
+5. If the portal **rejects the automated browser** (e.g., "Comportamento de Robô"), it fails right away, with a clear
+   message and **no retry** (insisting only makes it worse): download the PDF in your regular browser. With
+   `observar-pasta` on, it enters the system by itself (see below); on the dashboard, the "Enviar o PDF que baixei" button
+   does the same right away.
 
-Como rodar, direto da linha de comando (abre a janela; você resolve o captcha e só):
+How to run it from the command line (it opens the window; you solve the CAPTCHA and that's it):
 
 ```bash
 python -m agente_v2.cli baixar-extrato --portal pgmei --documento 11.222.333/0001-81 --ano 2026 --canal msedge
 python -m agente_v2.cli baixar-extrato --portal fgts  --documento 529.982.247-25 --canal msedge
-python -m agente_v2.cli baixar-extrato --portal nfe   --documento <chave 1> --documento <chave 2> --canal msedge
+python -m agente_v2.cli baixar-extrato --portal nfe   --documento <key 1> --documento <key 2> --canal msedge
 ```
 
-Ou pela API (fila `rpa`, com a pessoa na máquina do worker):
+Or through the API (`rpa` queue, with the person at the worker machine):
 
 ```bash
-python -m agente_v2.cli gerar-chaves-rpa --saida ./chaves   # coloque RPA_PQC_PUBLIC_KEY na API e RPA_PQC_PRIVATE_KEY no worker
-playwright install chromium                                  # ou use FGTS_BROWSER_CHANNEL=msedge|chrome
+python -m agente_v2.cli gerar-chaves-rpa --saida ./chaves   # put RPA_PQC_PUBLIC_KEY on the API and RPA_PQC_PRIVATE_KEY on the worker
+playwright install chromium                                  # or use FGTS_BROWSER_CHANNEL=msedge|chrome
 celery -A contabil_agente.tarefas worker -Q rpa --pool=solo --loglevel=info
 ```
 
-O worker `rpa` precisa rodar **em uma máquina com tela** (a pessoa resolve o captcha na janela) e enxergar o
-mesmo `DATA_DIR` e os mesmos segredos da API (status das tarefas, auditoria e LGPD ficam em arquivos ali). O
-caminho mais simples é rodar API e worker no mesmo computador. Ele **não** está no `docker-compose.yml`, de
-propósito. Configuração: `FGTS_CAIXA_URL`, `FGTS_PORTAL_CONFIG`, `FGTS_BROWSER_CHANNEL`, `FGTS_BROWSER_USER_DATA_DIR`
-(e `PGMEI_PORTAL_CONFIG`, `PGMEI_BROWSER_CHANNEL`, `PGMEI_BROWSER_USER_DATA_DIR`; e os mesmos três com os prefixos `NFE_`, `CTE_` e `NFCE_`); o YAML aceita seletores,
-rótulos, tempos, `ajuda_humana` e `capturar_tela_na_falha` (a captura de tela pode mostrar dados pessoais, por
-isso vem desligada).
+The `rpa` worker must run **on a machine with a screen** (the person solves the CAPTCHA in the window) and see the same
+`DATA_DIR` and the same secrets as the API (job status, audit and LGPD live in files there). The simplest setup is API
+and worker on the same computer. It is **not** in `docker-compose.yml`, on purpose. Configuration: `FGTS_CAIXA_URL`,
+`FGTS_PORTAL_CONFIG`, `FGTS_BROWSER_CHANNEL`, `FGTS_BROWSER_USER_DATA_DIR` (and `PGMEI_PORTAL_CONFIG`,
+`PGMEI_BROWSER_CHANNEL`, `PGMEI_BROWSER_USER_DATA_DIR`; and the same three with the `NFE_`, `CTE_` and `NFCE_` prefixes);
+the YAML accepts selectors, labels, timings, `ajuda_humana` and `capturar_tela_na_falha` (a screenshot may show personal
+data, so it is off by default).
 
-**Nos portais reais (testado em 2026-10-17):** o PGMEI e a Caixa recusam navegador controlado por automação (o PGMEI
-responde "13896 - Impedido por proteção Captcha. Comportamento de Robô"). Nesse caso o robô avisa, e você baixa o PDF no
-navegador normal e envia por `POST /api/v1/documentos` (ou deixa o `observar-pasta` enviar), que classifica, extrai,
-confere e arquiva. Nas consultas de NF-e, CT-e e NFC-e de SP (conferidas em 2026-10-19), o robô acha nas telas reais o
-campo da chave, o botão e o captcha (caixa de seleção do hCaptcha na NF-e e no CT-e, código de imagem na NFC-e). Os robôs
-foram testados de ponta a ponta contra portais falsos com a mesma estrutura, que reproduzem mudança de layout, demora,
-`iframe`, captcha vencido, código errado e bloqueio.
+**On the real portals (tested on 2026-10-17):** PGMEI and Caixa reject browsers controlled by automation (PGMEI answers
+"13896 - Impedido por proteção Captcha. Comportamento de Robô"). In that case the bot says so, and you download the PDF in
+your regular browser and send it through `POST /api/v1/documentos` (or let `observar-pasta` send it), which classifies,
+extracts, checks and archives it. For the NF-e, CT-e and São Paulo NFC-e lookups (checked on 2026-10-19), the bot finds
+the key field, the button and the CAPTCHA on the real screens (an hCaptcha checkbox on NF-e and CT-e, an image code on
+NFC-e). The bots were tested end to end against fake portals with the same structure, which reproduce layout changes,
+slowness, `iframe`s, expired CAPTCHAs, wrong codes and blocking.
 
-### PDF baixado no navegador normal entra sozinho (`observar-pasta`)
-
-```bash
-python -m agente_v2.cli observar-pasta --usuario maria        # olha a pasta Downloads; a senha vem de AGENTE_SENHA ou é perguntada
-```
-
-Você baixa o extrato do FGTS ou o DAS no seu navegador de sempre e o observador envia cada PDF novo a
-`POST /api/v1/documentos` assim que ele termina de ser gravado. Só PDF de verdade (até 25 MB); o mesmo conteúdo nunca
-vai duas vezes (SHA-256 guardado na pasta); falha de rede tenta de novo, recusa da API não. Ele não toca no navegador nem
-no portal.
-
-### XML completo da NF-e pelo certificado digital (`baixar-xml-nfe`)
+### A PDF downloaded in your regular browser enters by itself (`observar-pasta`)
 
 ```bash
-python -m agente_v2.cli baixar-xml-nfe --pfx empresa.pfx --uf SP --chave <chave> --usuario maria   # senha do .pfx em CERTIFICADO_SENHA
+python -m agente_v2.cli observar-pasta --usuario maria        # watches the Downloads folder; the password comes from AGENTE_SENHA or is prompted
 ```
 
-Usa o web service oficial **NFeDistribuicaoDFe** do Ambiente Nacional (sem navegador e sem captcha), com o certificado
-A1 da empresa na conexão (mTLS). O CNPJ sai do próprio certificado (campo da ICP-Brasil). Grava `nfe_<chave>.xml` e, com
-`--usuario`, já envia ao pipeline, que o lê como `NFE_XML` e confere chave, CNPJ, número e total. A SEFAZ só entrega notas
-em que a empresa aparece; quando ela manda só o resumo, o comando diz para registrar a "Ciência da Operação" e consultar
-de novo; consumo indevido (656) e nota inexistente (137) também vêm com o motivo. A chave privada do certificado nunca vai
-em claro para o disco. Os endereços de produção e homologação foram conferidos em 2026-10-19 (TLS válido, 403 sem
-certificado); o fluxo completo foi testado com mTLS de verdade contra uma SEFAZ falsa com o formato do `retDistDFeInt`.
+You download the FGTS statement or the DAS in your usual browser and the watcher sends each new PDF to
+`POST /api/v1/documentos` as soon as it finishes writing. Only real PDFs (up to 25 MB); the same content never goes
+twice (SHA-256 kept in the folder); a network failure retries, an API rejection doesn't. It doesn't touch the browser or
+the portal.
 
-## Segurança e LGPD
-
-- **Tenant isolado:** cada consulta carrega o `tenant_id` do token; acessar dado de outra empresa dá 404/403
-  (testado contra IDOR).
-- **Sem segredo no código:** um teste varre os arquivos versionados atrás de chaves e dados de execução.
-- **Cabeçalhos:** CSP restritiva, `X-Content-Type-Options`, `Referrer-Policy`, CORS por lista (`ALLOWED_ORIGINS`),
-  HSTS com `HTTPS_ONLY=1`, limite de tamanho do corpo JSON.
-- **Gateway:** nginx com TLS (443) e mTLS obrigatório na 8443 (`ssl_verify_client on`); identidade enviada pelo
-  cliente nunca é repassada; `/metrics` não é exposto na porta pública.
-- **Auditoria verificável:** `python -m agente_v2.cli verificar-auditoria` ou `GET /api/v1/auditoria/verificar`.
-  Guarde a âncora devolvida fora do servidor para detectar quem apague o fim da cadeia.
-- **LGPD:** finalidades e bases legais em `contabil_agente/lgpd/`; retenção em `RETENCAO_CONFIG`; exclusão de
-  titular preserva o que a lei manda guardar.
-
-## Docker, gateway e Vault
+### Full NF-e XML with the digital certificate (`baixar-xml-nfe`)
 
 ```bash
-cp .env.example .env                                  # preencha os segredos: o compose se recusa a subir sem eles
-docker compose up --build                             # API (8000), worker de documentos e Redis com senha
-docker compose --profile gateway up --build           # + nginx: https://localhost e mTLS em :8443 (certificados em ./certs)
-docker compose --profile dev up --build               # + Vault em modo dev (nunca em produção)
-docker compose --profile observabilidade up -d        # + Prometheus (9090), Alertmanager (9093) e Grafana (3000), só em 127.0.0.1
+python -m agente_v2.cli baixar-xml-nfe --pfx empresa.pfx --uf SP --chave <key> --usuario maria   # .pfx password in CERTIFICADO_SENHA
 ```
 
-Para o perfil `observabilidade`, defina `GRAFANA_ADMIN_PASSWORD` no `.env` (o Grafana se recusa a subir sem ela) e, se quiser receber os alertas fora da tela do Alertmanager, `ALERTA_WEBHOOK_URL` (só HTTPS).
+It uses the official **NFeDistribuicaoDFe** web service of the National Environment (no browser, no CAPTCHA), with the
+company's A1 certificate on the connection (mTLS). The CNPJ comes from the certificate itself (ICP-Brasil field). It
+writes `nfe_<key>.xml` and, with `--usuario`, sends it straight to the pipeline, which reads it as `NFE_XML` and checks
+the key, CNPJ, number and total. The tax authority only delivers invoices where the company appears; when it sends only
+the summary, the command says to register the "Ciência da Operação" (acknowledgment) and query again; improper use (656)
+and a missing invoice (137) also come with the reason. The certificate's private key never goes to disk in clear text.
+The production and staging endpoints were checked on 2026-10-19 (valid TLS, 403 without a certificate); the full flow was
+tested with real mTLS against a fake tax authority that uses the `retDistDFeInt` format.
 
-Para gerar certificados de desenvolvimento (CA própria, servidor e cliente, válidos por 7 dias):
-`python -c "from agente_v2.mtls import emitir_certificados_dev as e; e('certs')"`. Em produção use certificados
-da sua autoridade. Há também uma unidade systemd
-de exemplo em `deploy/maria-helena.service`.
+## Security and LGPD
 
-## Estrutura do projeto
+- **Isolated tenants:** every query carries the `tenant_id` from the token; accessing another company's data gives
+  404/403 (tested against IDOR).
+- **Two-factor login:** on the dashboard, "Ativar" shows the QR code (generated on the server; the page loads nothing from
+  outside); the user confirms with the password and an app code and gets 10 recovery codes. From then on, login asks for
+  the code. `MFA_ENCRYPTION_KEY` sets a dedicated key for the secret in the database (without it, the key is derived from
+  `JWT_SECRET` with HKDF).
+- **Prompt injection:** a message that tries to change the rules or get the prompt gets a system reminder; tool output
+  goes through `blindar` (invisible text is removed, a suspicious passage becomes a notice); a response that repeats the
+  rules or the conversation's canary code is replaced with a refusal; and a document with a hidden instruction is handled
+  by rules only, without AI, with the `instrucao_para_ia` alert. The audit trail keeps the origin and the reasons of each
+  case, never the text.
+- **No secrets in the code:** a test scans the versioned files for keys and runtime data, and CI runs `gitleaks` on the
+  files and on new commits.
+- **CI scans:** `pip-audit` (dependencies), `bandit` (code), `gitleaks` (secrets) and `trivy` (Docker image
+  vulnerabilities, HIGH and CRITICAL with a fix available). Every finding becomes an annotation on the run.
+- **Headers:** strict CSP, `X-Content-Type-Options`, `Referrer-Policy`, CORS by allowlist (`ALLOWED_ORIGINS`), HSTS with
+  `HTTPS_ONLY=1`, a JSON body size limit.
+- **Gateway:** nginx with TLS (443) and mandatory mTLS on 8443 (`ssl_verify_client on`); identity sent by the client is
+  never forwarded; `/metrics` is not exposed on the public port.
+- **Verifiable, anchored audit:** `python -m agente_v2.cli verificar-auditoria` or `GET /api/v1/auditoria/verificar` check
+  the chain. `python -m agente_v2.cli ancorar-auditoria` (schedule it hourly) publishes each trail's head to
+  `AUDIT_ANCHOR_DIR` (a folder on another volume) and/or `AUDIT_ANCHOR_URL` (an HTTPS service); `conferir-ancoras` and the
+  verification route catch a chain rebuilt with the key and an old backup restored, which the chain alone can't detect.
+- **LGPD:** purposes and legal bases in `contabil_agente/lgpd/`; retention in `RETENCAO_CONFIG`; data-subject erasure
+  keeps what the law requires to be retained.
+
+## Docker, gateway and Vault
+
+```bash
+cp .env.example .env                                  # fill in the secrets: compose refuses to start without them
+docker compose up --build                             # API (8000), document worker and password-protected Redis
+docker compose --profile gateway up --build           # + nginx: https://localhost and mTLS on :8443 (certificates in ./certs)
+docker compose --profile dev up --build               # + Vault in dev mode (never in production)
+docker compose --profile observabilidade up -d        # + Prometheus (9090), Alertmanager (9093) and Grafana (3000), on 127.0.0.1 only
+```
+
+For the `observabilidade` profile, set `GRAFANA_ADMIN_PASSWORD` in `.env` (Grafana refuses to start without it) and, if
+you want alerts outside the Alertmanager screen, `ALERTA_WEBHOOK_URL` (HTTPS only).
+
+To generate development certificates (your own CA, server and client, valid for 7 days):
+`python -c "from agente_v2.mtls import emitir_certificados_dev as e; e('certs')"`. In production use certificates from
+your own authority. There is also a sample systemd unit in `deploy/maria-helena.service`.
+
+## Project structure
 
 ```
-agente_v2/                  API e infraestrutura de execução
-├── main.py                 aplicação FastAPI (create_app) e rotas
-├── auth.py, config.py      autenticação (reexport) e configuração por ambiente
-├── vault_client.py         Vault (token/AppRole) e carga de segredos
-├── mtls.py, signing.py     certificados mTLS e assinatura XML-DSig
-├── rotas_agentes.py        API dos agentes e do orquestrador
-├── rotas_voz.py            canal de voz (WebSocket)
-├── observador.py           pasta observada: PDF baixado no navegador normal entra no sistema
+agente_v2/                  API and runtime infrastructure
+├── main.py                 FastAPI application (create_app) and routes
+├── auth.py, config.py      authentication (re-export) and environment configuration
+├── vault_client.py         Vault (token/AppRole) and secret loading
+├── mtls.py, signing.py     mTLS certificates and XML-DSig signing
+├── rotas_agentes.py        agents and orchestrator API
+├── rotas_voz.py            voice channel (WebSocket)
+├── observador.py           watched folder: a PDF downloaded in the regular browser enters the system
 ├── cli.py, logging_setup.py
 ├── web/                    interface (index.html, app.css, app.js)
-└── tests/                  API, Vault, mTLS, assinatura e front-end (navegador real)
+└── tests/                  API, Vault, mTLS, signing and front end (real browser)
 
-contabil_agente/            domínio e serviços
-├── calc/                   motor de cálculo (Decimal) e tabelas YAML
-├── chat/                   motor da conversa, LLM com ferramentas, marcadores de dados pessoais, armazenamento
-├── intelligence/           diálogo de cálculo, extração, auditoria forense, FSM
-├── documentos/             leitura, 27 tipos, validadores, PDF
-├── pipeline/               dispatcher, agentes, anomalias, evidência, destinos
-├── agentes/                TaxAgent, ValidationAgent, ReconciliationAgent, ComplianceAgent, RPAAgent e o orquestrador
-├── voz/                    Whisper (fala para texto)
-├── rpa/                    robôs do FGTS, do PGMEI e das notas fiscais (NF-e, CT-e, NFC-e), pausa humana, calibragem
-├── sefaz/                  web service oficial NFeDistribuicaoDFe (XML da NF-e com certificado A1)
-├── tarefas/                Celery (filas documentos e rpa)
-├── security/               auth, RBAC, auditoria WORM, PQC, Vault, criptografia
-├── lgpd/                   base legal, consentimento, retenção, anonimização
-├── middleware/             autenticação, cabeçalhos, limite de uso, métricas
+contabil_agente/            domain and services
+├── calc/                   calculation engine (Decimal) and YAML tables
+├── chat/                   chat engine, LLM with tools, personal-data placeholders, storage
+├── intelligence/           calculation dialog, extraction, forensic audit, FSM
+├── documentos/             reading, 27 types, validators, PDF
+├── pipeline/               dispatcher, agents, anomalies, evidence, destinations
+├── agentes/                TaxAgent, ValidationAgent, ReconciliationAgent, ComplianceAgent, RPAAgent and the orchestrator
+├── voz/                    Whisper (speech to text)
+├── rpa/                    FGTS, MEI and invoice bots (NF-e, CT-e, NFC-e), human pause, calibration
+├── sefaz/                  official NFeDistribuicaoDFe web service (NF-e XML with the A1 certificate)
+├── tarefas/                Celery (documents and rpa queues)
+├── security/               auth, two-factor (TOTP), RBAC, WORM audit and external anchor, prompt injection, PQC, Vault
+├── lgpd/                   legal basis, consent, retention, anonymization
+├── middleware/             authentication, headers, rate limit, metrics
 ├── resilience/             circuit breaker, retry, timeouts, readiness
-├── governance/ governance_manager.py   decisões assinadas e aprovação
+├── governance/ governance_manager.py   signed decisions and approval
 ├── core/, config/, tools/, models/, utils/, orchestrator/
-└── tests/                  testes de cálculo, pipeline, RPA, LGPD, infraestrutura…
+└── tests/                  calculation, pipeline, RPA, LGPD, infrastructure tests…
 
-rules/compliance_rules.yaml regras de conformidade
-observabilidade/           Prometheus, alertas, Alertmanager e painel do Grafana
+rules/compliance_rules.yaml compliance rules
+observabilidade/           Prometheus, alerts, Alertmanager and the Grafana dashboard
 Dockerfile, docker-compose.yml, nginx/, deploy/, .github/workflows/ci.yml
 ```
 
-## Testes
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
-playwright install chromium            # os testes do RPA e do front-end usam um navegador de verdade
+playwright install chromium            # the RPA and front-end tests use a real browser
 pytest
 flake8 agente_v2 contabil_agente --select=E9,F63,F7,F82,F401,F811,F841,F541
 ```
 
-A suíte cobre o motor de cálculo (inclusive cenários conferidos à mão), a API e o isolamento entre empresas, o
-robô contra um portal falso local, o front-end em navegador real, a cadeia de auditoria (adulteração e
-truncamento), LGPD, governança, criptografia e a consistência da infraestrutura. A criptografia pós-quântica
-(ML-KEM-768 e ML-DSA-65, do pacote `cryptography`) é conferida a cada execução contra duas implementações
-independentes (`kyber-py` e `dilithium-py`, só nos testes). Os testes de IA ao vivo
-(`contabil_agente/tests/test_ia_ao_vivo.py`) rodam quando há chave em `.env.teste` (verificados com a Groq). O CI (`.github/workflows/ci.yml`) roda lint, testes,
-`pip-audit`, a construção da imagem e a **pilha completa** do `docker-compose.yml` (API, worker, Redis com senha
-e nginx): confere o `/health` pelo TLS, o `/metrics` fechado na porta pública, a porta 8443 recusando quem não
-tem certificado de cliente (mTLS), o login com uma rota protegida e o worker falando com o Redis. Outro job sobe a observabilidade: o Prometheus enxerga a API e carrega as 7 regras sem erro, uma métrica real aparece depois de usar a API, o Grafana abre com o painel e a fonte de dados (e exige login), e um alerta de verdade (derrubar a API) chega ao Alertmanager.
+The suite (1,000+ tests) covers the calculation engine (including hand-checked scenarios), the API and the isolation
+between companies, the bot against a local fake portal, the front end in a real browser, the audit chain (tampering,
+truncation and, with the anchor, a chain rebuilt with the key and a restored backup), two-factor login (RFC 4226 and
+6238 vectors), the known prompt-injection attacks (and the normal texts that must not raise false alarms), LGPD,
+governance, cryptography and infrastructure consistency. The post-quantum cryptography (ML-KEM-768 and ML-DSA-65, from
+the `cryptography` package) is checked on every run against two independent implementations (`kyber-py` and
+`dilithium-py`, tests only). The live AI tests (`contabil_agente/tests/test_ia_ao_vivo.py`) run when there is a key in
+`.env.teste` (verified with Groq, including the prompt-injection attempt against the real model). CI
+(`.github/workflows/ci.yml`) runs lint, tests, `pip-audit`, `bandit`, `gitleaks`, the image build with `trivy` and the
+**full stack** from `docker-compose.yml` (API, worker, password-protected Redis and nginx): it checks `/health` over TLS,
+`/metrics` closed on the public port, port 8443 refusing clients without a certificate (mTLS), login with a protected
+route and the worker talking to Redis. Another job brings up observability: Prometheus sees the API and loads the 8 rules
+without errors, a real metric shows up after using the API, Grafana opens with the dashboard and the data source (and
+requires login), and a real alert (taking the API down) reaches Alertmanager.
 
-## Licença
+## License
 
 [MIT](LICENSE)
