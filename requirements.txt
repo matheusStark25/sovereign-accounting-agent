@@ -17,7 +17,7 @@ bcrypt>=4.1
 cryptography>=50.0      # inclui ML-KEM-768 e ML-DSA-65 (FIPS 203/204)
 hvac>=2.1
 signxml>=4.0
-certifi>=2024.2         # cadeia de confiança para o TLS dos web services da SEFAZ (mTLS com o certificado A1)
+certifi>=2026.10.18     # cadeia de confiança para o TLS dos web services da SEFAZ (mTLS com o certificado A1); PYSEC-2026-4320
 lxml>=5.0
 defusedxml>=0.7
 portalocker>=2.8
@@ -28,10 +28,11 @@ groq>=0.9
 
 # --- Documentos ---
 reportlab>=4.0
-pypdf>=4.0
+pypdf>=6.21.4           # as versões anteriores têm CVEs de 2026 corrigidas até a 6.21.4
 
 # --- Tarefas em segundo plano ---
 celery>=5.3
+kombu>=5.6,<5.7         # o kombu 5.7.0 (03/11/2026) importa "packaging" sem declarar: o worker do celery 5.6 não sobe
 redis>=5.0
 
 # --- RPA do FGTS. Depois de instalar:  playwright install chromium ---
