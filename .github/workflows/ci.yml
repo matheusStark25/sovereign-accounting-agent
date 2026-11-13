@@ -214,7 +214,13 @@ jobs:
             [ "$v" = 1 ] && ok=1 && break; sleep 3
           done
           [ "$ok" = 1 ] || { docker compose logs prometheus api; exit 1; }
-          curl -fsS http://127.0.0.1:9090/api/v1/rules | python -c "import sys,json; regras=[x for g in json.load(sys.stdin)['data']['groups'] for x in g['rules']]; assert len(regras) >= 6 and all(x['health'] == 'ok' for x in regras), regras; print(len(regras), 'regras ok')"
+          # a regra só fica "ok" depois da primeira avaliação (evaluation_interval: 15s); antes ela aparece "unknown".
+          # Espera até 60 s: regra com erro de verdade continua reprovando, e a última tentativa mostra qual.
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:9090/api/v1/rules | python -c "import sys,json; regras=[x for g in json.load(sys.stdin)['data']['groups'] for x in g['rules']]; assert len(regras) >= 6 and all(x['health'] == 'ok' for x in regras), [(x['name'], x['health'], x.get('lastError')) for x in regras]; print(len(regras), 'regras ok')" && exit 0
+            sleep 3
+          done
+          exit 1
       - name: Métrica de verdade aparece depois de usar a API
         run: |
           set -a; . ./.env; set +a
