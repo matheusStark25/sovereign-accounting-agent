@@ -15,6 +15,7 @@
     python -m agente_v2.cli baixar-extrato --portal fgts --documento 529.982.247-25 --canal msedge
     python -m agente_v2.cli observar-pasta --usuario maria            # o PDF baixado no navegador normal entra sozinho
     python -m agente_v2.cli baixar-xml-nfe --pfx empresa.pfx --uf SP --chave <chave> --usuario maria   # XML pelo web service oficial
+    python -m agente_v2.cli servidor-mcp                             # as ferramentas para Claude Desktop, Cursor e outros clientes MCP
 """
 
 from __future__ import annotations
@@ -318,6 +319,15 @@ def observar_pasta(args: argparse.Namespace) -> int:
         return 0
 
 
+def servidor_mcp(args: argparse.Namespace) -> int:
+    import logging
+
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr)  # a saída padrão é do protocolo: log só no stderr
+    from contabil_agente.chat.mcp_servidor import servir
+
+    return servir()
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agente_v2.cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -385,6 +395,8 @@ def main(argv=None) -> int:
     o.add_argument("--incluir-existentes", action="store_true", help="envia também os PDFs que já estavam na pasta")
     o.add_argument("--uma-vez", action="store_true", help="olha a pasta, envia o que estiver pronto e sai")
     o.set_defaults(func=observar_pasta)
+    mc = sub.add_parser("servidor-mcp", help="servidor MCP (stdio) com as ferramentas de cálculo e validação, para assistentes de IA compatíveis")
+    mc.set_defaults(func=servidor_mcp)
     args = p.parse_args(argv)
     return args.func(args)
 

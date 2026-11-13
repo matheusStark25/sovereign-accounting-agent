@@ -73,6 +73,8 @@ tool she used.*
   (Prometheus, Alertmanager and Grafana).
 - **Real domain:** Brazilian labor and tax rules, 27 document types and government-portal bots where a person solves the
   CAPTCHA (never bypassed).
+- **MCP server:** the same tools are served over the Model Context Protocol (`python -m agente_v2.cli servidor-mcp`), so
+  Claude Desktop, Cursor or any MCP client can call the calculation engine, with the chat's output shielding and placeholders.
 
 ---
 
@@ -83,6 +85,7 @@ tool she used.*
 - [What is actually implemented](#what-is-actually-implemented)
 - [Getting started](#getting-started)
 - [API](#api)
+- [MCP server](#mcp-server)
 - [Documents](#documents)
 - [RPA: FGTS, MEI and invoices](#rpa-fgts-mei-and-invoices)
 - [Security and LGPD](#security-and-lgpd)
@@ -157,7 +160,7 @@ graph LR
 | **Voice** | Browser microphone → WebSocket `/ws/voz` (audio in chunks) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → answer sentence by sentence, read aloud by the browser voice (Web Speech API). Requires the external-AI consent (the audio goes to a third party). Maria Helena adapts her tone (formal, informal or neutral) to how the person writes or speaks and uses the same tools as the text chat (the MARCOS persona is still available with `AGENTE_PERSONA=MARCOS`). |
 | **Observability** | Prometheus metrics at `/metrics`; a log filter that masks CPF, CNPJ, e-mail, phone and labeled names; and, in the `observabilidade` compose profile, Prometheus, Alertmanager (8 alerts: API down, 5xx errors, latency, audit-trail failure, prompt-injection attempt, rejected logins, calculation errors, voice failures) and Grafana with the "Sovereign Accounting Agent" dashboard. |
 | **Web interface** | An accounting-office identity (ledger paper, "MH" seal, dotted statements with a double-underlined total, a check stamp on documents, dark theme). Login, chat with shortcuts, document upload, microphone and read-aloud answers, and a dashboard (FGTS, MEI and invoice bots, with one or many invoice keys and each invoice summary on screen; pending approvals, AI consent, audit-trail and anchor verification, two-factor setup with a QR code). Works on phones. |
-| **CLI** | `python -m agente_v2.cli` creates users, resets two-factor login for someone who lost their phone (`desativar-2fa`), generates secrets, RPA and ML-DSA keys, verifies the audit trail, publishes and checks the external anchors (`ancorar-auditoria`, `conferir-ancoras`), really tests the AI keys and models (`verificar-ia`), records portal calibration (`calibrar-fgts`), downloads FGTS and MEI statements and looks up NF-e, CT-e and NFC-e with the person solving only the CAPTCHA (`baixar-extrato`), uploads by itself the PDF you downloaded in your regular browser (`observar-pasta`) and downloads the NF-e XML with the A1 certificate (`baixar-xml-nfe`). |
+| **CLI** | `python -m agente_v2.cli` creates users, resets two-factor login for someone who lost their phone (`desativar-2fa`), generates secrets, RPA and ML-DSA keys, verifies the audit trail, publishes and checks the external anchors (`ancorar-auditoria`, `conferir-ancoras`), really tests the AI keys and models (`verificar-ia`), records portal calibration (`calibrar-fgts`), downloads FGTS and MEI statements and looks up NF-e, CT-e and NFC-e with the person solving only the CAPTCHA (`baixar-extrato`), uploads by itself the PDF you downloaded in your regular browser (`observar-pasta`), downloads the NF-e XML with the A1 certificate (`baixar-xml-nfe`) and serves the tools to MCP clients (`servidor-mcp`, see [MCP server](#mcp-server)). |
 
 ## Getting started
 
@@ -231,6 +234,44 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 
 In this scenario the response has `total_proventos` 10566.67, `total_descontos` 313.19, `total_liquido` 10253.48, an
 FGTS penalty of 5052.8 (40% of the balance plus the termination deposit) and a termination deposit of 632.0.
+
+## MCP server
+
+The chat's tools are also available to any assistant that speaks the [Model Context Protocol](https://modelcontextprotocol.io)
+(Claude Desktop, Claude Code, Cursor and others). The model picks the tool and fills in the arguments; the system's code
+does the work:
+
+| Tool | What it does |
+|---|---|
+| `calcular` | Termination pay, vacation pay, 13th salary, INSS, IRRF, FGTS, payroll, owner's salary, GPS, the MEI DAS and late DARF, with the official tables |
+| `tabela_vigente` | The INSS or IRRF table in force for a period, with its legal source |
+| `validar_identificadores` | Check digits of CPF, CNPJ, PIS and the 44-digit access key |
+| `conciliar_fechamento` | Payslips against the FGTS slip, the GPS and the IRRF DARF, with the difference in reais |
+| `verificar_conformidade` | A payment checked against the compliance rules (minimum wage, CPF, period…) |
+
+```bash
+python -m agente_v2.cli servidor-mcp
+```
+
+It runs locally over stdio (JSON-RPC 2.0, protocol versions 2024-11-05 to 2025-06-18) and needs no SDK, so the Docker
+image and the audited dependencies stay the same. In Claude Desktop, add it to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "sovereign": {
+      "command": "python",
+      "args": ["-m", "agente_v2.cli", "servidor-mcp"],
+      "env": {"PYTHONPATH": "/path/to/sovereign-accounting-agent"}
+    }
+  }
+}
+```
+
+The chat's protections apply here too: every tool result goes through the prompt-injection shield, CPF, CNPJ, PIS and
+access keys come back as placeholders (`[CPF_1]`), and nothing is saved (no database, no history). `documentos_recentes`
+is left out because it needs a company's document history, which lives behind the API's login. The tests
+(`contabil_agente/tests/test_mcp_servidor.py`) cover the protocol, these protections and the real process over stdio.
 
 ## Documents
 
@@ -419,7 +460,7 @@ agente_v2/                  API and runtime infrastructure
 
 contabil_agente/            domain and services
 ├── calc/                   calculation engine (Decimal) and YAML tables
-├── chat/                   chat engine, LLM with tools, personal-data placeholders, storage
+├── chat/                   chat engine, LLM with tools, personal-data placeholders, storage, MCP server
 ├── intelligence/           calculation dialog, extraction, forensic audit, FSM
 ├── documentos/             reading, 27 types, validators, PDF
 ├── pipeline/               dispatcher, agents, anomalies, evidence, destinations
@@ -453,8 +494,9 @@ flake8 agente_v2 contabil_agente --select=E9,F63,F7,F82,F401,F811,F841,F541
 The suite (1,000+ tests) covers the calculation engine (including hand-checked scenarios), the API and the isolation
 between companies, the bot against a local fake portal, the front end in a real browser, the audit chain (tampering,
 truncation and, with the anchor, a chain rebuilt with the key and a restored backup), two-factor login (RFC 4226 and
-6238 vectors), the known prompt-injection attacks (and the normal texts that must not raise false alarms), LGPD,
-governance, cryptography and infrastructure consistency. The post-quantum cryptography (ML-KEM-768 and ML-DSA-65, from
+6238 vectors), the known prompt-injection attacks (and the normal texts that must not raise false alarms), the MCP
+server (protocol, output shielding, placeholders and the real process over stdio), LGPD, governance, cryptography and
+infrastructure consistency. The post-quantum cryptography (ML-KEM-768 and ML-DSA-65, from
 the `cryptography` package) is checked on every run against two independent implementations (`kyber-py` and
 `dilithium-py`, tests only). The live AI tests (`contabil_agente/tests/test_ia_ao_vivo.py`) run when there is a key in
 `.env.teste` (verified with Groq, including the prompt-injection attempt against the real model). CI

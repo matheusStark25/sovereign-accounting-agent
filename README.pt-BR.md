@@ -67,6 +67,8 @@ consulta os documentos da empresa e explica a divergência do INSS em reais, com
   ponta a ponta (Prometheus, Alertmanager e Grafana).
 - **Domínio real:** regras trabalhistas e fiscais brasileiras, 27 tipos de documento e robôs de portais em que a pessoa
   resolve o captcha (nunca burlado).
+- **Servidor MCP:** as mesmas ferramentas saem pelo Model Context Protocol (`python -m agente_v2.cli servidor-mcp`), e o
+  Claude Desktop, o Cursor ou qualquer cliente MCP chama o motor de cálculo, com a blindagem e os marcadores do chat.
 
 ---
 
@@ -77,6 +79,7 @@ consulta os documentos da empresa e explica a divergência do INSS em reais, com
 - [O que existe de verdade](#o-que-existe-de-verdade)
 - [Começando](#começando)
 - [API](#api)
+- [Servidor MCP](#servidor-mcp)
 - [Documentos](#documentos)
 - [RPA: FGTS, PGMEI e notas fiscais](#rpa-fgts-pgmei-e-notas-fiscais)
 - [Segurança e LGPD](#segurança-e-lgpd)
@@ -151,7 +154,7 @@ graph LR
 | **Voz** | Microfone no navegador → WebSocket `/ws/voz` (áudio em pedaços) → Whisper (`whisper-large-v3-turbo`, via Groq) → chat → resposta frase por frase, lida em voz alta pela voz do navegador (Web Speech API). Exige o consentimento de IA externa (o áudio vai a um terceiro). A Maria Helena adapta o tom (formal, informal ou neutro) ao jeito de quem escreve ou fala e usa as mesmas ferramentas do chat escrito (o MARCOS segue disponível por `AGENTE_PERSONA=MARCOS`). |
 | **Observabilidade** | Métricas Prometheus em `/metrics`; log com filtro que mascara CPF, CNPJ, e-mail, telefone e nomes rotulados; e, no perfil `observabilidade` do compose, Prometheus, Alertmanager (8 alertas: API fora do ar, erros 5xx, latência, falha na trilha de auditoria, tentativa de prompt injection, logins recusados, cálculos com erro, voz com falha) e Grafana com o painel "Sovereign Accounting Agent". |
 | **Interface web** | Identidade de escritório contábil (papel de livro-razão, selo "MH", demonstrativo com pontilhado e total com sublinhado duplo, carimbo de conferência nos documentos, tema escuro). Login, conversa com atalhos, envio de documento, microfone e leitura das respostas em voz alta, painel (robôs do FGTS, do PGMEI e das notas fiscais, com uma ou várias chaves e o resumo de cada nota na tela; aprovações pendentes, consentimento de IA, verificação da trilha e das âncoras, verificação em duas etapas com QR code). Funciona no celular. |
-| **CLI** | `python -m agente_v2.cli` cria usuários, desliga a verificação em duas etapas de quem perdeu o celular (`desativar-2fa`), gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, publica e confere as âncoras externas (`ancorar-auditoria`, `conferir-ancoras`), confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI e consulta NF-e, CT-e e NFC-e, com a pessoa resolvendo só o captcha (`baixar-extrato`), envia sozinho ao sistema o PDF que você baixou no navegador normal (`observar-pasta`) e baixa o XML da NF-e com o certificado A1 (`baixar-xml-nfe`). |
+| **CLI** | `python -m agente_v2.cli` cria usuários, desliga a verificação em duas etapas de quem perdeu o celular (`desativar-2fa`), gera segredos, chaves do RPA e do ML-DSA, verifica a auditoria, publica e confere as âncoras externas (`ancorar-auditoria`, `conferir-ancoras`), confere de verdade as chaves e modelos de IA (`verificar-ia`), grava a calibragem de portais (`calibrar-fgts`) e baixa extratos do FGTS e do PGMEI e consulta NF-e, CT-e e NFC-e, com a pessoa resolvendo só o captcha (`baixar-extrato`), envia sozinho ao sistema o PDF que você baixou no navegador normal (`observar-pasta`), baixa o XML da NF-e com o certificado A1 (`baixar-xml-nfe`) e serve as ferramentas para clientes MCP (`servidor-mcp`, veja [Servidor MCP](#servidor-mcp)). |
 
 ## Começando
 
@@ -225,6 +228,45 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
 
 Nesse cenário a resposta traz `total_proventos` 10566.67, `total_descontos` 313.19, `total_liquido` 10253.48,
 multa de FGTS 5052.8 (40% sobre saldo + depósito rescisório) e depósito rescisório 632.0.
+
+## Servidor MCP
+
+As ferramentas do chat também ficam disponíveis para qualquer assistente que fale o
+[Model Context Protocol](https://modelcontextprotocol.io) (Claude Desktop, Claude Code, Cursor e outros). O modelo escolhe
+a ferramenta e preenche os argumentos; quem faz o trabalho é o código do sistema:
+
+| Ferramenta | O que faz |
+|---|---|
+| `calcular` | Rescisão, férias, 13º, INSS, IRRF, FGTS, folha, pró-labore, GPS, DAS do MEI e DARF em atraso, com as tabelas oficiais |
+| `tabela_vigente` | A tabela de INSS ou IRRF vigente numa competência, com a norma |
+| `validar_identificadores` | Dígito verificador de CPF, CNPJ, PIS e chave de acesso de 44 dígitos |
+| `conciliar_fechamento` | Holerites contra a guia do FGTS, a GPS e o DARF do IRRF, com a diferença em reais |
+| `verificar_conformidade` | Um pagamento conferido contra as regras de conformidade (salário mínimo, CPF, competência…) |
+
+```bash
+python -m agente_v2.cli servidor-mcp
+```
+
+Roda na máquina, por stdio (JSON-RPC 2.0, versões 2024-11-05 a 2025-06-18 do protocolo), e não precisa de SDK: a imagem
+Docker e as dependências auditadas continuam as mesmas. No Claude Desktop, entra no `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "sovereign": {
+      "command": "python",
+      "args": ["-m", "agente_v2.cli", "servidor-mcp"],
+      "env": {"PYTHONPATH": "/caminho/para/sovereign-accounting-agent"}
+    }
+  }
+}
+```
+
+As proteções do chat valem aqui também: todo resultado de ferramenta passa pela blindagem contra prompt injection, CPF,
+CNPJ, PIS e chave de acesso voltam como marcadores (`[CPF_1]`) e nada fica gravado (sem banco, sem histórico).
+`documentos_recentes` fica de fora porque depende do histórico de documentos de uma empresa, que fica atrás do login da
+API. Os testes (`contabil_agente/tests/test_mcp_servidor.py`) cobrem o protocolo, essas proteções e o processo de verdade
+por stdio.
 
 ## Documentos
 
@@ -410,7 +452,7 @@ agente_v2/                  API e infraestrutura de execução
 
 contabil_agente/            domínio e serviços
 ├── calc/                   motor de cálculo (Decimal) e tabelas YAML
-├── chat/                   motor da conversa, LLM com ferramentas, marcadores de dados pessoais, armazenamento
+├── chat/                   motor da conversa, LLM com ferramentas, marcadores de dados pessoais, armazenamento, servidor MCP
 ├── intelligence/           diálogo de cálculo, extração, auditoria forense, FSM
 ├── documentos/             leitura, 27 tipos, validadores, PDF
 ├── pipeline/               dispatcher, agentes, anomalias, evidência, destinos
@@ -444,8 +486,9 @@ flake8 agente_v2 contabil_agente --select=E9,F63,F7,F82,F401,F811,F841,F541
 A suíte (mais de 1.000 testes) cobre o motor de cálculo (inclusive cenários conferidos à mão), a API e o isolamento entre
 empresas, o robô contra um portal falso local, o front-end em navegador real, a cadeia de auditoria (adulteração,
 truncamento e, com a âncora, cadeia refeita com a chave e backup restaurado), a verificação em duas etapas (vetores das
-RFCs 4226 e 6238), os ataques de prompt injection conhecidos (e os textos normais que não podem virar alarme falso), LGPD,
-governança, criptografia e a consistência da infraestrutura. A criptografia pós-quântica
+RFCs 4226 e 6238), os ataques de prompt injection conhecidos (e os textos normais que não podem virar alarme falso), o
+servidor MCP (protocolo, blindagem, marcadores e o processo de verdade por stdio), LGPD, governança, criptografia e a
+consistência da infraestrutura. A criptografia pós-quântica
 (ML-KEM-768 e ML-DSA-65, do pacote `cryptography`) é conferida a cada execução contra duas implementações
 independentes (`kyber-py` e `dilithium-py`, só nos testes). Os testes de IA ao vivo
 (`contabil_agente/tests/test_ia_ao_vivo.py`) rodam quando há chave em `.env.teste` (verificados com a Groq, inclusive
